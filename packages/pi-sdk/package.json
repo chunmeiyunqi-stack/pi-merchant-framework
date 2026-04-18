@@ -1,0 +1,8 @@
+{
+    "name":  "@pi-merchant/pi-sdk",
+    "version":  "0.1.0",
+    "description":  "Pi Network SDK wrapper for Pi Merchant Framework",
+    "main":  "./src/index.ts",
+    "types":  "./src/index.ts",
+    "private":  true
+}

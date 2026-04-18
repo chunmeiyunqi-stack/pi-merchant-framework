@@ -1,0 +1,109 @@
+// ============================================================
+// prisma/seed.ts — 测试数据生成器
+// 运行：pnpm db:seed
+// ============================================================
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('🌱 开始插入测试数据...');
+
+  // ── 1. 创建测试商户 ─────────────────────────────────────
+  const merchant = await prisma.merchant.upsert({
+    where: { id: 'merchant-demo-001' },
+    create: {
+      id: 'merchant-demo-001',
+      name: '美丽时光美甲工作室',
+      type: 'BEAUTY',
+      status: 'ACTIVE',
+      contactName: '王老板',
+      contactPhone: '138-0000-0000',
+      themeConfig: {
+        primaryColor: '#C48FBE',
+        secondaryColor: '#F7D6E0',
+      },
+    },
+    update: {},
+  });
+  console.log('✅ 商户已创建:', merchant.name);
+
+  // ── 2. 创建商户配置 ──────────────────────────────────────
+  await prisma.appConfig.upsert({
+    where: { merchantId: merchant.id },
+    create: {
+      merchantId: merchant.id,
+      modulesEnabled: {
+        booking: true,
+        membership: true,
+        coupon: false,
+        a2uReward: false,
+      },
+      homepageLayout: 'booking-first',
+      industrySkin: 'beauty',
+      checkoutMode: 'SINGLE',
+      enableCoupon: false,
+      enableA2uReward: false,
+    },
+    update: {},
+  });
+
+  // ── 3. 创建测试服务 ──────────────────────────────────────
+  const services = [
+    { title: '基础美甲护理', price: 5.0, durationMinutes: 60, description: '基础透明美甲，含手部护理' },
+    { title: '高级光疗美甲', price: 12.0, durationMinutes: 90, description: '高级光疗，多色可选，持久耐用' },
+    { title: '美睫嫁接', price: 18.0, durationMinutes: 120, description: '专业美睫嫁接，自然根数' },
+  ];
+
+  for (const s of services) {
+    await prisma.service.create({
+      data: {
+        merchantId: merchant.id,
+        type: 'SERVICE',
+        title: s.title,
+        description: s.description,
+        price: s.price,
+        durationMinutes: s.durationMinutes,
+        status: 'ACTIVE',
+      },
+    });
+  }
+  console.log(`✅ 已创建 ${services.length} 个测试服务`);
+
+  // ── 4. 创建会员方案 ──────────────────────────────────────
+  await prisma.membership.createMany({
+    data: [
+      {
+        merchantId: merchant.id,
+        name: '月卡会员',
+        mode: 'TIME_BASED',
+        price: 30.0,
+        validDays: 30,
+        benefitsJson: { discount: 0.9, description: '享9折优惠' },
+        status: 'ACTIVE',
+      },
+      {
+        merchantId: merchant.id,
+        name: '10次卡',
+        mode: 'USAGE_BASED',
+        price: 80.0,
+        totalUses: 10,
+        benefitsJson: { discount: 0.85, description: '享8.5折，可分多次使用' },
+        status: 'ACTIVE',
+      },
+    ],
+  });
+  console.log('✅ 已创建 2 个会员方案');
+
+  console.log('🎉 测试数据插入完成！');
+  console.log(`   商户 ID：${merchant.id}`);
+  console.log('   在 .env 中设置：DEFAULT_MERCHANT_ID=merchant-demo-001');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Seed 失败:', e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());
