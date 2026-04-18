@@ -1,30 +1,27 @@
-// ============================================================
-// Pi Merchant Framework — Pi SDK 类型定义
-// 基于 Pi Network 官方 JS SDK 类型
+﻿// ============================================================
+// Pi Merchant Framework 鈥?Pi SDK 绫诲瀷瀹氫箟
+// 鍩轰簬 Pi Network 瀹樻柟 JS SDK 绫诲瀷
 // ============================================================
 
-// ---- Pi SDK 全局注入类型 ----
+// ---- Pi SDK 鍏ㄥ眬娉ㄥ叆绫诲瀷 ----
 
-/** Pi 用户认证结果 */
+/** Pi 鐢ㄦ埛璁よ瘉缁撴灉 */
 export interface PiAuthResult {
-  accessToken: string;
+  accessToken?: string;
   user: PiUser;
 }
 
-/** Pi 用户信息 */
+/** Pi 鐢ㄦ埛淇℃伅 */
 export interface PiUser {
   uid: string;
   username: string;
 }
 
-/** Pi 支付数据（创建支付时传入） */
+/** Pi 鏀粯鏁版嵁锛堝垱寤烘敮浠樻椂浼犲叆锛?*/
 export interface PiPaymentData {
-  amount: number;   // 以 Pi 为单位，最多 7 位小数
-  memo: string;     // 用户可见的支付说明（最多 128 字符）
-  metadata: Record<string, unknown>; // 开发者自定义元数据（不对用户显示）
-}
+  amount: number;   // 浠?Pi 涓哄崟浣嶏紝鏈€澶?7 浣嶅皬鏁?  memo: string;     // 鐢ㄦ埛鍙鐨勬敮浠樿鏄庯紙鏈€澶?128 瀛楃锛?  metadata: Record<string, unknown>; // 寮€鍙戣€呰嚜瀹氫箟鍏冩暟鎹紙涓嶅鐢ㄦ埛鏄剧ず锛?}
 
-/** Pi Platform API 返回的支付对象 */
+/** Pi Platform API 杩斿洖鐨勬敮浠樺璞?*/
 export interface PiPaymentDTO {
   identifier: string;         // = paymentId
   user_uid: string;
@@ -50,24 +47,24 @@ export interface PiPaymentDTO {
   };
 }
 
-/** Pi SDK 回调集合 */
+/** Pi SDK 鍥炶皟闆嗗悎 */
 export interface PiPaymentCallbacks {
-  /** 支付准备好等待服务器审批时触发 */
+  /** 鏀粯鍑嗗濂界瓑寰呮湇鍔″櫒瀹℃壒鏃惰Е鍙?*/
   onReadyForServerApproval: (paymentId: string) => void;
-  /** 用户在 Pi 钱包确认后，链上交易完成时触发 */
+  /** 鐢ㄦ埛鍦?Pi 閽卞寘纭鍚庯紝閾句笂浜ゆ槗瀹屾垚鏃惰Е鍙?*/
   onReadyForServerCompletion: (paymentId: string, txid: string) => void;
-  /** 支付取消时触发 */
+  /** 鏀粯鍙栨秷鏃惰Е鍙?*/
   onCancel: (paymentId: string) => void;
-  /** 发现未完成的旧支付时触发 */
+  /** 鍙戠幇鏈畬鎴愮殑鏃ф敮浠樻椂瑙﹀彂 */
   onError: (error: Error, payment?: PiPaymentDTO) => void;
 }
 
-/** Pi.authenticate 的 scope 枚举 */
+/** Pi.authenticate 鐨?scope 鏋氫妇 */
 export type PiScope = 'username' | 'payments' | 'wallet_address';
 
-// ---- 内部业务类型 ----
+// ---- 鍐呴儴涓氬姟绫诲瀷 ----
 
-/** 订单状态枚举（与 Prisma OrderStatus 保持一致） */
+/** 璁㈠崟鐘舵€佹灇涓撅紙涓?Prisma OrderStatus 淇濇寔涓€鑷达級 */
 export type OrderStatus =
   | 'DRAFT'
   | 'PENDING_PAYMENT'
@@ -78,7 +75,7 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'REFUNDED';
 
-/** 内部支付记录 */
+/** 鍐呴儴鏀粯璁板綍 */
 export interface PaymentRecord {
   id: string;
   orderId?: string;
@@ -96,27 +93,27 @@ export interface PaymentRecord {
   completedAt?: Date;
 }
 
-/** 审批请求体 */
+/** 瀹℃壒璇锋眰浣?*/
 export interface ApprovePaymentRequest {
   paymentId: string;
   orderId?: string;
 }
 
-/** 审批响应体 */
+/** 瀹℃壒鍝嶅簲浣?*/
 export interface ApprovePaymentResponse {
   success: boolean;
   payment?: PiPaymentDTO;
   error?: string;
 }
 
-/** 完成请求体 */
+/** 瀹屾垚璇锋眰浣?*/
 export interface CompletePaymentRequest {
   paymentId: string;
   txid: string;
   orderId?: string;
 }
 
-/** 完成响应体 */
+/** 瀹屾垚鍝嶅簲浣?*/
 export interface CompletePaymentResponse {
   success: boolean;
   payment?: PiPaymentDTO;
@@ -128,13 +125,13 @@ export interface CompletePaymentResponse {
   error?: string;
 }
 
-/** Pi 认证请求体 */
+/** Pi 璁よ瘉璇锋眰浣?*/
 export interface PiAuthRequest {
-  accessToken: string;
+  accessToken?: string;
   merchantId: string;
 }
 
-/** Pi 认证响应体 */
+/** Pi 璁よ瘉鍝嶅簲浣?*/
 export interface PiAuthResponse {
   success: boolean;
   user?: {
@@ -148,7 +145,7 @@ export interface PiAuthResponse {
   error?: string;
 }
 
-/** 全局 Pi 对象类型（挂载在 window 上） */
+/** 鍏ㄥ眬 Pi 瀵硅薄绫诲瀷锛堟寕杞藉湪 window 涓婏級 */
 export interface PiSDK {
   authenticate(
     scopes: PiScope[],
@@ -168,3 +165,4 @@ declare global {
     Pi: PiSDK;
   }
 }
+
