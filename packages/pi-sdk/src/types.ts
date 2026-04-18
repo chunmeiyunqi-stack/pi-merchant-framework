@@ -49,8 +49,11 @@ export interface PiAuthRequest {
 }
 
 export interface PiAuthResponse {
+  user?: PiUser;
+  error?: string;
   success: boolean;
   customerId?: string;
   username?: string;
   message?: string;
 }
+
