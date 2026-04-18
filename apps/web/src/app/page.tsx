@@ -1,7 +1,6 @@
 ﻿"use client";
 import { useState, useEffect } from "react";
 
-}
 
 const services = [
   { id: 1, title: "基础美甲护理", desc: "基础透明美甲，含手部护理，快速便捷且持久闪亮。", price: 0.5, tag: "热门" },
@@ -304,4 +303,5 @@ export default function HomePage() {
     </main>
   );
 }
+
 
