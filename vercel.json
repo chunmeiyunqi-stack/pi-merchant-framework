@@ -1,5 +1,4 @@
 {
   "buildCommand": "turbo run build --filter=@pi-merchant/web...",
-  "outputDirectory": "apps/web/.next",
   "installCommand": "pnpm install"
 }
