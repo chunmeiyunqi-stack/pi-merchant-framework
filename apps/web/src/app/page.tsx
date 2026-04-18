@@ -1,19 +1,6 @@
 ﻿"use client";
 import { useState, useEffect } from "react";
 
-declare global {
-  interface Window {
-    Pi?: {
-      init: (config: { version: string; sandbox?: boolean }) => void;
-      authenticate: (scopes: string[], onIncomplete: (payment: unknown) => void) => Promise<{ user: { uid: string; username: string } }>;
-      createPayment: (data: { amount: number; memo: string; metadata: object }, callbacks: {
-        onReadyForServerApproval: (paymentId: string) => void;
-        onReadyForServerCompletion: (paymentId: string, txid: string) => void;
-        onCancel: (paymentId: string) => void;
-        onError: (error: Error, payment?: unknown) => void;
-      }) => void;
-    };
-  }
 }
 
 const services = [
@@ -317,3 +304,4 @@ export default function HomePage() {
     </main>
   );
 }
+
