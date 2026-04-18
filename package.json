@@ -4,6 +4,7 @@
     "private":  true,
     "description":  "White-label merchant application framework for Pi Network ecosystem",
     "scripts":  {
+    "postinstall": "prisma generate",
                     "dev":  "turbo run dev",
                     "build":  "turbo run build",
                     "lint":  "turbo run lint",
