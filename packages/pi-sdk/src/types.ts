@@ -49,11 +49,50 @@ export interface PiAuthRequest {
 }
 
 export interface PiAuthResponse {
-  user?: PiUser;
-  error?: string;
   success: boolean;
+  user?: PiUser;
   customerId?: string;
   username?: string;
   message?: string;
+  error?: string;
 }
 
+export interface ApprovePaymentRequest {
+  paymentId: string;
+  merchantId?: string;
+}
+
+export interface ApprovePaymentResponse {
+  success: boolean;
+  paymentId?: string;
+  message?: string;
+  error?: string;
+}
+
+export interface CompletePaymentRequest {
+  paymentId: string;
+  txid: string;
+  merchantId?: string;
+}
+
+export interface CompletePaymentResponse {
+  success: boolean;
+  paymentId?: string;
+  txid?: string;
+  message?: string;
+  error?: string;
+}
+
+export interface CreatePaymentRequest {
+  amount: number;
+  memo: string;
+  metadata?: Record<string, unknown>;
+  merchantId?: string;
+}
+
+export interface CreatePaymentResponse {
+  success: boolean;
+  paymentId?: string;
+  message?: string;
+  error?: string;
+}
