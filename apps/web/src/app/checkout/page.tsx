@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get('plan') || 'basic';
@@ -101,53 +101,62 @@ export default function CheckoutPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#110B19] text-gray-200 flex flex-col items-center justify-center p-4">
-      <div className="max-w-md w-full bg-[#1E112A] border border-[#F3C136]/20 rounded-3xl p-8 shadow-2xl relative">
-        {/* Back navigation */}
-        <Link href="/" className="absolute top-6 left-6 text-gray-500 hover:text-gray-300 text-sm flex items-center font-bold">
-          ← 返回大厅
-        </Link>
-        
-        <h1 className="text-2xl font-black text-center mt-6 text-white mb-2">安全收银台</h1>
-        <p className="text-sm text-center text-gray-400 mb-8 border-b border-gray-700 pb-6">
-          正在为您接入生态安全扣款网关
-        </p>
+    <div className="max-w-md w-full bg-[#1E112A] border border-[#F3C136]/20 rounded-3xl p-8 shadow-2xl relative">
+      {/* Back navigation */}
+      <Link href="/" className="absolute top-6 left-6 text-gray-500 hover:text-gray-300 text-sm flex items-center font-bold">
+        ← 返回大厅
+      </Link>
+      
+      <h1 className="text-2xl font-black text-center mt-6 text-white mb-2">安全收银台</h1>
+      <p className="text-sm text-center text-gray-400 mb-8 border-b border-gray-700 pb-6">
+        正在为您接入生态安全扣款网关
+      </p>
 
-        <div className="bg-[#2A1642] rounded-2xl p-6 mb-8 border border-indigo-900/50">
-          <h2 className="text-sm font-bold text-gray-400 mb-2">订阅包裹类型</h2>
-          <p className="text-lg font-black text-[#F3C136] mb-6">{selectedPlan.name}</p>
+      <div className="bg-[#2A1642] rounded-2xl p-6 mb-8 border border-indigo-900/50">
+        <h2 className="text-sm font-bold text-gray-400 mb-2">订阅包裹类型</h2>
+        <p className="text-lg font-black text-[#F3C136] mb-6">{selectedPlan.name}</p>
 
-          <h2 className="text-sm font-bold text-gray-400 mb-2">等价结算金额</h2>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-[#F3C136] text-4xl font-black">π</span>
-            <span className="text-4xl font-black text-white">{selectedPlan.amount.toFixed(2)}</span>
-          </div>
+        <h2 className="text-sm font-bold text-gray-400 mb-2">等价结算金额</h2>
+        <div className="flex items-baseline space-x-2">
+          <span className="text-[#F3C136] text-4xl font-black">π</span>
+          <span className="text-4xl font-black text-white">{selectedPlan.amount.toFixed(2)}</span>
         </div>
-
-        {errorStatus && (
-          <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm font-medium">
-            {errorStatus}
-          </div>
-        )}
-
-        <button 
-          onClick={handlePayment}
-          disabled={loading}
-          className="w-full bg-[#F3C136] hover:bg-[#EEA834] text-[#1E112A] font-black text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(243,193,54,0.3)] transition-all disabled:opacity-50 disabled:grayscale mb-4 flex justify-center items-center"
-        >
-          {loading ? (
-             <span className="animate-pulse">{statusText}</span>
-          ) : (
-             <span className="flex items-center">
-                安全确认并投递 <span className="text-xl ml-2 font-black leading-none">→</span>
-             </span>
-          )}
-        </button>
-
-        <p className="text-xs text-center text-gray-500 font-medium">
-           本次操作受底层防重放机制与密文验证码保护，保障完全的生态交互体验。
-        </p>
       </div>
+
+      {errorStatus && (
+        <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm font-medium">
+          {errorStatus}
+        </div>
+      )}
+
+      <button 
+        onClick={handlePayment}
+        disabled={loading}
+        className="w-full bg-[#F3C136] hover:bg-[#EEA834] text-[#1E112A] font-black text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(243,193,54,0.3)] transition-all disabled:opacity-50 disabled:grayscale mb-4 flex justify-center items-center"
+      >
+        {loading ? (
+           <span className="animate-pulse">{statusText}</span>
+        ) : (
+           <span className="flex items-center">
+              安全确认并投递 <span className="text-xl ml-2 font-black leading-none">→</span>
+           </span>
+        )}
+      </button>
+
+      <p className="text-xs text-center text-gray-500 font-medium">
+         本次操作受底层防重放机制与密文验证码保护，保障完全的生态交互体验。
+      </p>
+    </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <main className="min-h-screen bg-[#110B19] text-gray-200 flex flex-col items-center justify-center p-4">
+      <Suspense fallback={<div className="text-[#F3C136] font-bold">载入收银台中...</div>}>
+        <CheckoutContent />
+      </Suspense>
     </main>
   );
 }
+
