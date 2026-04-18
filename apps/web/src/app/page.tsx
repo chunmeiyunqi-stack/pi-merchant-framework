@@ -1,307 +1,219 @@
-﻿"use client";
-import { useState, useEffect } from "react";
-
-
-const services = [
-  { id: 1, title: "基础美甲护理", desc: "基础透明美甲，含手部护理，快速便捷且持久闪亮。", price: 0.5, tag: "热门" },
-  { id: 2, title: "高级光疗美甲", desc: "采用高级环保光疗胶，色彩饱和度高，持久不脱落，彰显优雅气质。", price: 1.0, tag: "精选" },
-  { id: 3, title: "日式美睫嫁接", desc: "专业美睫嫁接，采用自然仿真睫毛，打造清透素颜感。", price: 1.5, tag: "" },
-  { id: 4, title: "全套手足尊享", desc: "从手部到足部的全套深层清洁及滋养，赠送精油舒缓按摩。", price: 2.0, tag: "尊享" },
-];
-
-type ToastType = "success" | "error" | "info";
+import PiLoginButton from '@/components/PiLoginButton';
+import Link from 'next/link';
 
 export default function HomePage() {
-  const [user, setUser] = useState<{ uid: string; username: string } | null>(null);
-  const [piReady, setPiReady] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
-  const [paying, setPaying] = useState<number | null>(null);
-  const [bookings, setBookings] = useState<{ title: string; txid: string; time: string }[]>([]);
-
-  const showToast = (msg: string, type: ToastType = "info") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://sdk.minepi.com/pi-sdk.js";
-    script.async = true;
-    script.onload = () => {
-      if (window.Pi) {
-        window.Pi.init({ version: "2.0", sandbox: true });
-        setPiReady(true);
-      }
-    };
-    document.head.appendChild(script);
-  }, []);
-
-  const handleSignIn = async () => {
-    if (!piReady || !window.Pi) {
-      showToast("Pi SDK 尚未就绪，请稍后重试", "error");
-      return;
-    }
-    try {
-      const auth = await window.Pi.authenticate(["username", "payments"], (incomp) => {
-        console.log("未完成支付:", incomp);
-      });
-      setUser(auth.user);
-      showToast(`欢迎回来，${auth.user.username} ✓`, "success");
-    } catch {
-      showToast("登录失败，请在 Pi Browser 中打开", "error");
-    }
-  };
-
-  const handleBook = (service: typeof services[0]) => {
-    if (!user) {
-      showToast("请先登录 Pi 账号再预约", "info");
-      return;
-    }
-    if (!piReady || !window.Pi) {
-      showToast("Pi SDK 尚未就绪", "error");
-      return;
-    }
-    setPaying(service.id);
-    window.Pi.createPayment(
-      { amount: service.price, memo: `预约：${service.title}`, metadata: { serviceId: service.id } },
-      {
-        onReadyForServerApproval: (paymentId) => {
-          console.log("待服务端审批:", paymentId);
-          showToast("支付审批中...", "info");
-        },
-        onReadyForServerCompletion: (paymentId, txid) => {
-          console.log("支付完成:", paymentId, txid);
-          setBookings((prev) => [...prev, {
-            title: service.title,
-            txid: txid.slice(0, 12) + "...",
-            time: new Date().toLocaleTimeString("zh-CN"),
-          }]);
-          showToast(`✓ 预约成功！${service.title} — π ${service.price.toFixed(1)}`, "success");
-          setPaying(null);
-        },
-        onCancel: () => {
-          showToast("已取消支付", "info");
-          setPaying(null);
-        },
-        onError: (err) => {
-          showToast("支付出错：" + err.message, "error");
-          setPaying(null);
-        },
-      }
-    );
-  };
-
-  const toastColors: Record<ToastType, string> = {
-    success: "rgba(39,174,96,0.95)",
-    error: "rgba(192,57,43,0.95)",
-    info: "rgba(42,22,66,0.97)",
-  };
-
   return (
-    <main style={{
-      minHeight: "100vh",
-      background: "linear-gradient(135deg,#1E112A 0%,#2A1642 50%,#110B19 100%)",
-      fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif",
-      color: "#f0e6ff", margin: 0, padding: 0,
-    }}>
-
-      {/* TOAST */}
-      {toast && (
-        <div style={{
-          position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-          zIndex: 9999, background: toastColors[toast.type],
-          color: "#fff", padding: "12px 28px", borderRadius: 32,
-          fontWeight: 600, fontSize: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-          border: "1px solid rgba(255,255,255,0.15)", whiteSpace: "nowrap",
-        }}>{toast.msg}</div>
-      )}
-
-      {/* NAV */}
-      <nav style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 32px",
-        background: "rgba(30,17,42,0.75)",
-        backdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(243,193,54,0.15)",
-        position: "sticky", top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: "50%",
-            background: "linear-gradient(135deg,#F3C136,#9B59B6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 900, fontSize: 20, color: "#1E112A",
-          }}>π</div>
-          <span style={{ fontWeight: 700, fontSize: 18 }}>美丽时光工作室</span>
-          <span style={{
-            fontSize: 11, padding: "2px 8px", borderRadius: 20,
-            background: "rgba(243,193,54,0.12)", color: "#F3C136",
-            border: "1px solid rgba(243,193,54,0.25)",
-          }}>官方认证 Pi 商户</span>
+    <main className="min-h-screen bg-gradient-to-br from-[#1E112A] via-[#2A1642] to-[#110B19] text-gray-100 font-sans selection:bg-[#F3C136] selection:text-[#1E112A] flex flex-col">
+      {/* 顶部导航 */}
+      <header className="sticky top-0 z-50 bg-[#1E112A]/80 backdrop-blur-lg border-b border-white/5 shadow-lg">
+        <div className="max-w-6xl mx-auto flex justify-between items-center px-4 py-4 md:px-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center p-[1px] shadow-lg shadow-[#F3C136]/20">
+              <div className="flex items-center justify-center w-full h-full bg-[#1E112A] rounded-[11px]">
+                <span className="text-xl font-black text-[#F3C136]">AI</span>
+              </div>
+            </div>
+            <div>
+              <h1 className="text-lg md:text-xl font-bold text-white tracking-tight">Pioneer AI Framework</h1>
+              <p className="text-xs text-[#F3C136]/80 font-medium">商业闭环与赋能基建</p>
+            </div>
+          </div>
+          <PiLoginButton />
         </div>
-        <button onClick={handleSignIn} style={{
-          padding: "9px 22px", borderRadius: 24, fontWeight: 700, fontSize: 14,
-          background: user ? "rgba(39,174,96,0.15)" : "linear-gradient(90deg,#F3C136,#E67E22)",
-          color: user ? "#2ecc71" : "#1E112A",
-          border: user ? "1px solid rgba(46,204,113,0.35)" : "none",
-          cursor: "pointer",
-        }}>
-          {user ? `✓ ${user.username}` : "Sign in with Pi"}
-        </button>
-      </nav>
+      </header>
 
-      {/* HERO */}
-      <section style={{ textAlign: "center", padding: "64px 24px 40px" }}>
-        <div style={{
-          fontSize: 80, fontWeight: 900, lineHeight: 1,
-          background: "linear-gradient(90deg,#F3C136,#9B59B6,#F3C136)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-          marginBottom: 12,
-        }}>π</div>
-        <h1 style={{ fontSize: 34, fontWeight: 800, margin: "0 0 12px", color: "#f0e6ff" }}>
-          焕发您的独特光彩
-        </h1>
-        <p style={{ fontSize: 15, color: "rgba(240,230,255,0.6)", marginBottom: 4 }}>
-          在美丽时光工作室，我们为您提供最专业的美容及美甲体验。
-        </p>
-        <p style={{ fontSize: 15, color: "rgba(240,230,255,0.6)", marginBottom: 28 }}>
-          全面支持 Pi Network 链上安全支付。
-        </p>
-        <div style={{
-          display: "inline-block", padding: "6px 20px", borderRadius: 20,
-          background: "rgba(243,193,54,0.1)", border: "1px solid rgba(243,193,54,0.25)",
-          color: "#F3C136", fontSize: 13,
-        }}>探索我们的优质服务 · 服务起价 π 0.5</div>
+      {/* Hero 首屏区 */}
+      <section className="max-w-6xl mx-auto px-4 py-16 md:py-24 md:px-6 text-center md:text-left flex flex-col md:flex-row items-center">
+        <div className="md:w-3/5 space-y-6">
+          <div className="inline-block px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-[#F3C136] tracking-widest uppercase mb-2 shadow-inner">
+            Next Generation DApp Foundation
+          </div>
+          <h2 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300 leading-tight tracking-tight">
+            赋能千万先锋的 <br className="hidden md:block"/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F3C136] to-[#EEA834]">智能服务协同引擎</span>
+          </h2>
+          <p className="text-gray-400 text-sm md:text-lg max-w-xl mx-auto md:mx-0 leading-relaxed font-medium">
+            为全行业开发者与商户提供生态 API 互通、AI 业务辅助以及灵活的模块化管理系统，助力生态建设者高效部署商业闭环。
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start space-y-3 sm:space-y-0 sm:space-x-4 pt-4">
+            <Link 
+              href="/dashboard"
+              className="w-full sm:w-auto text-center font-bold text-[#1E112A] bg-[#F3C136] hover:bg-[#EEA834] px-8 py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(243,193,54,0.3)] hover:shadow-[0_0_25px_rgba(243,193,54,0.5)] transform hover:-translate-y-0.5"
+            >
+              🔥 启动我的控制台
+            </Link>
+            <a 
+              href="#pricing"
+              className="w-full sm:w-auto text-center font-bold text-white bg-white/5 border border-white/20 hover:bg-white/10 px-8 py-3.5 rounded-xl transition-all"
+            >
+              💡 浏览智能业务计划
+            </a>
+          </div>
+        </div>
+        
+        <div className="hidden md:flex md:w-2/5 justify-center mt-12 md:mt-0 relative">
+           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#7C3AED] rounded-full blur-[100px] opacity-30"></div>
+           <div className="w-full max-w-sm aspect-square border border-white/10 bg-[#2A1642]/60 backdrop-blur-xl rounded-3xl p-6 shadow-2xl relative z-10 flex flex-col relative overflow-hidden">
+             <div className="flex space-x-2 mb-6">
+                <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                <div className="w-3 h-3 rounded-full bg-green-400"></div>
+             </div>
+             <div className="space-y-4 flex-1">
+               <div className="h-4 bg-white/10 rounded w-3/4"></div>
+               <div className="h-4 bg-white/5 rounded w-1/2"></div>
+               <div className="h-12 bg-[#F3C136]/20 border border-[#F3C136]/30 rounded-xl mt-6 flex flex-col justify-center px-4">
+                  <div className="h-2 bg-[#F3C136] rounded w-1/3"></div>
+               </div>
+               <div className="h-12 bg-white/5 rounded-xl mt-2"></div>
+             </div>
+           </div>
+        </div>
       </section>
 
-      {/* SERVICE CARDS */}
-      <section style={{
-        maxWidth: 900, margin: "0 auto", padding: "0 24px 48px",
-        display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(380px,1fr))", gap: 22,
-      }}>
-        {services.map((s) => (
-          <div key={s.id}
-            style={{
-              borderRadius: 20, overflow: "hidden",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(243,193,54,0.15)",
-              transition: "transform 0.2s, box-shadow 0.2s",
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)";
-              (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 28px rgba(243,193,54,0.2)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
-              (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
-            }}
-          >
-            <div style={{ height: 5, background: "linear-gradient(90deg,#F3C136,#9B59B6)" }} />
-            <div style={{ padding: "22px 24px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <h3 style={{ fontSize: 19, fontWeight: 700, color: "#f0e6ff", margin: 0 }}>{s.title}</h3>
-                {s.tag && (
-                  <span style={{
-                    fontSize: 11, padding: "2px 8px", borderRadius: 12,
-                    background: "rgba(243,193,54,0.15)", color: "#F3C136",
-                    border: "1px solid rgba(243,193,54,0.25)",
-                  }}>{s.tag}</span>
-                )}
-              </div>
-              <p style={{ fontSize: 13, color: "rgba(240,230,255,0.55)", marginBottom: 20, lineHeight: 1.7 }}>{s.desc}</p>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                  <div style={{ fontSize: 10, color: "rgba(240,230,255,0.4)", marginBottom: 2 }}>服务价格</div>
-                  <span style={{
-                    fontSize: 26, fontWeight: 800,
-                    background: "linear-gradient(90deg,#F3C136,#E67E22)",
-                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                  }}>π {s.price.toFixed(1)}</span>
-                </div>
-                <button
-                  onClick={() => handleBook(s)}
-                  disabled={paying === s.id}
-                  style={{
-                    padding: "10px 24px", borderRadius: 24, fontWeight: 700, fontSize: 14,
-                    background: paying === s.id
-                      ? "rgba(243,193,54,0.3)"
-                      : "linear-gradient(90deg,#F3C136,#E67E22)",
-                    color: paying === s.id ? "#F3C136" : "#1E112A",
-                    border: "none", cursor: paying === s.id ? "not-allowed" : "pointer",
-                    boxShadow: paying === s.id ? "none" : "0 0 14px rgba(243,193,54,0.3)",
-                    transition: "all 0.2s",
-                  }}
-                >{paying === s.id ? "支付中..." : "立即预约"}</button>
-              </div>
+      {/* 信任背书区 */}
+      <section className="border-y border-white/5 bg-white/5 py-6 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 flex flex-wrap justify-center gap-4 text-xs md:text-sm font-bold text-gray-300">
+          <div className="flex items-center px-4 py-2 bg-[#1E112A] rounded-full border border-white/10">
+            <span className="text-[#F3C136] mr-2 text-lg leading-none">✓</span> 全面集成原生验证架构
+          </div>
+          <div className="flex items-center px-4 py-2 bg-[#1E112A] rounded-full border border-white/10">
+            <span className="text-[#F3C136] mr-2 text-lg leading-none">✓</span> 依托生态分布信任网络
+          </div>
+          <div className="flex items-center px-4 py-2 bg-[#1E112A] rounded-full border border-white/10">
+            <span className="text-[#F3C136] mr-2 text-lg leading-none">✓</span> 无缝的平台身份衔接体验
+          </div>
+        </div>
+      </section>
+
+      {/* 核心订阅定价区 */}
+      <section id="pricing" className="max-w-6xl mx-auto px-4 py-20 md:px-6 pt-24">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-black text-white mb-4">商业赋能引擎与业务方案</h2>
+          <p className="text-gray-400 max-w-2xl mx-auto">以框架赋能重塑产品生态潜力。选择最适合您团队进阶的服务包配置。</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Plan 1 */}
+          <div className="bg-[#1E112A]/60 border border-white/10 rounded-3xl p-8 flex flex-col hover:border-white/20 transition-all">
+            <h3 className="text-xl font-bold text-gray-200 mb-2">基础业务前瞻版</h3>
+            <p className="text-gray-400 text-sm mb-6 h-10">使用本标准组件框架快速跑通业务模型。</p>
+            <div className="text-4xl font-black text-[#F3C136] mb-8 border-b border-white/10 pb-6">
+              π 5.00 <span className="text-sm text-gray-500 font-medium">/起</span>
+            </div>
+            <ul className="space-y-4 mb-8 flex-1 text-sm text-gray-300">
+              <li className="flex items-start"><span className="text-green-400 mr-2">✓</span> 获取展示体系 UI 模版池</li>
+              <li className="flex items-start"><span className="text-green-400 mr-2">✓</span> 标准业务对账后台一览</li>
+              <li className="flex items-start"><span className="text-green-400 mr-2">✓</span> 每月 3 次组件配置技术辅导</li>
+            </ul>
+            <Link href="/checkout?plan=basic" className="w-full block text-center py-3 rounded-xl font-bold text-gray-300 bg-white/10 hover:bg-white/20 transition-colors">
+              配置前瞻版
+            </Link>
+          </div>
+
+          {/* Plan 2 PRO (Highlighted) */}
+          <div className="bg-[#2A1642] border-2 border-[#F3C136]/50 rounded-3xl p-8 flex flex-col relative transform md:-translate-y-4 shadow-2xl shadow-[#F3C136]/10">
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#F3C136] text-[#1E112A] text-xs font-black uppercase tracking-widest py-1 px-4 rounded-full">
+              开发者青睐方案
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">专业 AI 架构增益</h3>
+            <p className="text-gray-300 text-sm mb-6 h-10">获取架构师答疑体系，系统性加持运营链路。</p>
+            <div className="text-5xl font-black text-[#F3C136] mb-8 border-b border-white/10 pb-6">
+              π 25.00 <span className="text-sm text-gray-400 font-medium">/期</span>
+            </div>
+            <ul className="space-y-4 mb-8 flex-1 text-sm text-gray-200">
+              <li className="flex items-start"><span className="text-[#F3C136] mr-2">✓</span> <strong className="text-white font-bold ml-1">架构支持：</strong>资深应用向导答疑时间</li>
+              <li className="flex items-start"><span className="text-[#F3C136] mr-2">✓</span> <strong className="text-white font-bold ml-1">AI 增益：</strong>获取商用的自动化运营挂件库</li>
+              <li className="flex items-start"><span className="text-[#F3C136] mr-2">✓</span> 涵盖前瞻版全部底层呈现力</li>
+              <li className="flex items-start"><span className="text-[#F3C136] mr-2">✓</span> 探索畅通的生态资源结对支持</li>
+            </ul>
+            <Link href="/checkout?plan=pro" className="w-full block text-center py-3.5 rounded-xl font-black text-[#1E112A] bg-[#F3C136] hover:bg-[#EEA834] transition-colors shadow-lg">
+              开启智能专业架构
+            </Link>
+          </div>
+
+          {/* Plan 3 */}
+          <div className="bg-[#1E112A]/60 border border-white/10 rounded-3xl p-8 flex flex-col hover:border-white/20 transition-all">
+            <h3 className="text-xl font-bold text-gray-200 mb-2">生态共创定制</h3>
+            <p className="text-gray-400 text-sm mb-6 h-10">为资源充沛的机构节点提供集成研讨。</p>
+            <div className="text-4xl font-black text-gray-100 mb-8 border-b border-white/10 pb-6">
+              需求提案
+            </div>
+            <ul className="space-y-4 mb-8 flex-1 text-sm text-gray-300">
+              <li className="flex items-start"><span className="text-green-400 mr-2">✓</span> 特定赛道的应用代码级定制</li>
+              <li className="flex items-start"><span className="text-green-400 mr-2">✓</span> 生态应用指北与最佳实践宣讲</li>
+              <li className="flex items-start"><span className="text-green-400 mr-2">✓</span> 高可用的项目解耦与云协同</li>
+            </ul>
+            <button className="w-full text-center py-3 rounded-xl font-bold text-gray-300 bg-white/10 hover:bg-white/20 transition-colors">
+              与顾问研讨
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 行业 Demo 场景区 */}
+      <section className="bg-[#110B19] py-20 border-t border-white/5">
+        <div className="max-w-6xl mx-auto px-4 md:px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-black text-white mb-3">多垂直行业结构兼容性</h2>
+            <p className="text-gray-400 text-sm">一套底层设施即可支撑多样化的业务叙事实践</p>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Demo 1: Education */}
+            <div className="bg-[#1E112A]/80 border border-white/5 rounded-2xl p-6 group hover:bg-[#2A1642] transition-colors">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 text-2xl mb-4">📚</div>
+              <h4 className="text-lg font-bold text-gray-200 mb-2 group-hover:text-white">数字知识载库 (EdTech)</h4>
+              <p className="text-gray-500 text-sm leading-relaxed">提供专为导师定制的数字化专栏资源查阅权及独立课程展示组件模块。</p>
+            </div>
+            
+            {/* Demo 2: Beauty Local (Legacy downgraded) */}
+            <div className="bg-[#1E112A]/80 border border-white/5 rounded-2xl p-6 group hover:bg-[#2A1642] transition-colors relative">
+               <div className="absolute top-4 right-4 text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-400">本地服务示例</div>
+              <div className="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center text-pink-400 text-2xl mb-4">🛠️</div>
+              <h4 className="text-lg font-bold text-gray-200 mb-2 group-hover:text-white">下沉同城业务矩阵</h4>
+              <p className="text-gray-500 text-sm leading-relaxed">有效化解实体店的档期分配冲突，探索“线上锁定配额，随后到店核销体验”的融合模式。</p>
+              <Link href="/services/demo-beauty" className="inline-block mt-4 text-[#F3C136] text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity">加载实景流 →</Link>
+            </div>
+
+            {/* Demo 3: B2B Legal */}
+            <div className="bg-[#1E112A]/80 border border-white/5 rounded-2xl p-6 group hover:bg-[#2A1642] transition-colors">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 text-2xl mb-4">⚖️</div>
+              <h4 className="text-lg font-bold text-gray-200 mb-2 group-hover:text-white">严肃企业咨询 (B2B)</h4>
+              <p className="text-gray-500 text-sm leading-relaxed">在确保隔离的通道中下发顾问档案流验证，协助高级别商业会议排期的前置敲定。</p>
             </div>
           </div>
-        ))}
+        </div>
       </section>
 
-      {/* BOOKINGS */}
-      {bookings.length > 0 && (
-        <section style={{
-          maxWidth: 900, margin: "0 auto 48px", padding: "0 24px",
-        }}>
-          <h2 style={{
-            fontSize: 16, fontWeight: 700, color: "#F3C136",
-            marginBottom: 14, paddingBottom: 8,
-            borderBottom: "1px solid rgba(243,193,54,0.2)",
-          }}>✓ 我的预约记录</h2>
-          {bookings.map((b, i) => (
-            <div key={i} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "12px 16px", marginBottom: 8, borderRadius: 12,
-              background: "rgba(39,174,96,0.08)", border: "1px solid rgba(39,174,96,0.2)",
-            }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: "#f0e6ff" }}>{b.title}</div>
-                <div style={{ fontSize: 11, color: "rgba(240,230,255,0.4)", marginTop: 2 }}>TX: {b.txid}</div>
-              </div>
-              <div style={{ fontSize: 12, color: "rgba(240,230,255,0.4)" }}>{b.time}</div>
+      {/* 底部引导栏与 Footer */}
+      <footer className="mt-auto border-t border-white/5 bg-[#0B0610]">
+        <div className="bg-gradient-to-r from-[#2A1642] to-[#1E112A] border-b border-white/5">
+          <div className="max-w-6xl mx-auto px-4 py-8 md:px-6 flex flex-col md:flex-row items-center justify-between">
+            <div className="mb-4 md:mb-0 text-center md:text-left">
+              <h3 className="text-lg font-bold text-white mb-1">立即着手构建属于您的专属生态展示面</h3>
+              <p className="text-gray-400 text-sm">搭载智能组件与基建架构空间，为前沿拓荒注入动能。</p>
             </div>
-          ))}
-        </section>
-      )}
-
-      {/* TRUST BADGES */}
-      <section style={{
-        maxWidth: 900, margin: "0 auto 48px", padding: "0 24px",
-        display: "flex", gap: 16, flexWrap: "wrap",
-      }}>
-        {[
-          { icon: "🔒", label: "区块链安全支付" },
-          { icon: "✓", label: "Pi Network 官方认证" },
-          { icon: "⚡", label: "即时到账确认" },
-          { icon: "🛡️", label: "消费者权益保障" },
-        ].map((b) => (
-          <div key={b.label} style={{
-            flex: "1 1 180px", display: "flex", alignItems: "center", gap: 10,
-            padding: "14px 18px", borderRadius: 14,
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.07)",
-          }}>
-            <span style={{ fontSize: 20 }}>{b.icon}</span>
-            <span style={{ fontSize: 13, color: "rgba(240,230,255,0.6)" }}>{b.label}</span>
+            <Link href="/dashboard" className="px-6 py-2.5 bg-white text-[#110B19] rounded-xl font-bold hover:bg-gray-200 transition-colors">
+              获取平台接入权
+            </Link>
           </div>
-        ))}
-      </section>
+        </div>
 
-      {/* FOOTER */}
-      <footer style={{
-        textAlign: "center", padding: "24px 16px",
-        borderTop: "1px solid rgba(243,193,54,0.1)",
-        color: "rgba(240,230,255,0.35)", fontSize: 12,
-      }}>
-        <p>© 2026 美丽时光工作室. All rights reserved.</p>
-        <p style={{ marginTop: 6 }}>
-          <span style={{ marginRight: 16, cursor: "pointer", color: "rgba(240,230,255,0.4)" }}>服务协议</span>
-          <span style={{ marginRight: 16, cursor: "pointer", color: "rgba(240,230,255,0.4)" }}>隐私政策</span>
-          <span style={{ color: "#F3C136" }}>✦ Powered by Pi Merchant</span>
-        </p>
+        <div className="max-w-6xl mx-auto px-4 py-8 md:px-6 flex flex-col md:flex-row justify-between items-center text-gray-500 text-xs md:text-sm">
+          <p className="mb-4 md:mb-0">
+            © 2026 Pioneer AI Service Framework. 探索前沿效率.
+          </p>
+          <div className="flex items-center space-x-6">
+            <span className="hover:text-[#F3C136] transition-colors cursor-pointer">控制台</span>
+            <span className="hover:text-[#F3C136] transition-colors cursor-pointer">框架指北</span>
+            <span className="hover:text-[#F3C136] transition-colors cursor-pointer">责任声告</span>
+          </div>
+        </div>
+        <div className="text-center py-4 text-[10px] text-gray-600 bg-black/30">
+          Disclaimer: This application is not officially affiliated with the Pi Core Team. It is an independent utility software created by the community. Nothing herein constitutes financial or trading advice.
+        </div>
       </footer>
     </main>
   );
 }
-
-

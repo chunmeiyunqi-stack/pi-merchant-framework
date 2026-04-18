@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { signSessionToken } from '@/lib/session';
 
 const prisma = new PrismaClient();
 
@@ -15,7 +17,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Upsert Customer: Create if not exists, otherwise update username
+    // Upsert Customer
     const customer = await prisma.customer.upsert({
       where: {
         merchantId_piUid: {
@@ -33,9 +35,18 @@ export async function POST(req: Request) {
       },
     });
     
-    // (Optional here: create a secure session/JWT cookie)
+    // Set secure HTTP-only cookie with SIGNED opaque token
+    const secureToken = signSessionToken(piUid);
+    const cookieStore = cookies();
+    cookieStore.set('pi_auth_token', secureToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7 // 7 days
+    });
 
-    return NextResponse.json({ success: true, customer });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Auth API Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

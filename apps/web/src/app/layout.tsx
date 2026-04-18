@@ -1,9 +1,11 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import EnvBanner from '@/components/EnvBanner';
 
 export const metadata: Metadata = {
-  title: 'Pi Merchant App',
-  description: 'Pi Network Merchant Application Workspace',
+  // 对外合规展示名
+  title: 'Pioneer AI Service Framework',
+  description: '赋能千万先锋的智能服务引擎与可复用业务平台基建。',
 };
 
 export default function RootLayout({
@@ -27,8 +29,11 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-gray-50 min-h-screen text-gray-900 font-sans">
-        {children}
+      <body className="bg-gray-50 min-h-screen text-gray-900 font-sans flex flex-col">
+        <EnvBanner />
+        <div className="flex-1 flex flex-col">
+          {children}
+        </div>
       </body>
     </html>
   );
