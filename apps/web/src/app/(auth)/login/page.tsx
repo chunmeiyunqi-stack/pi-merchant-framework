@@ -42,9 +42,9 @@ export default function LoginPage() {
           <span className="text-4xl">π</span>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">欢迎光临</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Sign In</h1>
         <p className="text-gray-500 text-sm mb-8">
-          使用您的 Pi Network 账号安全登录
+          登录您的账户以继续访问
         </p>
 
         {/* Pi 登录按钮 */}
@@ -58,12 +58,12 @@ export default function LoginPage() {
           {loading ? (
             <>
               <span className="animate-spin text-lg">⟳</span>
-              <span>登录中...</span>
+              <span>Signing in...</span>
             </>
           ) : (
             <>
               <span className="text-xl">π</span>
-              <span>使用 Pi 账号登录</span>
+              <span>Sign In with Pi</span>
             </>
           )}
         </button>
