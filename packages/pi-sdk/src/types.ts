@@ -59,6 +59,7 @@ export interface PiAuthResponse {
 
 export interface ApprovePaymentRequest {
   paymentId: string;
+  orderId?: string;
   merchantId?: string;
 }
 
@@ -72,6 +73,7 @@ export interface ApprovePaymentResponse {
 export interface CompletePaymentRequest {
   paymentId: string;
   txid: string;
+  orderId?: string;
   merchantId?: string;
 }
 
