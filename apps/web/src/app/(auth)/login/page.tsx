@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticateWithPi } from '@pi-merchant/pi-sdk';
 
-const DEFAULT_MERCHANT_ID = process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ?? '';
+const DEFAULT_MERCHANT_ID = process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ?? process.env.NEXT_PUBLIC_MERCHANT_ID ?? 'merchant-demo-001';
 
 export default function LoginPage() {
   const router = useRouter();

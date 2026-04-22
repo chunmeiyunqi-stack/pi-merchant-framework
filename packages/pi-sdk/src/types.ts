@@ -1,4 +1,4 @@
-﻿// Pi SDK Type Definitions
+// Pi SDK Type Definitions
 
 export interface PiAuthResult {
   accessToken?: string;
@@ -44,7 +44,9 @@ export interface PiPaymentDTO {
 export type PiScope = 'username' | 'payments' | 'wallet_address';
 
 export interface PiAuthRequest {
-  accessToken: string;
+  accessToken?: string;
+  piUid: string;
+  username: string;
   merchantId: string;
 }
 

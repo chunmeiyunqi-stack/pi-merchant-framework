@@ -53,9 +53,11 @@ export async function authenticateWithPi(
     throw new Error(msg);
   }
 
-  // 步骤 3：将 accessToken 发送到后端验证
+  // 步骤 3：将 piUid、username、accessToken 发送到后端验证
   return verifyAccessTokenWithBackend({
     accessToken: authResult.accessToken,
+    piUid: authResult.user.uid,
+    username: authResult.user.username,
     merchantId,
   });
 }

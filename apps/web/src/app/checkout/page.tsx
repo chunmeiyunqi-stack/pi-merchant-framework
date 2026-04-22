@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import CheckoutClient from './CheckoutClient';
 
+export const dynamic = 'force-dynamic';
+
 export default function CheckoutPage() {
   return (
     <main className="min-h-screen bg-[#110B19] text-gray-200 flex flex-col items-center justify-center p-4">
