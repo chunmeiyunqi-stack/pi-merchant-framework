@@ -2,7 +2,8 @@
 
 // 后台 — 订单管理
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 interface Order {
   id: string;
@@ -14,20 +15,62 @@ interface Order {
   service?: { title: string };
 }
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 const STATUS_OPTIONS = ['ALL', 'PENDING_PAYMENT', 'APPROVED', 'COMPLETED', 'CANCELLED'];
 
-export default function AdminOrdersPage() {
+function OrdersContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const currentStatus = searchParams.get('status') || 'ALL';
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filter, setFilter] = useState('ALL');
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const qs = filter !== 'ALL' ? `?status=${filter}` : '';
-    fetch(`/api/admin/orders${qs}`, { credentials: 'include' })
+    setLoading(true);
+    const qs = new URLSearchParams();
+    if (currentStatus !== 'ALL') qs.set('status', currentStatus);
+    qs.set('page', currentPage.toString());
+    qs.set('limit', '10');
+
+    fetch(`/api/admin/orders?${qs.toString()}`, { credentials: 'include' })
       .then((r) => r.json())
-      .then((data: { orders: Order[] }) => { setOrders(data.orders ?? []); setLoading(false); })
+      .then((data: { orders: Order[], pagination: Pagination }) => { 
+        setOrders(data.orders ?? []); 
+        setPagination(data.pagination ?? null);
+        setLoading(false); 
+      })
       .catch(() => setLoading(false));
-  }, [filter]);
+  }, [currentStatus, currentPage]);
+
+  const handleStatusChange = (status: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (status === 'ALL') {
+      params.delete('status');
+    } else {
+      params.set('status', status);
+    }
+    // Changing status resets page to 1
+    params.set('page', '1');
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || (pagination && newPage > pagination.totalPages)) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', newPage.toString());
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
   return (
     <div>
@@ -38,9 +81,9 @@ export default function AdminOrdersPage() {
         {STATUS_OPTIONS.map((s) => (
           <button
             key={s}
-            onClick={() => setFilter(s)}
+            onClick={() => handleStatusChange(s)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-              filter === s ? 'bg-[#7C3AED] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              currentStatus === s ? 'bg-[#7C3AED] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {s === 'ALL' ? '全部' : s}
@@ -49,7 +92,7 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* 订单表格 */}
-      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 mb-6">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
             <tr>
@@ -65,7 +108,7 @@ export default function AdminOrdersPage() {
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-10 text-gray-400">暂无订单</td>
+                <td colSpan={6} className="text-center py-10 text-gray-400">暂无订单数据</td>
               </tr>
             ) : (
               orders.map((order) => (
@@ -86,6 +129,40 @@ export default function AdminOrdersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* 分页器 */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <div>
+            共 {pagination.total} 条记录，当前第 {pagination.page} / {pagination.totalPages} 页
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page <= 1}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              上一页
+            </button>
+            <button
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export default function AdminOrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center text-gray-500">Loading Orders...</div>}>
+      <OrdersContent />
+    </Suspense>
+  );
+}
+
