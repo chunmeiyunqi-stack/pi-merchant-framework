@@ -46,7 +46,10 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      user: { uid: piUid, username: username }
+    });
   } catch (error: any) {
     console.error('Auth API Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
