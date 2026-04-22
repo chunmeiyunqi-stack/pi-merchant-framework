@@ -21,7 +21,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "apps/web/.next/**", "!apps/web/.next/cache/**"],
       "env": ["PI_API_KEY", "NEXT_PUBLIC_PI_SANDBOX"]
     },
     "lint": {
