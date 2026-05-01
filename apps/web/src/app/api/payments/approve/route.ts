@@ -8,45 +8,60 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { paymentId, orderId } = body;
 
-    if (!paymentId || !orderId) {
-      return NextResponse.json({ success: false, error: 'Missing parameters' }, { status: 400 });
+    if (!paymentId) {
+      return NextResponse.json({ success: false, error: 'Missing paymentId' }, { status: 400 });
     }
 
-    const order = await prisma.order.findUnique({
-      where: { orderNo: orderId }
-    });
-
-    if (!order) {
-      return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
-    }
-
-    // 幂等策略: Check if payment id is already stored to prevent duplicate insertion
+    // 1. 幂等策略: 检查数据库状态
     const existingPayment = await prisma.payment.findUnique({
       where: { piPaymentId: paymentId }
     });
 
-    if (existingPayment) {
-        return NextResponse.json({ success: true });
+    if (!existingPayment) {
+      const order = await prisma.order.findUnique({ where: { orderNo: orderId } });
+      if (order) {
+        await prisma.payment.create({
+          data: {
+            orderId: order.id,
+            piPaymentId: paymentId,
+            amount: order.amount,
+            status: 'PENDING',
+            developerApproved: true,
+            approvedAt: new Date(),
+            memo: `Paying for order ${order.orderNo}`
+          }
+        });
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'PENDING_APPROVAL', paymentId: paymentId }
+        });
+      }
     }
 
-    // Create pending payment link
-    await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        piPaymentId: paymentId,
-        amount: order.amount,
-        status: 'PENDING',
-        developerApproved: true,
-        approvedAt: new Date(),
-        memo: `Paying for order ${order.orderNo}`
+    // 2. 极其关键：必须向 Pi 官方服务器发送 Approve 请求，否则 SDK 会死锁！
+    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
+    const apiKey = process.env.PI_API_KEY;
+    
+    if (!apiKey) {
+      console.error('[Pi API] Missing PI_API_KEY in environment variables');
+      return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
+    }
+
+    const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/approve`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Key ${apiKey}`
       }
     });
 
-    // Mark order as pending approval
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: 'PENDING_APPROVAL', paymentId: paymentId }
-    });
+    if (!piRes.ok) {
+      const errText = await piRes.text();
+      console.error('[Pi API] Approve Failed:', piRes.status, errText);
+      // 如果 Pi 报错说已经 approve 过了，可以放行
+      if (!errText.includes('already approved')) {
+        return NextResponse.json({ success: false, error: `Pi API Error: ${errText}` }, { status: 502 });
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

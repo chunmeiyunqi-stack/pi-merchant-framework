@@ -12,22 +12,44 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Missing parameters' }, { status: 400 });
     }
 
-    // Verify payment against Pi Network Platform API (skipped mock for sandbox)
-    // In production: await axios.get(`https://api.minepi.com/v2/payments/${paymentId}`, { headers: { Authorization: `Key ${process.env.PI_API_KEY}` }})
-
     const payment = await prisma.payment.findUnique({
       where: { piPaymentId: paymentId },
       include: { order: true }
     });
 
-    if (!payment || payment.status === 'COMPLETED') {
-        // 幂等边界: If already completed, returns success. 
-        return NextResponse.json({ success: true, message: 'Already completed' });
+    // 1. 极其关键：向 Pi 官方服务器发送 Complete 请求，真正完结这笔支付
+    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
+    const apiKey = process.env.PI_API_KEY;
+    
+    if (!apiKey) {
+      console.error('[Pi API] Missing PI_API_KEY in environment variables');
+      return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
     }
 
-    // Execute atomic transaction for safety
+    const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Key ${apiKey}`
+      },
+      body: JSON.stringify({ txid })
+    });
+
+    if (!piRes.ok) {
+      const errText = await piRes.text();
+      console.error('[Pi API] Complete Failed:', piRes.status, errText);
+      if (!errText.includes('already completed')) {
+        return NextResponse.json({ success: false, error: `Pi API Error: ${errText}` }, { status: 502 });
+      }
+    }
+
+    if (!payment || payment.status === 'COMPLETED') {
+        // 幂等边界
+        return NextResponse.json({ success: true, message: 'Already completed locally' });
+    }
+
+    // 2. 更新本地数据库
     await prisma.$transaction(async (tx) => {
-      // 1. Mark Payment
       await tx.payment.update({
         where: { piPaymentId: paymentId },
         data: {
@@ -39,19 +61,12 @@ export async function POST(req: Request) {
         }
       });
 
-      // 2. Mark Order
       const updatedOrder = await tx.order.update({
         where: { id: payment.orderId },
         data: { status: 'COMPLETED' }
       });
 
-      // 3. Issue CustomerMembership (Extract plan from note or metadata)
-      // Standardize reading plan identifier. For this minimal framework, we map hardcoded packages.
-      // E.g. Note holds 'PRO' or 'BASIC'
       const durationDays = 30; 
-      
-      // We must hook to an existing membership definition in the DB.
-      // If we don't have one, we just create a dummy one for the merchant or find first.
       let dbMembership = await tx.membership.findFirst({
          where: { merchantId: updatedOrder.merchantId }
       });
