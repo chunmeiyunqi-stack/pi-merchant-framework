@@ -9,7 +9,7 @@ export default function PiLoginButton() {
   const router = useRouter();
 
   useEffect(() => {
-    // P1-A: Validate session with backend
+    // 验证后端 session 是否仍有效
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
@@ -19,49 +19,77 @@ export default function PiLoginButton() {
   }, []);
 
   const handleLogin = async () => {
+    // Pi Browser 同步加载 SDK，Pi.init() 也是同步的，此处直接检查即可
     if (typeof window === 'undefined' || !(window as any).Pi) {
-      alert("💡 提示: 请复制链接并前往 Pi Browser 继续这步操作！");
+      alert('💡 请在 Pi Browser 中打开此应用后再操作。');
       return;
     }
 
     setLoading(true);
     try {
       const Pi = (window as any).Pi;
-      const authResult = await Pi.authenticate(['payments', 'username'], (payment: any) => {
-         console.warn("发现未流转完毕的支付行为:", payment);
-      });
-      
+
+      // 官方文档标准写法：Pi.authenticate(scopes, onIncompletePaymentFound)
+      // onIncompletePaymentFound 处理上次未完成的支付，用 async 确保 fetch 完成后再继续
+      const authResult = await Pi.authenticate(
+        ['payments', 'username'],
+        async function onIncompletePaymentFound(payment: any) {
+          console.warn('[PiLogin] 发现未完成支付，处理中:', payment.identifier);
+          try {
+            const { identifier: paymentId, status, transaction } = payment;
+            if (!status.developer_approved) {
+              await fetch('/api/payments/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, orderId: payment.metadata?.orderId }),
+              });
+            } else if (status.developer_approved && !status.developer_completed && transaction?.txid) {
+              await fetch('/api/payments/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, txid: transaction.txid }),
+              });
+            }
+          } catch (err) {
+            // 不 rethrow —— 未完成支付处理失败不应阻断本次握手
+            console.error('[PiLogin] 处理未完成支付出错（继续握手）:', err);
+          }
+        }
+      );
+
+      console.log('[PiLogin] Pi.authenticate 成功，uid:', authResult.user.uid);
+
+      // 将 accessToken 发给后端，后端用 GET /v2/me 验证后签发 session cookie
       const res = await fetch('/api/auth/pi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           accessToken: authResult.accessToken,
           piUid: authResult.user.uid,
           username: authResult.user.username,
-          merchantId: process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001'
-        })
+          merchantId: process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001',
+        }),
       });
 
       const data = await res.json();
-      
+
       if (data.success) {
-        setUsername(authResult.user.username);
-        // Successful HttpOnly cookie session generated, routing to dashboard
+        setUsername(data.user?.username ?? authResult.user.username);
         router.push('/dashboard');
       } else {
-        alert('身份授权接入遇到问题: ' + data.error);
+        console.error('[PiLogin] 后端验证失败:', data.error);
+        alert('身份验证失败: ' + (data.error ?? '未知错误'));
       }
     } catch (error: any) {
-      console.error('Auth Error', error);
-      alert('生态身份唤起中止或发生异常，请重试。');
+      console.error('[PiLogin] 握手异常:', error);
+      alert('握手中止，请重试。错误: ' + (error.message ?? '未知'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoDashboard = () => {
-    router.push('/dashboard');
-  };
+  const handleGoDashboard = () => router.push('/dashboard');
 
   if (username) {
     return (
@@ -72,7 +100,7 @@ export default function PiLoginButton() {
           </div>
           <span className="hidden sm:inline-block">{username}</span>
         </div>
-        <button 
+        <button
           onClick={handleGoDashboard}
           className="bg-[#2A1642]/80 hover:bg-[#3B2D4F] text-[#F3C136] border border-[#F3C136]/50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
         >
@@ -84,15 +112,16 @@ export default function PiLoginButton() {
 
   return (
     <div className="flex flex-col items-end">
-      <button 
-        onClick={handleLogin} 
+      <button
+        onClick={handleLogin}
         disabled={loading}
         className="bg-transparent border border-[#F3C136]/60 hover:bg-[#F3C136] hover:text-[#1E112A] text-[#F3C136] px-4 py-2 rounded-xl shadow-lg transition-all text-sm font-bold disabled:opacity-50 flex items-center space-x-2"
       >
         <span>{loading ? '等待握手...' : '🔗 同步 Pi Wallet 身份'}</span>
       </button>
-      <span className="text-[10px] text-gray-500 mt-1 pointer-events-none hidden sm:block">由官方安全验证通道提供支持</span>
+      <span className="text-[10px] text-gray-500 mt-1 pointer-events-none hidden sm:block">
+        由官方安全验证通道提供支持
+      </span>
     </div>
   );
 }
-
