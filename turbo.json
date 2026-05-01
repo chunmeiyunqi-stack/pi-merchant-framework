@@ -22,7 +22,7 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "apps/web/.next/**", "!apps/web/.next/cache/**"],
-      "env": ["PI_API_KEY", "NEXT_PUBLIC_PI_SANDBOX"]
+      "env": ["PI_API_KEY", "NEXT_PUBLIC_PI_SANDBOX", "PI_PLATFORM_API_BASE", "PI_SESSION_SECRET", "NEXT_PUBLIC_MERCHANT_ID", "NEXT_PUBLIC_APP_URL"]
     },
     "lint": {
       "dependsOn": ["^build"]

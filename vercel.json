@@ -1,6 +1,5 @@
 {
   "framework": "nextjs",
   "buildCommand": "turbo run build --filter=@pi-merchant/web...",
-  "installCommand": "pnpm install",
-  "outputDirectory": "apps/web/.next"
+  "installCommand": "pnpm install"
 }
