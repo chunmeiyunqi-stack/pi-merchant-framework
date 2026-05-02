@@ -5,9 +5,16 @@ import { verifySessionToken } from '@/lib/session';
 
 const prisma = new PrismaClient();
 
-export async function GET() {
+export async function GET(req: Request) {
   const cookieStore = cookies();
-  const token = cookieStore.get('pi_auth_token')?.value;
+  let token = cookieStore.get('pi_auth_token')?.value;
+
+  if (!token) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+  }
 
   if (!token) {
     return NextResponse.json({ authenticated: false });

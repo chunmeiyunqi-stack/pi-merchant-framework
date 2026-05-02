@@ -96,6 +96,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       user: { uid: verifiedUid, username: verifiedUsername },
+      token: secureToken, // 发送给前端，作为 localStorage 备用
     });
   } catch (error: any) {
     console.error('[Auth/Pi] 内部错误:', error);

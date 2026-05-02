@@ -75,6 +75,9 @@ export default function PiLoginButton() {
       const data = await res.json();
 
       if (data.success) {
+        if (data.token) {
+          localStorage.setItem('pi_auth_token_fallback', data.token);
+        }
         setUsername(data.user?.username ?? authResult.user.username);
         router.push('/dashboard');
       } else {

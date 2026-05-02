@@ -32,9 +32,14 @@ export default function CheckoutClient() {
 
     try {
       // Step 1: Draft order creation (Idempotent keys generated server side for the user action)
+      const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
+      
       const orderRes = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(fallbackToken ? { 'Authorization': `Bearer ${fallbackToken}` } : {})
+        },
         credentials: 'include',
         body: JSON.stringify({
            amount: selectedPlan.amount,
@@ -66,18 +71,26 @@ export default function CheckoutClient() {
       }, {
         onReadyForServerApproval: async (paymentId: string) => {
           setStatusText(`3. 服务器核算对价中 [${paymentId.slice(0,6)}...]`);
+          const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
           await fetch('/api/payments/approve', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              ...(fallbackToken ? { 'Authorization': `Bearer ${fallbackToken}` } : {})
+            },
             credentials: 'include',
             body: JSON.stringify({ paymentId, orderId: orderData.order.orderNo })
           });
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
           setStatusText('4. 交易上链成功！正在为您颁发数字权益...');
+          const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
           await fetch('/api/payments/complete', {
              method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
+             headers: { 
+               'Content-Type': 'application/json',
+               ...(fallbackToken ? { 'Authorization': `Bearer ${fallbackToken}` } : {})
+             },
              credentials: 'include',
              body: JSON.stringify({ paymentId, txid })
           });

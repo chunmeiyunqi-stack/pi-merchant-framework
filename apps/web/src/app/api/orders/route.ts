@@ -8,7 +8,15 @@ const prisma = new PrismaClient();
 export async function POST(req: Request) {
   try {
     const cookieStore = cookies();
-    const token = cookieStore.get('pi_auth_token')?.value;
+    let token = cookieStore.get('pi_auth_token')?.value;
+    
+    // 如果 Cookie 丢了，尝试从 Authorization 头中读取
+    if (!token) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
     
     console.log('[Orders API] Received token:', token ? 'YES (hidden)' : 'NO');
     
