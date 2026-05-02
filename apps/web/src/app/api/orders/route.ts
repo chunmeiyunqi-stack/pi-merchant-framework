@@ -9,10 +9,15 @@ export async function POST(req: Request) {
   try {
     const cookieStore = cookies();
     const token = cookieStore.get('pi_auth_token')?.value;
+    
+    console.log('[Orders API] Received token:', token ? 'YES (hidden)' : 'NO');
+    
     const piUid = token ? verifySessionToken(token) : null;
+    
+    console.log('[Orders API] Verified piUid:', piUid ? piUid : 'FAILED');
 
     if (!piUid) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized (No valid token)' }, { status: 401 });
     }
 
     const body = await req.json();
