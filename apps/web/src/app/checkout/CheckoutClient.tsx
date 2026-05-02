@@ -35,6 +35,7 @@ export default function CheckoutClient() {
       const orderRes = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
            amount: selectedPlan.amount,
            planId: plan,
@@ -68,6 +69,7 @@ export default function CheckoutClient() {
           await fetch('/api/payments/approve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ paymentId, orderId: orderData.order.orderNo })
           });
         },
@@ -76,6 +78,7 @@ export default function CheckoutClient() {
           await fetch('/api/payments/complete', {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
+             credentials: 'include',
              body: JSON.stringify({ paymentId, txid })
           });
           // All good, flow returning to dashboard
