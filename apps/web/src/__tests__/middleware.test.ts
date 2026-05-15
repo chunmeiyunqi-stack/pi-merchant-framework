@@ -1,6 +1,11 @@
-import { middleware } from '../middleware';
+if (typeof global.Request === 'undefined') {
+  global.Request = class Request {} as any;
+}
+if (typeof global.Response === 'undefined') {
+  global.Response = class Response {} as any;
+}
 
-// Mock Next.js modules
+// Mock Next.js modules MUST come before imports that use them
 jest.mock('next/server', () => ({
   NextResponse: {
     next: jest.fn(() => ({ type: 'next' })),
@@ -8,7 +13,8 @@ jest.mock('next/server', () => ({
   },
 }));
 
-const mockNextResponse = require('next/server').NextResponse;
+import { middleware } from '../middleware';
+import { NextResponse } from 'next/server';
 
 describe('Middleware', () => {
   beforeEach(() => {
@@ -25,11 +31,11 @@ describe('Middleware', () => {
           pathname: '/dashboard',
         },
         url: 'https://example.com/dashboard',
-      };
+      } as unknown as any;
 
-      middleware(mockRequest as any);
+      middleware(mockRequest);
 
-      expect(mockNextResponse.redirect).toHaveBeenCalled();
+      expect(NextResponse.redirect).toHaveBeenCalled();
     });
 
     it('allows authenticated users to access protected paths', () => {
@@ -41,11 +47,11 @@ describe('Middleware', () => {
           pathname: '/dashboard',
         },
         url: 'https://example.com/dashboard',
-      };
+      } as unknown as any;
 
-      middleware(mockRequest as any);
+      middleware(mockRequest);
 
-      expect(mockNextResponse.next).toHaveBeenCalled();
+      expect(NextResponse.next).toHaveBeenCalled();
     });
 
     it('allows unauthenticated users to access the landing page', () => {
@@ -57,11 +63,11 @@ describe('Middleware', () => {
           pathname: '/',
         },
         url: 'https://example.com/',
-      };
+      } as unknown as any;
 
-      middleware(mockRequest as any);
+      middleware(mockRequest);
 
-      expect(mockNextResponse.next).toHaveBeenCalled();
+      expect(NextResponse.next).toHaveBeenCalled();
     });
 
     it('allows authenticated users to access public pages', () => {
@@ -73,18 +79,18 @@ describe('Middleware', () => {
           pathname: '/about',
         },
         url: 'https://example.com/about',
-      };
+      } as unknown as any;
 
-      middleware(mockRequest as any);
+      middleware(mockRequest);
 
-      expect(mockNextResponse.next).toHaveBeenCalled();
+      expect(NextResponse.next).toHaveBeenCalled();
     });
   });
 
   describe('Path matching', () => {
     const protectedPaths = ['/dashboard', '/account', '/billing'];
 
-    protectedPaths.forEach(path => {
+    protectedPaths.forEach((path) => {
       it(`recognizes ${path} as protected`, () => {
         const mockRequest = {
           cookies: {
@@ -94,17 +100,17 @@ describe('Middleware', () => {
             pathname: path,
           },
           url: 'https://example.com' + path,
-        };
+        } as unknown as any;
 
-        middleware(mockRequest as any);
+        middleware(mockRequest);
 
-        expect(mockNextResponse.redirect).toHaveBeenCalled();
+        expect(NextResponse.redirect).toHaveBeenCalled();
       });
     });
 
     const publicPaths = ['/about', '/contact', '/pricing'];
 
-    publicPaths.forEach(path => {
+    publicPaths.forEach((path) => {
       it(`allows access to public path ${path}`, () => {
         const mockRequest = {
           cookies: {
@@ -114,11 +120,11 @@ describe('Middleware', () => {
             pathname: path,
           },
           url: 'https://example.com' + path,
-        };
+        } as unknown as any;
 
-        middleware(mockRequest as any);
+        middleware(mockRequest);
 
-        expect(mockNextResponse.next).toHaveBeenCalled();
+        expect(NextResponse.next).toHaveBeenCalled();
       });
     });
   });

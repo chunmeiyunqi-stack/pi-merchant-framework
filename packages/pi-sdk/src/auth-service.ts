@@ -8,18 +8,13 @@
 //   4. 后端验证 token → 查询/创建 customer 记录 → 返回 session
 // ============================================================
 
-import type {
-  PiAuthResult,
-  PiAuthResponse,
-  PiAuthRequest,
-  PiScope,
-  PiPaymentDTO,
-} from './types';
+import type { PiAuthResult, PiAuthResponse, PiAuthRequest, PiScope, PiPaymentDTO } from './types';
 import { handleIncompletePayment } from './payment-service';
 
-const API_BASE = typeof window !== 'undefined'
-  ? window.location.origin
-  : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000');
+const API_BASE =
+  typeof window !== 'undefined'
+    ? window.location.origin
+    : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000');
 
 // ============================================================
 // authenticateWithPi
@@ -42,10 +37,10 @@ export async function authenticateWithPi(
   // 步骤 1：调用 Pi SDK authenticate
   let authResult: PiAuthResult;
   try {
-    authResult = await window.Pi.authenticate(scopes, async (payment: PiPaymentDTO) => {
+    authResult = await window.Pi.authenticate(scopes, async (payment: unknown) => {
       // 发现未完成支付时自动处理（防止用户被卡单）
       console.log('[PiAuth] 发现未完成支付，开始处理...');
-      await handleIncompletePayment(payment);
+      await handleIncompletePayment(payment as PiPaymentDTO);
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Pi 认证失败';
@@ -71,9 +66,7 @@ export async function authenticateWithPi(
  * 将 Pi accessToken 发送到后端换取 session
  * @param req - { accessToken, merchantId }
  */
-export async function verifyAccessTokenWithBackend(
-  req: PiAuthRequest
-): Promise<PiAuthResponse> {
+export async function verifyAccessTokenWithBackend(req: PiAuthRequest): Promise<PiAuthResponse> {
   const response = await fetch(`${API_BASE}/api/auth/pi`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -103,7 +96,7 @@ export async function getCurrentUser(): Promise<PiAuthResponse['user'] | null> {
       credentials: 'include',
     });
     if (!response.ok) return null;
-    const data = await response.json() as { user: PiAuthResponse['user'] };
+    const data = (await response.json()) as { user: PiAuthResponse['user'] };
     return data.user ?? null;
   } catch {
     return null;

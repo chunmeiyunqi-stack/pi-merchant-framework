@@ -8,8 +8,11 @@ function isAIRequest(obj: unknown): obj is AIRequest {
     typeof (obj as AIRequest).merchantId === 'string' &&
     typeof (obj as AIRequest).prompt === 'string' &&
     ((obj as AIRequest).model === undefined ||
-     ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-3.5-turbo'].includes((obj as AIRequest).model as AIModel)) &&
-    ((obj as AIRequest).temperature === undefined || typeof (obj as AIRequest).temperature === 'number')
+      ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-3.5-turbo'].includes(
+        (obj as AIRequest).model as AIModel
+      )) &&
+    ((obj as AIRequest).temperature === undefined ||
+      typeof (obj as AIRequest).temperature === 'number')
   );
 }
 
@@ -36,7 +39,8 @@ function isPiAuthResult(obj: unknown): obj is PiAuthResult {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    ((obj as PiAuthResult).accessToken === undefined || typeof (obj as PiAuthResult).accessToken === 'string') &&
+    ((obj as PiAuthResult).accessToken === undefined ||
+      typeof (obj as PiAuthResult).accessToken === 'string') &&
     isPiUser((obj as PiAuthResult).user) &&
     ((obj as PiAuthResult).token === undefined || typeof (obj as PiAuthResult).token === 'string')
   );

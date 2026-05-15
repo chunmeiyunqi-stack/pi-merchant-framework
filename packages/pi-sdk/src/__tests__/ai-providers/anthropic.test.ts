@@ -35,7 +35,9 @@ describe('AnthropicProvider', () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        id: 'msg_1', type: 'message', role: 'assistant',
+        id: 'msg_1',
+        type: 'message',
+        role: 'assistant',
         model: 'claude-sonnet-4-20250514',
         content: [{ type: 'text', text: 'Hello from Claude!' }],
         usage: { input_tokens: 10, output_tokens: 5 },
@@ -55,7 +57,9 @@ describe('AnthropicProvider', () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        id: 'msg_1', type: 'message', role: 'assistant',
+        id: 'msg_1',
+        type: 'message',
+        role: 'assistant',
         model: 'claude-sonnet-4-20250514',
         content: [{ type: 'text', text: 'Response' }],
         usage: { input_tokens: 10, output_tokens: 5 },
@@ -74,7 +78,9 @@ describe('AnthropicProvider', () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        id: 'msg_1', type: 'message', role: 'assistant',
+        id: 'msg_1',
+        type: 'message',
+        role: 'assistant',
         model: 'claude-sonnet-4-20250514',
         content: [{ type: 'text', text: 'Claude response' }],
         usage: { input_tokens: 20, output_tokens: 10 },
@@ -94,7 +100,9 @@ describe('AnthropicProvider', () => {
   it('throws on non-OK response', async () => {
     const provider = new AnthropicProvider({ apiKey: 'k' });
     mockFetch.mockResolvedValueOnce({
-      ok: false, status: 401, text: async () => 'Invalid API key',
+      ok: false,
+      status: 401,
+      text: async () => 'Invalid API key',
     } as Response);
     await expect(provider.chat(baseRequest)).rejects.toThrow('Invalid API key');
   });
@@ -108,7 +116,9 @@ describe('AnthropicProvider', () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        id: 'msg_1', type: 'message', role: 'assistant',
+        id: 'msg_1',
+        type: 'message',
+        role: 'assistant',
         model: 'claude-sonnet-4-20250514',
         content: [{ type: 'text', text: 'Response' }],
         usage: { input_tokens: 5, output_tokens: 5 },

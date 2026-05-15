@@ -5,11 +5,8 @@
 // 支持 GPT-4o / GPT-4o-mini / GPT-3.5-turbo 等模型
 // ============================================================
 
-import type {
-  AIProviderRequest,
-  AIProviderResponse,
-} from './types';
 import { BaseAIProvider } from './base';
+import type { AIProviderRequest, AIProviderResponse, AIStreamChunk } from './types';
 
 const DEFAULT_MODEL = 'gpt-4o-mini';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
@@ -46,7 +43,9 @@ interface OpenAIChatResponse {
 export class OpenAIProvider extends BaseAIProvider {
   readonly name = 'openai' as const;
 
-  constructor(config?: Partial<{ apiKey: string; baseUrl: string; defaultModel: string; timeout: number }>) {
+  constructor(
+    config?: Partial<{ apiKey: string; baseUrl: string; defaultModel: string; timeout: number }>
+  ) {
     super({
       apiKey: config?.apiKey ?? process.env.OPENAI_API_KEY ?? '',
       baseUrl: config?.baseUrl ?? process.env.OPENAI_API_BASE ?? DEFAULT_BASE_URL,

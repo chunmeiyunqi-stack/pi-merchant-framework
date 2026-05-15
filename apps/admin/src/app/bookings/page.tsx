@@ -22,7 +22,10 @@ export default function AdminBookingsPage() {
     setLoading(true);
     fetch('/api/admin/bookings', { credentials: 'include' })
       .then((r) => r.json())
-      .then((data: { bookings: Booking[] }) => { setBookings(data.bookings ?? []); setLoading(false); })
+      .then((data: { bookings: Booking[] }) => {
+        setBookings(data.bookings ?? []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   };
 
@@ -46,7 +49,9 @@ export default function AdminBookingsPage() {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">预约管理</h1>
       <div className="space-y-3">
         {loading ? (
-          [1, 2, 3].map((i) => <div key={i} className="bg-white rounded-2xl p-5 animate-pulse h-24" />)
+          [1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-2xl p-5 animate-pulse h-24" />
+          ))
         ) : bookings.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <div className="text-5xl mb-4">📅</div>
@@ -61,16 +66,25 @@ export default function AdminBookingsPage() {
                   <p className="text-gray-500 text-sm mt-1">顾客：{b.customer?.username ?? '-'}</p>
                   <p className="text-gray-400 text-xs mt-1">
                     {new Date(b.slotStart).toLocaleString('zh-CN')} →{' '}
-                    {new Date(b.slotEnd).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(b.slotEnd).toLocaleTimeString('zh-CN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </p>
                   {b.note && <p className="text-gray-300 text-xs mt-1">备注：{b.note}</p>}
                 </div>
                 <div className="text-right flex-shrink-0 ml-4">
-                  <span className={`text-xs px-2 py-1 rounded-lg ${
-                    b.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' :
-                    b.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                    'bg-gray-100 text-gray-500'
-                  }`}>{b.status}</span>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-lg ${
+                      b.status === 'CONFIRMED'
+                        ? 'bg-blue-100 text-blue-700'
+                        : b.status === 'COMPLETED'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {b.status}
+                  </span>
 
                   {b.status === 'CONFIRMED' && (
                     <button

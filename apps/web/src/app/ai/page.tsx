@@ -28,7 +28,7 @@ export default function AiPage() {
       }
 
       setResult(data.result);
-    } catch (err) {
+    } catch (_err) {
       setError('无法连接 AI 服务，请检查网络或稍后再试。');
     } finally {
       setLoading(false);
@@ -64,7 +64,9 @@ export default function AiPage() {
         <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-lg shadow-slate-950/20 min-h-[220px]">
           <h2 className="text-xl font-semibold text-white mb-4">输出结果</h2>
           {error ? (
-            <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-200">{error}</div>
+            <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-200">
+              {error}
+            </div>
           ) : result ? (
             <div className="whitespace-pre-wrap text-sm leading-7 text-slate-100">{result}</div>
           ) : (

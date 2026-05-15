@@ -7,11 +7,7 @@ export const metadata: Metadata = {
   description: '赋能千万先锋的智能服务引擎与可复用业务平台基建。',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
       <head>
@@ -21,7 +17,7 @@ export default function RootLayout({
             <script>Pi.init({ version: "2.0" })</script>
           两个顺序 <script>，Pi Browser 保证同步执行，无需 defer / load 事件
         */}
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        {/* eslint-disable-next-line */}
         <script src="https://sdk.minepi.com/pi-sdk.js" />
         <script
           dangerouslySetInnerHTML={{
@@ -31,9 +27,7 @@ export default function RootLayout({
       </head>
       <body className="bg-gray-50 min-h-screen text-gray-900 font-sans flex flex-col">
         <EnvBanner />
-        <div className="flex-1 flex flex-col">
-          {children}
-        </div>
+        <div className="flex-1 flex flex-col">{children}</div>
       </body>
     </html>
   );

@@ -4,10 +4,18 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('pi_auth_token')?.value;
 
-  const protectedPaths = ['/dashboard', '/memberships', '/orders', '/payments', '/services', '/bookings', '/settings'];
-  
-  const isProtectedPath = protectedPaths.some((path) => 
-    request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`)
+  const protectedPaths = [
+    '/dashboard',
+    '/memberships',
+    '/orders',
+    '/payments',
+    '/services',
+    '/bookings',
+    '/settings',
+  ];
+
+  const isProtectedPath = protectedPaths.some(
+    (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`)
   );
 
   if (isProtectedPath && !token) {

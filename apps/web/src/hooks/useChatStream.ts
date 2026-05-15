@@ -15,7 +15,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const abortControllerRef = useRef<AbortController | null>(null);
   const maxRetries = options.maxRetries ?? 2;
 
@@ -27,134 +27,143 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     }
   }, []);
 
-  const appendMessage = useCallback(async (prompt: string) => {
-    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: prompt };
-    const assistantMessageId = (Date.now() + 1).toString();
-    
-    setMessages((prev) => [...prev, userMessage, { id: assistantMessageId, role: 'assistant', content: '' }]);
-    setIsLoading(true);
-    setError(null);
+  const appendMessage = useCallback(
+    async (prompt: string) => {
+      const userMessage: Message = { id: Date.now().toString(), role: 'user', content: prompt };
+      const assistantMessageId = (Date.now() + 1).toString();
 
-    let retryCount = 0;
-    
-    const executeStream = async (): Promise<void> => {
-      abortControllerRef.current = new AbortController();
-      let streamStarted = false;
+      setMessages((prev) => [
+        ...prev,
+        userMessage,
+        { id: assistantMessageId, role: 'assistant', content: '' },
+      ]);
+      setIsLoading(true);
+      setError(null);
 
-      try {
-        const response = await fetch('/api/ai/stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt, provider: options.provider }),
-          signal: abortControllerRef.current.signal,
-        });
+      let retryCount = 0;
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+      const executeStream = async (): Promise<void> => {
+        abortControllerRef.current = new AbortController();
+        let streamStarted = false;
 
-        if (!response.body) {
-          throw new Error('No response body returned');
-        }
+        try {
+          const response = await fetch('/api/ai/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, provider: options.provider }),
+            signal: abortControllerRef.current.signal,
+          });
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-        let accumulatedContent = '';
-        
-        // Throttled UI update to prevent excessive re-renders
-        let updatePending = false;
-        const flushUpdate = () => {
-          setMessages((prev) => 
-            prev.map((msg) => 
-              msg.id === assistantMessageId 
-                ? { ...msg, content: accumulatedContent } 
-                : msg
-            )
-          );
-          updatePending = false;
-        };
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
+          if (!response.body) {
+            throw new Error('No response body returned');
+          }
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          let accumulatedContent = '';
 
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+          // Throttled UI update to prevent excessive re-renders
+          let updatePending = false;
+          const flushUpdate = () => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId ? { ...msg, content: accumulatedContent } : msg
+              )
+            );
+            updatePending = false;
+          };
 
-            if (trimmedLine.startsWith('event: error')) {
-              // Expected next line is data: ...
-              continue; // We'll handle the data line next
+          let isDone = false;
+          while (!isDone) {
+            const { value, done } = await reader.read();
+            if (done) {
+              isDone = true;
+              break;
             }
 
-            if (trimmedLine.startsWith('data: ')) {
-              streamStarted = true; // Once we get data, we lock it in
-              const dataStr = trimmedLine.slice(6);
-              
-              if (dataStr === '[DONE]') {
-                flushUpdate();
-                return; // Normal exit
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+              if (trimmedLine.startsWith('event: error')) {
+                // Expected next line is data: ...
+                continue; // We'll handle the data line next
               }
-              
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.message) {
-                  // This is an error event payload
-                  throw new Error(data.message);
+
+              if (trimmedLine.startsWith('data: ')) {
+                streamStarted = true; // Once we get data, we lock it in
+                const dataStr = trimmedLine.slice(6);
+
+                if (dataStr === '[DONE]') {
+                  flushUpdate();
+                  isDone = true;
+                  return; // Normal exit
                 }
-                if (data.content) {
-                  accumulatedContent += data.content;
-                  if (!updatePending) {
-                    updatePending = true;
-                    requestAnimationFrame(flushUpdate);
+
+                try {
+                  const data = JSON.parse(dataStr);
+                  if (data.message) {
+                    // This is an error event payload
+                    throw new Error(data.message);
                   }
+                  if (data.content) {
+                    accumulatedContent += data.content;
+                    if (!updatePending) {
+                      updatePending = true;
+                      requestAnimationFrame(flushUpdate);
+                    }
+                  }
+                } catch (_e) {
+                  // Parse error, ignore incomplete chunks
                 }
-              } catch (e) {
-                // Parse error, ignore incomplete chunks
               }
             }
           }
+
+          // Final flush if any
+          if (updatePending) flushUpdate();
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            console.log('Stream aborted by user');
+            return;
+          }
+
+          if (!streamStarted && retryCount < maxRetries) {
+            retryCount++;
+            console.warn(`Stream failed, retrying... (${retryCount}/${maxRetries})`);
+            await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
+            return executeStream();
+          }
+
+          const errMsg = err instanceof Error ? err.message : String(err);
+          setError(errMsg);
+
+          // Append error to UI
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, content: msg.content + `\n\n[Error: ${errMsg}]` }
+                : msg
+            )
+          );
+        } finally {
+          setIsLoading(false);
         }
-        
-        // Final flush if any
-        if (updatePending) flushUpdate();
+      };
 
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          console.log('Stream aborted by user');
-          return;
-        }
-
-        if (!streamStarted && retryCount < maxRetries) {
-          retryCount++;
-          console.warn(`Stream failed, retrying... (${retryCount}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
-          return executeStream();
-        }
-
-        const errMsg = err instanceof Error ? err.message : String(err);
-        setError(errMsg);
-        
-        // Append error to UI
-        setMessages((prev) => 
-          prev.map((msg) => 
-            msg.id === assistantMessageId 
-              ? { ...msg, content: msg.content + `\n\n[Error: ${errMsg}]` } 
-              : msg
-          )
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    await executeStream();
-  }, [options.provider, maxRetries]);
+      await executeStream();
+    },
+    [options.provider, maxRetries]
+  );
 
   return { messages, isLoading, error, appendMessage, stopGeneration };
 }

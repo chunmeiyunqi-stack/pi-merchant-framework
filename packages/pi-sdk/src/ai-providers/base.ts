@@ -17,6 +17,7 @@ import type {
   AIProviderName,
   AIProviderRequest,
   AIProviderResponse,
+  AIStreamChunk,
 } from './types';
 import { logEvent, logError } from '../logger';
 
@@ -126,7 +127,7 @@ export abstract class BaseAIProvider implements AIProvider {
 
   /**
    * 发送流式请求（模板方法）
-   * 
+   *
    * 与 chat 不同，流式请求只对"初始连接"进行超时控制，
    * 建立连接后由底层控制，如果客户端中断则通过 signal 传递。
    */
@@ -142,12 +143,12 @@ export abstract class BaseAIProvider implements AIProvider {
     // 但为了防止死连接，可以设置一个较长的兜底超时或者取消超时。
     // 在这里我们仅将 signal 传给底层，由底层在 fetch 建立时抛出错误，
     // 且一旦 stream 开始 yielding，底层不会抛出 fallback，而是按错误结束 stream。
-    
+
     // 为了安全起见，我们不在基类为整个流式周期加固定定时器，而是依赖客户端 AbortSignal（路由层会传入）
     // 或者仅处理底层的 initial connection timeout.
     // 简单起见，我们仅传递 controller.signal 给 executeStream。
     // 注意：这里的 catch 可以捕获建立流之前的错误（即 fallback 所需的错误）。
-    
+
     try {
       // 记录流开始
       logEvent(`${this.getDisplayName()} stream started`, {
@@ -178,10 +179,7 @@ export abstract class BaseAIProvider implements AIProvider {
    * 通用 HTTP 响应错误处理
    * 子类在 executeChat() 中调用
    */
-  protected async handleHttpError(
-    response: Response,
-    model: string
-  ): Promise<never> {
+  protected async handleHttpError(response: Response, model: string): Promise<never> {
     const bodyText = await response.text();
     const errorMsg = `${this.getDisplayName()} API responded with status ${response.status}`;
     logError(errorMsg, bodyText, {
@@ -206,10 +204,7 @@ export abstract class BaseAIProvider implements AIProvider {
    * 通用健康检查 HTTP 请求
    * 子类可直接使用或覆写
    */
-  protected async performHealthCheckRequest(
-    url: string,
-    options?: RequestInit
-  ): Promise<boolean> {
+  protected async performHealthCheckRequest(url: string, options?: RequestInit): Promise<boolean> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);

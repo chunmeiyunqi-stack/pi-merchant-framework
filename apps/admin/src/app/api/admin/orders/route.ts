@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { getMerchantId } from '@/lib/utils';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
 
 export async function GET(req: Request) {
   const token = cookies().get('pi_auth_token')?.value;
-  if (!token || !verifySessionToken(token)) return NextResponse.json({ orders: [], pagination: null });
+  if (!token || !verifySessionToken(token))
+    return NextResponse.json({ orders: [], pagination: null });
 
   const { searchParams } = new URL(req.url);
   const statusParam = searchParams.get('status');
@@ -15,10 +17,10 @@ export async function GET(req: Request) {
 
   const page = pageParam ? Math.max(1, parseInt(pageParam)) : 1;
   const limit = limitParam ? Math.min(100, Math.max(1, parseInt(limitParam))) : 10;
-  
+
   const merchantId = getMerchantId();
-  const where: any = { merchantId };
-  
+  const where: Prisma.OrderWhereInput = { merchantId };
+
   if (statusParam && statusParam !== 'ALL') {
     where.status = statusParam;
   }
@@ -29,23 +31,23 @@ export async function GET(req: Request) {
       where,
       include: {
         customer: { select: { username: true } },
-        service: { select: { title: true } }
+        service: { select: { title: true } },
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
-      take: limit
+      take: limit,
     });
-    
-    return NextResponse.json({ 
-      orders, 
+
+    return NextResponse.json({
+      orders,
       pagination: {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit) || 1
-      }
+        totalPages: Math.ceil(total / limit) || 1,
+      },
     });
-  } catch (e) {
+  } catch (_e) {
     return NextResponse.json({ orders: [], pagination: null });
   }
 }

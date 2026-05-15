@@ -9,17 +9,18 @@ export async function GET() {
   try {
     const memberships = await prisma.membership.findMany({
       where: { merchantId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
     return NextResponse.json({ memberships });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ memberships: [] });
   }
 }
 
 export async function POST(req: Request) {
   const token = cookies().get('pi_auth_token')?.value;
-  if (!token || !verifySessionToken(token)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!token || !verifySessionToken(token))
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const merchantId = getMerchantId();
   try {
@@ -32,11 +33,14 @@ export async function POST(req: Request) {
         price: body.price,
         validDays: body.validDays || null,
         totalUses: body.totalUses || null,
-        status: 'ACTIVE'
-      }
+        status: 'ACTIVE',
+      },
     });
     return NextResponse.json({ success: true, data: newMembership });
-  } catch (e: any) {
-    return NextResponse.json({ success: false, error: e.message }, { status: 400 });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }

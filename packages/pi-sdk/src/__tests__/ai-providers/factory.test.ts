@@ -141,18 +141,18 @@ describe('AIProviderFactory', () => {
     it('throws for unknown provider', async () => {
       factory = new AIProviderFactory();
 
-      await expect(
-        factory.route(baseRequest, 'unknown-provider' as any)
-      ).rejects.toThrow('Unknown AI provider: unknown-provider');
+      await expect(factory.route(baseRequest, 'unknown-provider' as any)).rejects.toThrow(
+        'Unknown AI provider: unknown-provider'
+      );
     });
 
     it('throws when requested provider is unavailable', async () => {
       // Don't set ANTHROPIC_API_KEY
       factory = new AIProviderFactory();
 
-      await expect(
-        factory.route(baseRequest, 'anthropic')
-      ).rejects.toThrow("AI provider 'anthropic' is not available");
+      await expect(factory.route(baseRequest, 'anthropic')).rejects.toThrow(
+        "AI provider 'anthropic' is not available"
+      );
     });
 
     it('does NOT fallback when provider is directly requested', async () => {
@@ -164,9 +164,7 @@ describe('AIProviderFactory', () => {
       mockFetch.mockRejectedValueOnce(new Error('OpenAI down'));
 
       // Should NOT try Anthropic when OpenAI was directly requested
-      await expect(
-        factory.route(baseRequest, 'openai')
-      ).rejects.toThrow('OpenAI down');
+      await expect(factory.route(baseRequest, 'openai')).rejects.toThrow('OpenAI down');
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
@@ -323,11 +321,11 @@ describe('AIProviderFactory', () => {
   describe('routeStream() - Stream Routing', () => {
     let mockGenerateStreamOpenAI: jest.Mock;
     let mockGenerateStreamAnthropic: jest.Mock;
-    
+
     beforeEach(() => {
       mockGenerateStreamOpenAI = jest.fn();
       mockGenerateStreamAnthropic = jest.fn();
-      
+
       const openai = factory.getProvider('openai') as OpenAIProvider;
       openai.isAvailable = jest.fn().mockReturnValue(true);
       openai.generateStream = mockGenerateStreamOpenAI;
@@ -335,7 +333,7 @@ describe('AIProviderFactory', () => {
       const anthropic = factory.getProvider('anthropic') as AnthropicProvider;
       anthropic.isAvailable = jest.fn().mockReturnValue(true);
       anthropic.generateStream = mockGenerateStreamAnthropic;
-      
+
       const ollama = factory.getProvider('ollama') as OllamaProvider;
       ollama.isAvailable = jest.fn().mockReturnValue(true);
     });
@@ -393,7 +391,7 @@ describe('AIProviderFactory', () => {
 
       const stream = factory.routeStream({ messages: [{ role: 'user', content: 'test' }] });
       const chunks = [];
-      
+
       let caughtError: Error | null = null;
       try {
         for await (const chunk of stream) {

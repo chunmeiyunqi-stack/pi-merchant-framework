@@ -14,6 +14,7 @@ import type {
   AIProviderName,
   AIProviderRequest,
   AIProviderResponse,
+  AIStreamChunk,
   RoutingDecision,
 } from './types';
 import { OpenAIProvider } from './openai';
@@ -114,7 +115,9 @@ export class AIProviderFactory {
         throw new Error(`Unknown AI provider: ${requestedProvider}`);
       }
       if (!provider.isAvailable()) {
-        throw new Error(`AI provider '${requestedProvider}' is not available (missing API key or disabled)`);
+        throw new Error(
+          `AI provider '${requestedProvider}' is not available (missing API key or disabled)`
+        );
       }
 
       const response = await provider.chat(request);
@@ -207,8 +210,8 @@ export class AIProviderFactory {
 
     throw new Error(
       `All AI providers failed. Last error: ${lastError?.message ?? 'Unknown'}. ` +
-      `Attempted: ${providersToTry.join(', ')}. ` +
-      `Skipped: ${skipped.map((s) => `${s.provider}(${s.reason})`).join(', ')}`
+        `Attempted: ${providersToTry.join(', ')}. ` +
+        `Skipped: ${skipped.map((s) => `${s.provider}(${s.reason})`).join(', ')}`
     );
   }
 
@@ -255,7 +258,10 @@ export class AIProviderFactory {
     for (const providerName of providersToTry) {
       const provider = this.providers.get(providerName);
       if (!provider || !provider.isAvailable()) {
-        skipped.push({ provider: providerName, reason: !provider ? 'not registered' : 'not available' });
+        skipped.push({
+          provider: providerName,
+          reason: !provider ? 'not registered' : 'not available',
+        });
         continue;
       }
 
@@ -269,10 +275,10 @@ export class AIProviderFactory {
 
         // 尝试获取首个 chunk
         const firstResult = await iterator.next();
-        
+
         // 如果成功获取首个 chunk，说明连接已建立，锁定当前提供商
         streamStarted = true;
-        
+
         if (isFallback) {
           logWarn('AI stream routed via fallback', {
             primary: this.primaryProvider,
@@ -303,7 +309,6 @@ export class AIProviderFactory {
 
         // 成功完成，直接退出
         return;
-
       } catch (error) {
         if (streamStarted) {
           // 如果流已经开始，禁止 fallback，直接抛出错误
@@ -322,8 +327,8 @@ export class AIProviderFactory {
         });
       } finally {
         if (iterator && typeof iterator.return === 'function' && !streamStarted) {
-           // If we failed before starting or we are falling back, close the iterator to release resources
-           iterator.return().catch(() => {});
+          // If we failed before starting or we are falling back, close the iterator to release resources
+          iterator.return().catch(() => {});
         }
       }
     }
@@ -337,8 +342,8 @@ export class AIProviderFactory {
 
     throw new Error(
       `All AI stream providers failed. Last error: ${lastError?.message ?? 'Unknown'}. ` +
-      `Attempted: ${providersToTry.join(', ')}. ` +
-      `Skipped: ${skipped.map((s) => `${s.provider}(${s.reason})`).join(', ')}`
+        `Attempted: ${providersToTry.join(', ')}. ` +
+        `Skipped: ${skipped.map((s) => `${s.provider}(${s.reason})`).join(', ')}`
     );
   }
 

@@ -30,7 +30,9 @@ export default function StreamDemoPage() {
         {/* Chat History */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
           {messages.length === 0 ? (
-            <div className="text-center text-gray-400 mt-20">No messages yet. Send a prompt to start streaming.</div>
+            <div className="text-center text-gray-400 mt-20">
+              No messages yet. Send a prompt to start streaming.
+            </div>
           ) : (
             messages.map((msg) => (
               <div
@@ -69,11 +71,9 @@ export default function StreamDemoPage() {
                 <option value="invalid_provider">Force Invalid (Test Error)</option>
               </select>
             </label>
-            
+
             {error && (
-              <span className="text-red-500 bg-red-50 px-2 py-1 rounded">
-                Error occurred
-              </span>
+              <span className="text-red-500 bg-red-50 px-2 py-1 rounded">Error occurred</span>
             )}
           </div>
 

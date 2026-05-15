@@ -24,10 +24,16 @@ export default function MonitoringPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500 animate-pulse">正在加载监控指标...</div>;
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-4">系统监控中心</h1>
-      <p className="text-sm text-gray-500 mb-8">基础监控已激活，当前展示的是实时商户核心指标与支付健康状态。</p>
+      <p className="text-sm text-gray-500 mb-8">
+        基础监控已激活，当前展示的是实时商户核心指标与支付健康状态。
+      </p>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[
@@ -38,7 +44,10 @@ export default function MonitoringPage() {
           { label: '待处理支付', value: metrics?.pendingPayments ?? 0 },
           { label: '活跃服务', value: metrics?.activeServices ?? 0 },
         ].map((item) => (
-          <div key={item.label} className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div
+            key={item.label}
+            className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
+          >
             <p className="text-sm text-gray-500 mb-3">{item.label}</p>
             <p className="text-3xl font-semibold text-gray-900">{item.value}</p>
           </div>

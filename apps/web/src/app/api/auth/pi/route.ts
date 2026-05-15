@@ -99,10 +99,11 @@ export async function POST(req: Request) {
       user: { uid: verifiedUid, username: verifiedUsername },
       token: secureToken, // 发送给前端，作为 localStorage 备用
     });
-  } catch (error: any) {
-    logEvent('auth.pi.error', { error: error?.message ?? String(error) });
-    console.error('[Auth/Pi] 内部错误:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    console.error('[POST /api/auth/pi] 验证异常:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : '服务器内部错误' },
+      { status: 500 }
+    );
   }
 }
-

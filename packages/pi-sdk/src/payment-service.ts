@@ -21,9 +21,10 @@ import type {
 
 // ---- 配置 ----
 
-const API_BASE = typeof window !== 'undefined'
-  ? window.location.origin
-  : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000');
+const API_BASE =
+  typeof window !== 'undefined'
+    ? window.location.origin
+    : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000');
 
 // ============================================================
 // 核心：createPayment
@@ -95,7 +96,7 @@ export function createPayment(
     /**
      * SDK 内部错误
      */
-    onError: (error: Error, payment?: PiPaymentDTO) => {
+    onError: (error: Error, payment?: unknown) => {
       console.error('[PiPayment] SDK 错误:', error, payment);
       onFailed(error.message ?? 'Unknown SDK error');
     },
@@ -112,9 +113,7 @@ export function createPayment(
  * 后端审批支付（Server Approval）
  * @param req - { paymentId, orderId }
  */
-export async function approvePayment(
-  req: ApprovePaymentRequest
-): Promise<ApprovePaymentResponse> {
+export async function approvePayment(req: ApprovePaymentRequest): Promise<ApprovePaymentResponse> {
   const response = await fetch(`${API_BASE}/api/payments/approve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -169,9 +168,7 @@ export async function completePayment(
  * Pi SDK 在发现上次未完成的支付时触发此函数
  * @param payment - Pi Platform 返回的支付对象
  */
-export async function handleIncompletePayment(
-  payment: PiPaymentDTO
-): Promise<void> {
+export async function handleIncompletePayment(payment: PiPaymentDTO): Promise<void> {
   const { identifier: paymentId, status, transaction } = payment;
   console.log('[PiPayment] 发现未完成支付:', paymentId, status);
 

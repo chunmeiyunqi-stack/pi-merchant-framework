@@ -64,10 +64,14 @@ export async function POST(req: Request) {
           }
         }
       } catch (error) {
-        logError('AI stream failed', error instanceof Error ? error : new Error(String(error)), { merchantId });
+        logError('AI stream failed', error instanceof Error ? error : new Error(String(error)), {
+          merchantId,
+        });
         const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
         // Send an error event instead of data
-        controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ message: errorMessage })}\n\n`));
+        controller.enqueue(
+          encoder.encode(`event: error\ndata: ${JSON.stringify({ message: errorMessage })}\n\n`)
+        );
       } finally {
         clearInterval(heartbeat);
         try {
@@ -79,14 +83,14 @@ export async function POST(req: Request) {
     },
     cancel() {
       // Stream cancelled by consumer
-    }
+    },
   });
 
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     },
   });
 }

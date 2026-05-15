@@ -27,7 +27,7 @@ export async function GET(req: Request) {
 
   const customer = await prisma.customer.findFirst({
     where: { piUid },
-    select: { username: true }
+    select: { username: true },
   });
 
   if (!customer) {

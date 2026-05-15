@@ -6,7 +6,7 @@ export function verifySessionToken(token: string): string | null {
   if (!token || !token.includes('.')) return null;
 
   const [payload, signature] = token.split('.');
-  
+
   const hmac = crypto.createHmac('sha256', SECRET_KEY);
   hmac.update(payload);
   const expectedSignature = hmac.digest('base64url');
@@ -17,7 +17,7 @@ export function verifySessionToken(token: string): string | null {
 
   try {
     return Buffer.from(payload, 'base64url').toString('utf8');
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }

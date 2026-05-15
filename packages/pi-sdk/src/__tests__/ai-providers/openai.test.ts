@@ -59,7 +59,9 @@ describe('OpenAIProvider', () => {
   it('throws on non-OK response', async () => {
     const provider = new OpenAIProvider({ apiKey: 'k' });
     mockFetch.mockResolvedValueOnce({
-      ok: false, status: 429, text: async () => 'Rate limit',
+      ok: false,
+      status: 429,
+      text: async () => 'Rate limit',
     } as Response);
     await expect(provider.chat(baseRequest)).rejects.toThrow('Rate limit');
   });
@@ -67,7 +69,8 @@ describe('OpenAIProvider', () => {
   it('throws on empty choices', async () => {
     const provider = new OpenAIProvider({ apiKey: 'k' });
     mockFetch.mockResolvedValueOnce({
-      ok: true, json: async () => ({ choices: [], model: 'gpt-4o-mini' }),
+      ok: true,
+      json: async () => ({ choices: [], model: 'gpt-4o-mini' }),
     } as Response);
     await expect(provider.chat(baseRequest)).rejects.toThrow('no valid response');
   });

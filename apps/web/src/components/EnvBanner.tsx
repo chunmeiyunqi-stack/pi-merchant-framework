@@ -8,7 +8,7 @@ export default function EnvBanner() {
   useEffect(() => {
     // 基础探测，给予合理延迟容错
     const timer = setTimeout(() => {
-      if (typeof window !== 'undefined' && !(window as any).Pi) {
+      if (typeof window !== 'undefined' && !window.Pi) {
         setIsOutsidePi(true);
       }
     }, 1500);
@@ -24,11 +24,12 @@ export default function EnvBanner() {
       <div className="flex items-center text-center sm:text-left mb-2 sm:mb-0 max-w-3xl">
         <span className="mr-2 text-lg">💡</span>
         <span>
-          侦测到您当前可能未在 Pi Browser 访问。为体验无缝的生态身份互通及完整的应用功能，欢迎复制链接，
+          侦测到您当前可能未在 Pi Browser
+          访问。为体验无缝的生态身份互通及完整的应用功能，欢迎复制链接，
           <strong className="text-white mx-1">在 Pi Browser 中重新开启</strong>本站。
         </span>
       </div>
-      <button 
+      <button
         onClick={() => {
           navigator.clipboard.writeText(currentUrl);
           alert('网址已复制！请前往 Pi Browser 地址栏粘贴访问。');

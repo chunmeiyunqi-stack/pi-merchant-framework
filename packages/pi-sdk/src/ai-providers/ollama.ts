@@ -10,11 +10,8 @@
 //   - 使用 /api/chat 端点（非流式模式）
 // ============================================================
 
-import type {
-  AIProviderRequest,
-  AIProviderResponse,
-} from './types';
 import { BaseAIProvider } from './base';
+import type { AIProviderRequest, AIProviderResponse, AIStreamChunk } from './types';
 
 const DEFAULT_MODEL = 'llama3.1';
 const DEFAULT_BASE_URL = 'http://localhost:11434';
@@ -52,7 +49,7 @@ export class OllamaProvider extends BaseAIProvider {
 
   constructor(config?: Partial<{ baseUrl: string; defaultModel: string; timeout: number }>) {
     super({
-      apiKey: '',  // Ollama 无需 API Key
+      apiKey: '', // Ollama 无需 API Key
       baseUrl: config?.baseUrl ?? process.env.OLLAMA_API_BASE ?? DEFAULT_BASE_URL,
       defaultModel: config?.defaultModel ?? process.env.OLLAMA_MODEL ?? DEFAULT_MODEL,
       timeout: config?.timeout ?? DEFAULT_TIMEOUT,
@@ -99,7 +96,7 @@ export class OllamaProvider extends BaseAIProvider {
         role: m.role,
         content: m.content,
       })),
-      stream: false,  // 使用非流式模式获取完整响应
+      stream: false, // 使用非流式模式获取完整响应
       options: {
         temperature: request.temperature ?? 0.6,
         num_predict: request.maxTokens ?? 512,
@@ -130,13 +127,14 @@ export class OllamaProvider extends BaseAIProvider {
       content,
       model: data.model,
       provider: 'ollama',
-      usage: data.prompt_eval_count !== undefined && data.eval_count !== undefined
-        ? {
-            promptTokens: data.prompt_eval_count,
-            completionTokens: data.eval_count,
-            totalTokens: data.prompt_eval_count + data.eval_count,
-          }
-        : undefined,
+      usage:
+        data.prompt_eval_count !== undefined && data.eval_count !== undefined
+          ? {
+              promptTokens: data.prompt_eval_count,
+              completionTokens: data.eval_count,
+              totalTokens: data.prompt_eval_count + data.eval_count,
+            }
+          : undefined,
     };
   }
 

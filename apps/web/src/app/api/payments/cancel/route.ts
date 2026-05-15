@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { paymentId?: string };
+    const body = (await request.json()) as { paymentId?: string };
     const { paymentId } = body;
 
     if (!paymentId) {

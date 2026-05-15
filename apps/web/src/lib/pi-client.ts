@@ -1,8 +1,8 @@
 // apps/web/src/lib/pi-client.ts
 
 export const initPiSDK = () => {
-  if (typeof window !== 'undefined' && (window as any).Pi) {
-    const Pi = (window as any).Pi;
+  if (typeof window !== 'undefined' && window.Pi) {
+    const Pi = window.Pi;
     // Set sandbox mode dynamically (usually true in development)
     const isSandbox = process.env.NEXT_PUBLIC_PI_SANDBOX === 'true';
     Pi.init({ version: '2.0', sandbox: isSandbox });
@@ -14,11 +14,11 @@ export const initPiSDK = () => {
 interface CreatePaymentOptions {
   amount: number;
   memo: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   onReadyForServerApproval: (paymentId: string) => void;
   onReadyForServerCompletion: (paymentId: string, txid: string) => void;
   onCancel: (paymentId: string) => void;
-  onError: (error: any, payment?: any) => void;
+  onError: (error: Error, payment?: unknown) => void;
 }
 
 export const createPiPayment = async (options: CreatePaymentOptions) => {

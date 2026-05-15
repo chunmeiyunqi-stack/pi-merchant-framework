@@ -7,9 +7,9 @@ export function middleware(request: NextRequest) {
 
   // Paths that require authentication
   const protectedPaths = ['/dashboard', '/account', '/billing'];
-  
-  const isProtectedPath = protectedPaths.some((path) => 
-    request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`)
+
+  const isProtectedPath = protectedPaths.some(
+    (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`)
   );
 
   // Redirect to login (Sign In) if trying to access a protected route without a token
@@ -21,7 +21,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Ensure the landing page / is ALWAYS accessible to unauthenticated users.
-  // Next.js allows it unless explicitly intercepted, but this is added for clarity 
+  // Next.js allows it unless explicitly intercepted, but this is added for clarity
   // to satisfy strict requirements forbidding auto-redirects to signup on /.
   if (request.nextUrl.pathname === '/') {
     return NextResponse.next();

@@ -30,7 +30,9 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     fetch('/api/admin/settings', { credentials: 'include' })
       .then((r) => r.json())
-      .then((data: { config: AppConfigForm }) => { if (data.config) setForm(data.config); })
+      .then((data: { config: AppConfigForm }) => {
+        if (data.config) setForm(data.config);
+      })
       .catch(() => {});
   }, []);
 
@@ -50,8 +52,7 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const toggle = (key: keyof AppConfigForm) =>
-    setForm((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggle = (key: keyof AppConfigForm) => setForm((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
     <div>
@@ -86,7 +87,9 @@ export default function AdminSettingsPage() {
             className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]"
           >
             {['beauty', 'fitness', 'education', 'consulting', 'repair', 'generic'].map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>
+                {s}
+              </option>
             ))}
           </select>
         </div>
@@ -107,9 +110,11 @@ export default function AdminSettingsPage() {
                   form[key as keyof AppConfigForm] ? 'bg-[#7C3AED]' : 'bg-gray-200'
                 }`}
               >
-                <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
-                  form[key as keyof AppConfigForm] ? 'translate-x-6' : 'translate-x-0'
-                }`} />
+                <span
+                  className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
+                    form[key as keyof AppConfigForm] ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
               </button>
             </div>
           ))}

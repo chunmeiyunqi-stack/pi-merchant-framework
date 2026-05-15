@@ -14,8 +14,8 @@ type IndustryPreset = Omit<MerchantConfig, 'merchantId' | 'info'>;
 // ============================================================
 export const beautyPreset: IndustryPreset = {
   modules: {
-    booking: true,       // 必须：预约制服务
-    membership: true,    // 常用：次卡/月卡
+    booking: true, // 必须：预约制服务
+    membership: true, // 常用：次卡/月卡
     subscription: false,
     coupon: false,
     a2uReward: false,
@@ -38,7 +38,7 @@ export const beautyPreset: IndustryPreset = {
     refundWindowHours: 24,
   },
   theme: {
-    primaryColor: '#C48FBE',   // 玫瑰紫
+    primaryColor: '#C48FBE', // 玫瑰紫
     secondaryColor: '#F7D6E0', // 粉霜白
     borderRadius: 'lg',
   },
@@ -49,8 +49,8 @@ export const beautyPreset: IndustryPreset = {
 // ============================================================
 export const fitnessPreset: IndustryPreset = {
   modules: {
-    booking: true,       // 课程预约
-    membership: true,    // 月卡/年卡核心
+    booking: true, // 课程预约
+    membership: true, // 月卡/年卡核心
     subscription: false,
     coupon: false,
     a2uReward: false,
@@ -72,7 +72,7 @@ export const fitnessPreset: IndustryPreset = {
     refundEnabled: false,
   },
   theme: {
-    primaryColor: '#2563EB',   // 活力蓝
+    primaryColor: '#2563EB', // 活力蓝
     secondaryColor: '#DBEAFE', // 浅蓝
     borderRadius: 'md',
   },
@@ -83,8 +83,8 @@ export const fitnessPreset: IndustryPreset = {
 // ============================================================
 export const educationPreset: IndustryPreset = {
   modules: {
-    booking: true,       // 课程预约
-    membership: true,    // 课时包
+    booking: true, // 课程预约
+    membership: true, // 课时包
     subscription: false,
     coupon: false,
     a2uReward: false,
@@ -107,7 +107,7 @@ export const educationPreset: IndustryPreset = {
     refundWindowHours: 48,
   },
   theme: {
-    primaryColor: '#059669',   // 知性绿
+    primaryColor: '#059669', // 知性绿
     secondaryColor: '#D1FAE5', // 浅绿
     borderRadius: 'md',
   },
@@ -142,7 +142,7 @@ export const consultingPreset: IndustryPreset = {
     refundWindowHours: 12,
   },
   theme: {
-    primaryColor: '#7C3AED',   // 专业紫
+    primaryColor: '#7C3AED', // 专业紫
     secondaryColor: '#EDE9FE',
     borderRadius: 'sm',
   },
@@ -162,16 +162,18 @@ export const industryPresets: Record<string, IndustryPreset> = {
  * @returns 对应的行业预设配置
  */
 export function getIndustryPreset(skin: string): IndustryPreset {
-  return industryPresets[skin] ?? {
-    modules: {
-      booking: true,
-      membership: false,
-      subscription: false,
-      coupon: false,
-      a2uReward: false,
-    },
-    homepage: { layout: 'service-first', primaryCta: 'order' },
-    industry: { skin: 'generic', serviceMode: 'walk-in', requireTimeSlot: false },
-    payment: { checkoutMode: 'single', currency: 'Pi', refundEnabled: false },
-  };
+  return (
+    industryPresets[skin] ?? {
+      modules: {
+        booking: true,
+        membership: false,
+        subscription: false,
+        coupon: false,
+        a2uReward: false,
+      },
+      homepage: { layout: 'service-first', primaryCta: 'order' },
+      industry: { skin: 'generic', serviceMode: 'walk-in', requireTimeSlot: false },
+      payment: { checkoutMode: 'single', currency: 'Pi', refundEnabled: false },
+    }
+  );
 }

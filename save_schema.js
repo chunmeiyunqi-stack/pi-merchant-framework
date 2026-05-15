@@ -301,7 +301,7 @@ const schemaLines = [
   '  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)',
   '',
   '  @@map("app_configs")',
-  '}'
+  '}',
 ];
 
 const targetPath = path.join('D:\\', 'PiMerchantFramework', 'prisma', 'schema.prisma');
@@ -312,7 +312,7 @@ fs.writeFileSync(targetPath, schemaContent, { encoding: 'utf8' });
 
 // 5. 写完读取验证
 const buf = fs.readFileSync(targetPath);
-const isBom = buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF;
+const isBom = buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf;
 
 // 3. 打印 OK 等信息
 console.log(`OK: ${buf.length} bytes written, BOM: ${isBom}`);

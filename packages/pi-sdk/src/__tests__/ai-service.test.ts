@@ -178,7 +178,7 @@ describe('AI Service (Backward Compatibility)', () => {
     beforeEach(() => {
       process.env.OPENAI_API_KEY = 'test-key';
       process.env.OLLAMA_ENABLED = 'false';
-      process.env.AI_FALLBACK_PROVIDERS = '';  // Disable fallback for cleaner error tests
+      process.env.AI_FALLBACK_PROVIDERS = ''; // Disable fallback for cleaner error tests
     });
 
     it('handles network errors gracefully', async () => {
@@ -241,7 +241,9 @@ describe('AI Service (Backward Compatibility)', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          id: 'msg_1', type: 'message', role: 'assistant',
+          id: 'msg_1',
+          type: 'message',
+          role: 'assistant',
           model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Anthropic response' }],
           usage: { input_tokens: 10, output_tokens: 5 },
@@ -271,7 +273,9 @@ describe('AI Service (Backward Compatibility)', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          id: 'msg_1', type: 'message', role: 'assistant',
+          id: 'msg_1',
+          type: 'message',
+          role: 'assistant',
           model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Fallback to Anthropic' }],
           usage: { input_tokens: 10, output_tokens: 5 },

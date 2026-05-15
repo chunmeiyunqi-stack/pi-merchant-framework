@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   try {
     const cookieStore = cookies();
     let token = cookieStore.get('pi_auth_token')?.value;
-    
+
     // 如果 Cookie 丢了，尝试从 Authorization 头中读取
     if (!token) {
       const authHeader = req.headers.get('authorization');
@@ -17,15 +17,18 @@ export async function POST(req: Request) {
         token = authHeader.substring(7);
       }
     }
-    
+
     console.log('[Orders API] Received token:', token ? 'YES (hidden)' : 'NO');
-    
+
     const piUid = token ? verifySessionToken(token) : null;
-    
+
     console.log('[Orders API] Verified piUid:', piUid ? piUid : 'FAILED');
 
     if (!piUid) {
-      return NextResponse.json({ success: false, error: 'Unauthorized (No valid token)' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized (No valid token)' },
+        { status: 401 }
+      );
     }
 
     const body = await req.json();
@@ -34,7 +37,7 @@ export async function POST(req: Request) {
 
     // Verify customer exists
     const customer = await prisma.customer.findUnique({
-      where: { merchantId_piUid: { merchantId, piUid } }
+      where: { merchantId_piUid: { merchantId, piUid } },
     });
 
     if (!customer) {
@@ -53,12 +56,15 @@ export async function POST(req: Request) {
         amount,
         status: 'DRAFT',
         note: memo || planId || 'App Subscription',
-      }
+      },
     });
 
     return NextResponse.json({ success: true, order });
-  } catch (error: any) {
-    console.error('Create Order Error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    console.error('[POST /api/orders] 创建订单失败:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : '服务器内部错误' },
+      { status: 500 }
+    );
   }
 }

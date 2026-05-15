@@ -10,11 +10,8 @@
 //   - 认证头使用 x-api-key，非 Bearer token
 // ============================================================
 
-import type {
-  AIProviderRequest,
-  AIProviderResponse,
-} from './types';
 import { BaseAIProvider } from './base';
+import type { AIProviderRequest, AIProviderResponse, AIStreamChunk } from './types';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
@@ -52,7 +49,9 @@ interface AnthropicMessagesResponse {
 export class AnthropicProvider extends BaseAIProvider {
   readonly name = 'anthropic' as const;
 
-  constructor(config?: Partial<{ apiKey: string; baseUrl: string; defaultModel: string; timeout: number }>) {
+  constructor(
+    config?: Partial<{ apiKey: string; baseUrl: string; defaultModel: string; timeout: number }>
+  ) {
     super({
       apiKey: config?.apiKey ?? process.env.ANTHROPIC_API_KEY ?? '',
       baseUrl: config?.baseUrl ?? process.env.ANTHROPIC_API_BASE ?? DEFAULT_BASE_URL,

@@ -105,7 +105,9 @@ describe('OllamaProvider', () => {
   it('throws on non-OK response', async () => {
     const provider = new OllamaProvider();
     mockFetch.mockResolvedValueOnce({
-      ok: false, status: 404, text: async () => 'Model not found',
+      ok: false,
+      status: 404,
+      text: async () => 'Model not found',
     } as Response);
     await expect(provider.chat(baseRequest)).rejects.toThrow('Model not found');
   });

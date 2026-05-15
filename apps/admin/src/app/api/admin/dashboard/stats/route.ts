@@ -24,29 +24,37 @@ export async function GET() {
   startOfToday.setHours(0, 0, 0, 0);
 
   try {
-    const [todayOrders, todayRevenueAgg, totalMembers, pendingBookings, activeServices, pendingPayments, activeMemberships] = await Promise.all([
+    const [
+      todayOrders,
+      todayRevenueAgg,
+      totalMembers,
+      pendingBookings,
+      activeServices,
+      pendingPayments,
+      activeMemberships,
+    ] = await Promise.all([
       prisma.order.count({
-        where: { merchantId, createdAt: { gte: startOfToday } }
+        where: { merchantId, createdAt: { gte: startOfToday } },
       }),
       prisma.payment.aggregate({
         _sum: { amount: true },
-        where: { order: { merchantId }, status: 'COMPLETED', createdAt: { gte: startOfToday } }
+        where: { order: { merchantId }, status: 'COMPLETED', createdAt: { gte: startOfToday } },
       }),
       prisma.customer.count({
-        where: { merchantId }
+        where: { merchantId },
       }),
       prisma.booking.count({
-        where: { merchantId, status: 'PENDING' }
+        where: { merchantId, status: 'PENDING' },
       }),
       prisma.service.count({
-        where: { merchantId, status: 'ACTIVE' }
+        where: { merchantId, status: 'ACTIVE' },
       }),
       prisma.payment.count({
-        where: { status: 'PENDING', order: { merchantId } }
+        where: { status: 'PENDING', order: { merchantId } },
       }),
       prisma.customerMembership.count({
-        where: { customer: { merchantId }, status: 'ACTIVE' }
-      })
+        where: { customer: { merchantId }, status: 'ACTIVE' },
+      }),
     ]);
 
     const todayRevenue = todayRevenueAgg._sum.amount ? Number(todayRevenueAgg._sum.amount) : 0;

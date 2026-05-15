@@ -11,26 +11,26 @@ let lines = content.split('\n');
 
 // Remove empty lines at the very end
 while (lines[lines.length - 1].trim() === '') {
-    lines.pop();
+  lines.pop();
 }
 
 // Add the copyright header to the beginning
 const headerLines = [
-    "/* ===========================================================================",
-    " * Pioneer AI Service Framework V1.0.0",
-    " * 版权所有 © 2026 [秦晓望]",
-    " * 提交日期：2026-05-04",
-    " * =========================================================================== */",
-    ""
+  '/* ===========================================================================',
+  ' * Pioneer AI Service Framework V1.0.0',
+  ' * 版权所有 © 2026 [秦晓望]',
+  ' * 提交日期：2026-05-04',
+  ' * =========================================================================== */',
+  '',
 ];
 
 lines = [...headerLines, ...lines];
 
 // For soft copyright in China, if lines > 3000, take first 1500 and last 1500
 if (lines.length > 3000) {
-    const firstHalf = lines.slice(0, 1500);
-    const secondHalf = lines.slice(lines.length - 1500);
-    lines = [...firstHalf, ...secondHalf];
+  const firstHalf = lines.slice(0, 1500);
+  const secondHalf = lines.slice(lines.length - 1500);
+  lines = [...firstHalf, ...secondHalf];
 }
 
 const linesPerPage = 50;
@@ -114,10 +114,12 @@ let pageCount = Math.ceil(lines.length / linesPerPage);
 
 for (let i = 0; i < pageCount; i++) {
   const pageLines = lines.slice(i * linesPerPage, (i + 1) * linesPerPage);
-  
+
   // Replace HTML special characters
-  const pageContent = pageLines.map(l => l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('\n');
-  
+  const pageContent = pageLines
+    .map((l) => l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+    .join('\n');
+
   html += `
   <div class="page">
     <div class="header">Pioneer AI Service Framework V1.0.0</div>

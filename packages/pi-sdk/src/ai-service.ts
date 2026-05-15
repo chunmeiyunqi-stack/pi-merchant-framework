@@ -14,7 +14,7 @@
 import { logEvent, logError } from './logger';
 import { getProviderFactory } from './ai-providers/factory';
 import type { AIRequest, AIResponse } from './types';
-import type { AIProviderName } from './ai-providers/types';
+import type { AIProviderName, AIStreamChunk } from './ai-providers/types';
 
 /**
  * 构建 merchant 上下文的 system prompt

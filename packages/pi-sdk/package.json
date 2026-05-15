@@ -1,8 +1,22 @@
 {
-    "name":  "@pi-merchant/pi-sdk",
-    "version":  "0.1.0",
-    "description":  "Pi Network SDK wrapper for Pi Merchant Framework",
-    "main":  "./src/index.ts",
-    "types":  "./src/index.ts",
-    "private":  true
+  "name": "@pi-merchant/pi-sdk",
+  "version": "0.1.0",
+  "description": "Pi Network SDK wrapper for Pi Merchant Framework",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --watch",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "docs": "typedoc"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "jest-mock-fetch": "^2.0.5",
+    "tsup": "^8.5.1",
+    "typedoc": "^0.28.19",
+    "typedoc-plugin-markdown": "^4.11.0"
+  }
 }

@@ -13,18 +13,18 @@ export async function GET() {
     const payments = await prisma.payment.findMany({
       where: { order: { merchantId } },
       include: {
-        order: { 
-          select: { 
-            orderNo: true, 
-            customer: { select: { username: true } } 
-          }
-        }
+        order: {
+          select: {
+            orderNo: true,
+            customer: { select: { username: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
-      take: 100
+      take: 100,
     });
     return NextResponse.json({ payments });
-  } catch (e) {
+  } catch (_e) {
     return NextResponse.json({ payments: [] });
   }
 }

@@ -82,6 +82,7 @@ export interface PiAuthResponse {
   username?: string;
   message?: string;
   error?: string;
+  token?: string;
 }
 
 export interface ApprovePaymentRequest {

@@ -1,7 +1,7 @@
 import type { LogLevel } from './types';
 
-const SERVICE_NAME = process.env.NEXT_PUBLIC_APP_NAME || process.env.APP_NAME || 'pi-merchant-framework';
-const MONITORING_WEBHOOK_URL = process.env.MONITORING_WEBHOOK_URL;
+const SERVICE_NAME =
+  process.env.NEXT_PUBLIC_APP_NAME || process.env.APP_NAME || 'pi-merchant-framework';
 
 function createPayload(level: LogLevel, message: string, metadata?: Record<string, unknown>) {
   return {
@@ -13,9 +13,25 @@ function createPayload(level: LogLevel, message: string, metadata?: Record<strin
   } as const;
 }
 
+function safeStringify(obj: unknown): string {
+  const cache = new Set();
+  return JSON.stringify(obj, (key, value) => {
+    if (typeof value === 'object' && value !== null) {
+      if (cache.has(value)) return '[Circular]';
+      cache.add(value);
+    }
+    return value;
+  });
+}
+
 export function log(level: LogLevel, message: string, metadata?: Record<string, unknown>) {
   const payload = createPayload(level, message, metadata);
-  const formatted = JSON.stringify(payload);
+  let formatted = '';
+  try {
+    formatted = safeStringify(payload);
+  } catch (_e) {
+    formatted = JSON.stringify({ error: 'stringify_failed' });
+  }
 
   switch (level) {
     case 'debug':
@@ -31,19 +47,22 @@ export function log(level: LogLevel, message: string, metadata?: Record<string, 
       console.info(formatted);
   }
 
-  if (MONITORING_WEBHOOK_URL) {
-    void fetch(MONITORING_WEBHOOK_URL, {
+  const webhookUrl = process.env.MONITORING_WEBHOOK_URL;
+  if (webhookUrl) {
+    void fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: formatted,
     }).catch((error) => {
-      console.warn(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        service: SERVICE_NAME,
-        level: 'warn',
-        message: 'Monitoring webhook failed',
-        metadata: { error: String(error), webhook: MONITORING_WEBHOOK_URL },
-      }));
+      console.warn(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          service: SERVICE_NAME,
+          level: 'warn',
+          message: 'Monitoring webhook failed',
+          metadata: { error: String(error), webhook: webhookUrl },
+        })
+      );
     });
   }
 }
@@ -61,7 +80,10 @@ export function logWarn(message: string, metadata?: Record<string, unknown>) {
 }
 
 export function logError(message: string, error?: unknown, metadata?: Record<string, unknown>) {
-  const errorDetails = error instanceof Error ? { message: error.message, stack: error.stack } : { error: String(error) };
+  const errorDetails =
+    error instanceof Error
+      ? { message: error.message, stack: error.stack }
+      : { error: String(error) };
   log('error', message, { ...metadata, ...errorDetails });
 }
 

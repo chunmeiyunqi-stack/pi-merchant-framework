@@ -12,8 +12,8 @@ export default function PiLoginButton() {
   useEffect(() => {
     // 验证后端 session 是否仍有效
     fetch('/api/auth/me')
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.authenticated) setUsername(data.username);
       })
       .catch(console.error);
@@ -21,14 +21,16 @@ export default function PiLoginButton() {
 
   const handleLogin = async () => {
     // Pi Browser 同步加载 SDK，Pi.init() 也是同步的，此处直接检查即可
-    if (typeof window === 'undefined' || !(window as any).Pi) {
+    if (typeof window === 'undefined' || !window.Pi) {
       alert('💡 请在 Pi Browser 中打开此应用后再操作。');
       return;
     }
 
     setLoading(true);
     try {
-      const authResult = await authenticateWithPi(process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001');
+      const authResult = await authenticateWithPi(
+        process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001'
+      );
       if (authResult.success && authResult.user) {
         if (authResult.token) {
           localStorage.setItem('pi_auth_token_fallback', authResult.token);
@@ -40,9 +42,10 @@ export default function PiLoginButton() {
 
       console.error('[PiLogin] 后端验证失败:', authResult.error);
       alert('身份验证失败: ' + (authResult.error ?? '未知错误'));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[PiLogin] 握手异常:', error);
-      alert('握手中止，请重试。错误: ' + (error?.message ?? '未知'));
+      const errorMessage = error instanceof Error ? error.message : '未知';
+      alert('握手中止，请重试。错误: ' + errorMessage);
     } finally {
       setLoading(false);
     }

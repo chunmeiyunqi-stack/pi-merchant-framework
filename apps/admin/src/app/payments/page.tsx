@@ -23,7 +23,10 @@ export default function AdminPaymentsPage() {
   useEffect(() => {
     fetch('/api/admin/payments', { credentials: 'include' })
       .then((r) => r.json())
-      .then((data: { payments: Payment[] }) => { setPayments(data.payments ?? []); setLoading(false); })
+      .then((data: { payments: Payment[] }) => {
+        setPayments(data.payments ?? []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -36,32 +39,61 @@ export default function AdminPaymentsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                {['Pi Payment ID', '链上 TxID', '金额', '状态', '已审批', '已完成', '时间'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium whitespace-nowrap">{h}</th>
-                ))}
+                {['Pi Payment ID', '链上 TxID', '金额', '状态', '已审批', '已完成', '时间'].map(
+                  (h) => (
+                    <th
+                      key={h}
+                      className="text-left px-4 py-3 text-gray-500 font-medium whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-10 text-gray-300">加载中...</td></tr>
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-gray-300">
+                    加载中...
+                  </td>
+                </tr>
               ) : payments.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-10 text-gray-400">暂无支付记录</td></tr>
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-gray-400">
+                    暂无支付记录
+                  </td>
+                </tr>
               ) : (
                 payments.map((p) => (
                   <tr key={p.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[140px] truncate" title={p.piPaymentId}>
+                    <td
+                      className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[140px] truncate"
+                      title={p.piPaymentId}
+                    >
                       {p.piPaymentId}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-400 max-w-[120px] truncate" title={p.txid ?? ''}>
+                    <td
+                      className="px-4 py-3 font-mono text-xs text-gray-400 max-w-[120px] truncate"
+                      title={p.txid ?? ''}
+                    >
                       {p.txid ?? '-'}
                     </td>
-                    <td className="px-4 py-3 text-[#7C3AED] font-semibold">π {Number(p.amount).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-[#7C3AED] font-semibold">
+                      π {Number(p.amount).toFixed(2)}
+                    </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-lg ${
-                        p.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                        p.status === 'CANCELLED' ? 'bg-red-100 text-red-600' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>{p.status}</span>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-lg ${
+                          p.status === 'COMPLETED'
+                            ? 'bg-green-100 text-green-700'
+                            : p.status === 'CANCELLED'
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {p.status}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-center">{p.developerApproved ? '✅' : '❌'}</td>
                     <td className="px-4 py-3 text-center">{p.developerCompleted ? '✅' : '❌'}</td>

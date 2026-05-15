@@ -23,17 +23,50 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/admin/dashboard/stats', { credentials: 'include' })
       .then((r) => r.json())
-      .then((data: DashboardStats) => { setStats(data); setLoading(false); })
+      .then((data: DashboardStats) => {
+        setStats(data);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
   const cards = [
-    { label: '今日订单', value: stats?.todayOrders ?? 0, icon: '📋', color: 'bg-blue-50 border-blue-100' },
-    { label: '今日收款 (π)', value: stats?.todayRevenue?.toFixed(2) ?? '0.00', icon: '💰', color: 'bg-green-50 border-green-100' },
-    { label: '活跃服务', value: stats?.activeServices ?? 0, icon: '🛠️', color: 'bg-cyan-50 border-cyan-100' },
-    { label: '待处理支付', value: stats?.pendingPayments ?? 0, icon: '⚠️', color: 'bg-amber-50 border-amber-100' },
-    { label: '活跃会员数', value: stats?.activeMemberships ?? 0, icon: '⭐', color: 'bg-purple-50 border-purple-100' },
-    { label: '待核销预约', value: stats?.pendingBookings ?? 0, icon: '📅', color: 'bg-orange-50 border-orange-100' },
+    {
+      label: '今日订单',
+      value: stats?.todayOrders ?? 0,
+      icon: '📋',
+      color: 'bg-blue-50 border-blue-100',
+    },
+    {
+      label: '今日收款 (π)',
+      value: stats?.todayRevenue?.toFixed(2) ?? '0.00',
+      icon: '💰',
+      color: 'bg-green-50 border-green-100',
+    },
+    {
+      label: '活跃服务',
+      value: stats?.activeServices ?? 0,
+      icon: '🛠️',
+      color: 'bg-cyan-50 border-cyan-100',
+    },
+    {
+      label: '待处理支付',
+      value: stats?.pendingPayments ?? 0,
+      icon: '⚠️',
+      color: 'bg-amber-50 border-amber-100',
+    },
+    {
+      label: '活跃会员数',
+      value: stats?.activeMemberships ?? 0,
+      icon: '⭐',
+      color: 'bg-purple-50 border-purple-100',
+    },
+    {
+      label: '待核销预约',
+      value: stats?.pendingBookings ?? 0,
+      icon: '📅',
+      color: 'bg-orange-50 border-orange-100',
+    },
   ];
 
   return (

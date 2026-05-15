@@ -14,7 +14,7 @@ export async function POST(req: Request) {
 
     // 1. 幂等策略: 检查数据库状态
     const existingPayment = await prisma.payment.findUnique({
-      where: { piPaymentId: paymentId }
+      where: { piPaymentId: paymentId },
     });
 
     if (!existingPayment) {
@@ -28,12 +28,12 @@ export async function POST(req: Request) {
             status: 'PENDING',
             developerApproved: true,
             approvedAt: new Date(),
-            memo: `Paying for order ${order.orderNo}`
-          }
+            memo: `Paying for order ${order.orderNo}`,
+          },
         });
         await prisma.order.update({
           where: { id: order.id },
-          data: { status: 'PENDING_APPROVAL', paymentId: paymentId }
+          data: { status: 'PENDING_APPROVAL', paymentId: paymentId },
         });
       }
     }
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     // 2. 极其关键：必须向 Pi 官方服务器发送 Approve 请求，否则 SDK 会死锁！
     const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
     const apiKey = process.env.PI_API_KEY;
-    
+
     if (!apiKey) {
       console.error('[Pi API] Missing PI_API_KEY in environment variables');
       return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
@@ -50,8 +50,8 @@ export async function POST(req: Request) {
     const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/approve`, {
       method: 'POST',
       headers: {
-        'Authorization': `Key ${apiKey}`
-      }
+        Authorization: `Key ${apiKey}`,
+      },
     });
 
     if (!piRes.ok) {
@@ -59,13 +59,18 @@ export async function POST(req: Request) {
       console.error('[Pi API] Approve Failed:', piRes.status, errText);
       // 如果 Pi 报错说已经 approve 过了，可以放行
       if (!errText.includes('already approved')) {
-        return NextResponse.json({ success: false, error: `Pi API Error: ${errText}` }, { status: 502 });
+        return NextResponse.json(
+          { success: false, error: `Pi API Error: ${errText}` },
+          { status: 502 }
+        );
       }
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Payment Approve Error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    console.error('[POST /api/payments/approve] 审批异常:', error);
+    return new NextResponse(error instanceof Error ? error.message : 'Server error', {
+      status: 500,
+    });
   }
 }

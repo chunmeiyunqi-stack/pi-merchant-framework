@@ -51,8 +51,18 @@ async function main() {
 
   // ── 3. 创建测试服务 ──────────────────────────────────────
   const services = [
-    { title: '基础美甲护理', price: 5.0, durationMinutes: 60, description: '基础透明美甲，含手部护理' },
-    { title: '高级光疗美甲', price: 12.0, durationMinutes: 90, description: '高级光疗，多色可选，持久耐用' },
+    {
+      title: '基础美甲护理',
+      price: 5.0,
+      durationMinutes: 60,
+      description: '基础透明美甲，含手部护理',
+    },
+    {
+      title: '高级光疗美甲',
+      price: 12.0,
+      durationMinutes: 90,
+      description: '高级光疗，多色可选，持久耐用',
+    },
     { title: '美睫嫁接', price: 18.0, durationMinutes: 120, description: '专业美睫嫁接，自然根数' },
   ];
 

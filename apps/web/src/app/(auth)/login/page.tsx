@@ -9,7 +9,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticateWithPi } from '@pi-merchant/pi-sdk';
 
-const DEFAULT_MERCHANT_ID = process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ?? process.env.NEXT_PUBLIC_MERCHANT_ID ?? 'merchant-demo-001';
+const DEFAULT_MERCHANT_ID =
+  process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ??
+  process.env.NEXT_PUBLIC_MERCHANT_ID ??
+  'merchant-demo-001';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,9 +46,7 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Sign In</h1>
-        <p className="text-gray-500 text-sm mb-8">
-          登录您的账户以继续访问
-        </p>
+        <p className="text-gray-500 text-sm mb-8">登录您的账户以继续访问</p>
 
         {/* Pi 登录按钮 */}
         <button
@@ -75,9 +76,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <p className="text-xs text-gray-400 mt-6">
-          请在 Pi Browser 中打开以使用 Pi 登录功能
-        </p>
+        <p className="text-xs text-gray-400 mt-6">请在 Pi Browser 中打开以使用 Pi 登录功能</p>
       </div>
     </main>
   );
