@@ -4,3 +4,6 @@
 export * from './types';
 export * from './payment-service';
 export * from './auth-service';
+export * from './ai-service';
+export * from './logger';
+export * from './ai-providers';

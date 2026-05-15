@@ -1,0 +1,531 @@
+# Pioneer AI 智能商户服务框架
+
+# 用户手册
+
+---
+
+**软件名称：** Pioneer AI 智能商户服务框架  
+**版本号：** V1.1.0  
+**编制日期：** 2026年5月15日  
+**编制单位：** Pioneer AI 技术团队  
+**文档密级：** 内部公开
+
+---
+
+# 目 录
+
+1. [概述](#1-概述)
+   - 1.1 [系统简介](#11-系统简介)
+   - 1.2 [技术架构](#12-技术架构)
+   - 1.3 [运行环境](#13-运行环境)
+2. [安装与部署](#2-安装与部署)
+   - 2.1 [环境准备](#21-环境准备)
+   - 2.2 [安装步骤](#22-安装步骤)
+   - 2.3 [环境变量配置](#23-环境变量配置)
+3. [系统架构](#3-系统架构)
+   - 3.1 [Monorepo 工程结构](#31-monorepo-工程结构)
+   - 3.2 [数据库设计](#32-数据库设计)
+   - 3.3 [认证体系](#33-认证体系)
+4. [核心功能](#4-核心功能)
+   - 4.1 [中间件安全体系](#41-中间件安全体系)
+   - 4.2 [路由管理与 API 规范](#42-路由管理与-api-规范)
+   - 4.3 [智能 AI 路由系统 (V1.1.0 新增)](#43-智能-ai-路由系统-v110-新增)
+   - 4.4 [Pi Network 支付集成](#44-pi-network-支付集成)
+   - 4.5 [商户配置化引擎](#45-商户配置化引擎)
+5. [运维管理](#5-运维管理)
+   - 5.1 [日志与监控](#51-日志与监控)
+   - 5.2 [数据库维护](#52-数据库维护)
+   - 5.3 [常见运维操作](#53-常见运维操作)
+6. [附录](#6-附录)
+   - 6.1 [术语表](#61-术语表)
+   - 6.2 [文档修订记录](#62-文档修订记录)
+
+---
+
+# 1 概述
+
+## 1.1 系统简介
+
+Pioneer AI 智能商户服务框架（以下简称"本系统"）是一套面向 Pi Network 生态的**白标商户应用模板框架**。本系统采用 Monorepo 架构（pnpm + Turborepo），以 Next.js 14 App Router + TypeScript 为核心技术栈，内置企业级 AI 服务路由引擎，支持 OpenAI / Anthropic / Ollama 多模型动态切换与自动容错。
+
+系统设计理念为"80% 通用底座 + 20% 行业配置"，通过行业预设与商户配置机制，可在极短周期内交付定制化商户应用，覆盖美容/美甲、健身、培训、咨询等多种垂直行业。
+
+**核心特性：**
+
+- **多 AI 提供商智能路由**：基于 Strategy + Factory 设计模式，支持 OpenAI、Anthropic（Claude）、Ollama 三大 AI 服务提供商的动态选择与自动容错降级
+- **Pi Network 原生支付**：完整集成 Pi U2A（User-to-App）支付流程，包括创建支付、审批、链上确认、完成的全生命周期管理
+- **Monorepo 工程化**：基于 pnpm Workspace + Turborepo 的高性能构建体系，共享包在 apps 之间零冗余复用
+- **安全认证体系**：Pi SDK 认证 + HMAC 签名 Session + HttpOnly Cookie 的多层安全防护
+- **行业配置化**：通过结构化配置驱动 UI 渲染、功能模块开关与业务流程定制
+
+## 1.2 技术架构
+
+| 层级 | 技术选型 | 说明 |
+|------|---------|------|
+| 前端框架 | Next.js 14 (App Router) | React Server Components + 流式渲染 |
+| 编程语言 | TypeScript 5.4+ | 严格模式，全项目类型安全 |
+| UI 样式 | Tailwind CSS 3 | 原子化 CSS，按需编译 |
+| 后端 | Next.js API Routes | 同构服务端，无需独立后端 |
+| 数据库 | PostgreSQL 15+ | 关系型数据，Prisma ORM 映射 |
+| ORM | Prisma 5 | 类型安全的数据库访问层 |
+| 包管理 | pnpm 8 (Monorepo) | 高效依赖解析与磁盘利用 |
+| 构建工具 | Turborepo 2 | 增量构建，任务缓存 |
+| AI 引擎 | 多提供商路由器 | OpenAI / Anthropic / Ollama 智能切换 |
+| 支付 | Pi Network U2A | 链上支付，Pi Platform API 集成 |
+| 部署 | Vercel / Docker | Serverless 或容器化部署 |
+
+## 1.3 运行环境
+
+| 项目 | 最低要求 |
+|------|---------|
+| 操作系统 | Windows 10+ / macOS 12+ / Ubuntu 20.04+ |
+| Node.js | ≥ 18.0.0 |
+| pnpm | ≥ 8.0.0 |
+| PostgreSQL | ≥ 15.0 |
+| 内存 | ≥ 4 GB |
+| 磁盘 | ≥ 2 GB 可用空间 |
+
+---
+
+# 2 安装与部署
+
+## 2.1 环境准备
+
+```bash
+# 1. 安装 Node.js 18+
+# 2. 安装 pnpm
+npm install -g pnpm
+
+# 3. 准备 PostgreSQL 数据库
+# 4. 获取 Pi Developer Portal API Key
+# 5. （可选）获取 OpenAI / Anthropic API Key
+```
+
+## 2.2 安装步骤
+
+```bash
+# 克隆项目
+git clone <repository-url>
+cd PiMerchantFramework
+
+# 安装依赖
+pnpm install
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env，填写数据库连接、API Key 等
+
+# 初始化数据库
+pnpm db:migrate
+pnpm db:seed
+
+# 启动开发服务器
+pnpm dev
+```
+
+## 2.3 环境变量配置
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `DATABASE_URL` | 是 | PostgreSQL 连接字符串 |
+| `PI_API_KEY` | 是 | Pi Developer Portal API Key |
+| `NEXTAUTH_SECRET` | 是 | Session 签名密钥（≥32字符） |
+| `AI_PRIMARY_PROVIDER` | 否 | 主 AI 提供商（openai/anthropic/ollama），默认 openai |
+| `AI_FALLBACK_PROVIDERS` | 否 | 容错降级顺序（逗号分隔），默认 anthropic,ollama |
+| `OPENAI_API_KEY` | 否* | OpenAI API 密钥（使用 OpenAI 时必填） |
+| `ANTHROPIC_API_KEY` | 否* | Anthropic API 密钥（使用 Anthropic 时必填） |
+| `OLLAMA_API_BASE` | 否 | Ollama 服务地址，默认 http://localhost:11434 |
+| `OLLAMA_ENABLED` | 否 | 是否启用 Ollama（true/false），默认 true |
+
+---
+
+# 3 系统架构
+
+## 3.1 Monorepo 工程结构
+
+```
+PiMerchantFramework/
+├── apps/
+│   ├── web/              # 商户前台（客户端，Pi Browser 中运行）
+│   └── admin/            # 商户后台（管理员使用）
+├── packages/
+│   ├── pi-sdk/           # Pi SDK 封装层
+│   │   └── src/
+│   │       ├── ai-providers/    # ★ V1.1.0 新增：多 AI 提供商路由系统
+│   │       │   ├── types.ts     #   统一接口定义（Strategy 模式契约）
+│   │       │   ├── base.ts      #   抽象基类（Template Method 模式）
+│   │       │   ├── openai.ts    #   OpenAI Chat Completions 适配器
+│   │       │   ├── anthropic.ts #   Anthropic Messages API 适配器
+│   │       │   ├── ollama.ts    #   Ollama 本地推理适配器
+│   │       │   └── factory.ts   #   Factory 路由器（动态选择 + 容错）
+│   │       ├── ai-service.ts    #   AI 服务入口（向后兼容层）
+│   │       ├── payment-service.ts
+│   │       ├── auth-service.ts
+│   │       ├── logger.ts
+│   │       └── types.ts
+│   ├── config/           # 商户配置类型 + 行业预设
+│   ├── types/            # 共用业务类型
+│   └── ui/               # 共用 UI 组件
+├── prisma/               # 数据库 Schema + 迁移
+├── docs/                 # 技术文档
+└── scripts/              # 工具脚本
+```
+
+**包间依赖关系：**
+
+| 包 | 职责 | 被依赖方 |
+|----|------|---------|
+| `packages/types` | 业务类型定义 | 所有包 |
+| `packages/pi-sdk` | Pi SDK 封装（支付 + 认证 + AI） | apps/web, apps/admin |
+| `packages/config` | 商户配置 + 行业预设 | apps/web |
+| `packages/ui` | 共用 UI 组件 | apps/web, apps/admin |
+
+## 3.2 数据库设计
+
+本系统采用 PostgreSQL 关系型数据库，通过 Prisma ORM 进行类型安全的数据访问。核心数据模型：
+
+| 表名 | 职责 | 关联关系 |
+|------|------|---------|
+| `merchants` | 商户基本信息 | 一对多关联所有业务表 |
+| `customers` | 顾客档案（按商户隔离） | 归属于 merchant |
+| `services` | 服务目录 | 归属于 merchant |
+| `orders` | 订单记录 | 关联 customer + service |
+| `payments` | Pi 支付记录 | 一对一关联 order |
+| `memberships` | 会员方案 | 归属于 merchant |
+| `bookings` | 预约记录 | 关联 customer + service |
+
+所有业务表均包含 `merchant_id` 外键，架构层面已支持多租户扩展。
+
+## 3.3 认证体系
+
+```
+客户端 (Pi Browser)         服务端              Pi Platform API
+    │                         │                       │
+    │ Pi.authenticate()       │                       │
+    │──────────────►          │                       │
+    │                         │ GET /v2/me            │
+    │                         │ Bearer accessToken    │
+    │                         │──────────────────►    │
+    │                         │◄── { uid, username }  │
+    │                         │                       │
+    │                         │ upsert customers      │
+    │                         │ sign HMAC session      │
+    │◄── Set-Cookie: pi_session (HttpOnly, Secure)    │
+```
+
+**安全机制：**
+
+- Pi SDK 端认证 → Pi Platform API 二次验证 → HMAC 签名 Session
+- Session 存储于 HttpOnly + Secure Cookie（防 XSS / CSRF）
+- JWT 载荷包含：`{ sub, piUid, username, merchantId }`
+- Session 有效期：7 天
+
+---
+
+# 4 核心功能
+
+## 4.1 中间件安全体系
+
+本系统在 Next.js 中间件层实现了统一的请求拦截与安全防护：
+
+**中间件链路：**
+
+```
+请求 → [匹配路由] → [认证校验] → [权限检查] → [注入上下文] → 业务处理
+```
+
+**安全策略：**
+
+| 路由模式 | 认证要求 | 说明 |
+|----------|---------|------|
+| `/` (首页) | 无 | 公开访问 |
+| `/api/auth/*` | 无 | 认证端点 |
+| `/api/payments/*` | Cookie Session | 支付操作 |
+| `/api/ai/*` | Cookie Session | AI 查询 |
+| `/admin/*` | 管理员 Session | 后台管理 |
+
+## 4.2 路由管理与 API 规范
+
+**API 路由结构：**
+
+```
+apps/web/src/app/api/
+├── auth/
+│   └── pi/route.ts          # Pi 认证入口
+├── payments/
+│   ├── approve/route.ts      # 支付审批
+│   ├── complete/route.ts     # 支付完成
+│   └── cancel/route.ts       # 支付取消
+└── ai/
+    └── query/route.ts        # AI 智能查询
+```
+
+**统一响应格式：**
+
+```typescript
+// 成功响应
+{ success: true, data: T }
+
+// 错误响应
+{ success: false, error: string }
+```
+
+## 4.3 智能 AI 路由系统 (V1.1.0 新增)
+
+本版本新增企业级多 AI 提供商路由引擎，支持 OpenAI、Anthropic（Claude）、Ollama 三大主流 AI 服务提供商的智能选择与自动容错。
+
+### 4.3.1 Strategy 模式设计
+
+系统采用 **Strategy（策略）设计模式** 定义统一的 AI 提供商接口 `AIProvider`，所有提供商均实现该接口，保证调用方无需感知具体实现差异。
+
+```
+                    ┌─────────────────────┐
+                    │   AIProvider 接口     │
+                    │  ─────────────────   │
+                    │  + name: string      │
+                    │  + chat(request)     │
+                    │  + isAvailable()     │
+                    │  + healthCheck()     │
+                    └─────────┬───────────┘
+                              │ implements
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+    ┌─────────────┐  ┌──────────────┐  ┌────────────┐
+    │ OpenAI      │  │ Anthropic    │  │ Ollama     │
+    │ Provider    │  │ Provider     │  │ Provider   │
+    │ (GPT-4o)    │  │ (Claude)     │  │ (Llama3)   │
+    └─────────────┘  └──────────────┘  └────────────┘
+```
+
+**抽象基类 (Template Method 模式)：**
+
+系统同时引入 `BaseAIProvider` 抽象基类，采用 Template Method 模式将通用逻辑（超时控制、HTTP 错误处理、结构化日志）固化在基类中，子类仅需实现差异化的 `executeChat()` 方法。
+
+| 基类封装的通用逻辑 | 子类实现的差异逻辑 |
+|-------------------|-------------------|
+| 超时控制 (AbortController) | API 端点地址与请求格式 |
+| HTTP 错误统一包装 | 认证头构建方式 |
+| 结构化日志记录 | 响应解析与格式转换 |
+| AbortError → 可读消息 | 可用性检查策略 |
+
+**各提供商差异处理：**
+
+| 提供商 | 认证方式 | System Prompt 处理 | 响应提取路径 | 默认模型 |
+|--------|---------|-------------------|-------------|---------|
+| OpenAI | `Bearer` Token | messages 数组内 | `choices[0].message.content` | gpt-4o-mini |
+| Anthropic | `x-api-key` 头 | 顶层 `system` 参数 | `content[0].text` | claude-sonnet-4 |
+| Ollama | 无需认证 | messages 数组内 | `message.content` | llama3.1 |
+
+### 4.3.2 Factory 路由与自动容错 (Failsafe)
+
+系统采用 **Factory（工厂）设计模式** 实现提供商的动态选择与自动容错降级。
+
+**路由决策流程：**
+
+```
+请求到达
+    │
+    ▼
+[指定了 provider?] ──是──► 直连该提供商（不 Fallback）
+    │
+   否
+    │
+    ▼
+[读取 AI_PRIMARY_PROVIDER]
+    │
+    ▼
+[主提供商可用?] ──否──► [跳过，记录原因]
+    │                           │
+   是                          ▼
+    │               [AI_FALLBACK_PROVIDERS 列表]
+    ▼                           │
+[调用主提供商]                  ▼
+    │               [依次尝试备选提供商]
+ 成功/失败                      │
+    │               ┌───────────┤
+    ▼               ▼           ▼
+[成功] ◄────── [备选成功]   [全部失败]
+                              │
+                              ▼
+                    [抛出聚合错误信息]
+```
+
+**核心容错机制：**
+
+1. **可用性预检查**：调用前通过 `isAvailable()` 检查 API Key / 服务配置，跳过不可用节点
+2. **自动降级**：主提供商 API 调用失败时，自动按配置顺序尝试备选提供商
+3. **错误聚合**：所有提供商失败时，返回包含完整失败链路的聚合错误信息
+4. **路由追踪**：每次路由决策均生成 `RoutingDecision` 日志，包含请求路径、实际提供商、跳过原因及耗时
+
+### 4.3.3 健康检查机制
+
+每个提供商均实现 `healthCheck()` 方法，用于在运行时验证远程服务的可达性：
+
+| 提供商 | 健康检查端点 | 超时时间 | 检查方式 |
+|--------|-------------|---------|---------|
+| OpenAI | `GET /v1/models` | 5 秒 | 验证 API Key + 服务可达 |
+| Anthropic | `POST /v1/messages` | 5 秒 | 最小化请求验证 Key 有效性 |
+| Ollama | `GET /api/tags` | 3 秒 | 验证本地服务在线 |
+
+### 4.3.4 向后兼容性
+
+核心入口方法 `generateMerchantAiResponse()` 保持与 V1.0.0 完全兼容的方法签名。新增参数均为可选字段，不影响任何现有调用方。
+
+```typescript
+// V1.0.0 调用方式（完全兼容，无需修改）
+const result = await generateMerchantAiResponse({
+  merchantId: 'merchant-001',
+  prompt: '帮我优化库存管理流程',
+});
+
+// V1.1.0 新增：指定提供商
+const result = await generateMerchantAiResponse({
+  merchantId: 'merchant-001',
+  prompt: '帮我优化库存管理流程',
+  provider: 'anthropic',  // 可选：指定使用 Anthropic
+});
+```
+
+## 4.4 Pi Network 支付集成
+
+系统完整封装了 Pi Network U2A（User-to-App）支付流程：
+
+```
+前端                    后端                    Pi Platform API
+ │                       │                           │
+ │ Pi.createPayment()    │                           │
+ │──────────────────     │                           │
+ │ onReadyForServerApproval(paymentId)               │
+ │──────► POST /api/payments/approve ──► POST /v2/payments/{id}/approve
+ │                       │                           │
+ │ (用户在 Pi 钱包确认)   │                           │
+ │ onReadyForServerCompletion(paymentId, txid)        │
+ │──────► POST /api/payments/complete ─► POST /v2/payments/{id}/complete
+ │                       │                           │
+ │ ← 跳转支付结果页       │ 更新订单状态=COMPLETED    │
+```
+
+**支付安全保障：**
+
+- 所有支付审批/完成操作均在服务端执行，前端禁止直接调用 Pi Platform API
+- 支付回调幂等处理，防止重复提交
+- 未完成支付自动恢复机制（在用户重新认证时触发）
+
+## 4.5 商户配置化引擎
+
+系统通过结构化配置对象驱动 UI 渲染与业务流程：
+
+```typescript
+MerchantConfig
+├── modules.booking      → 预约模块开关
+├── modules.membership   → 会员模块开关
+├── homepage.layout      → 首页布局顺序
+├── industry.skin        → 行业主题皮肤
+└── payment.checkoutMode → 结账模式
+```
+
+**支持的行业预设：**
+
+| 行业 | 皮肤标识 | 核心功能 |
+|------|---------|---------|
+| 美容/美甲 | `beauty` | 预约 + 次卡 |
+| 健身 | `fitness` | 月卡 + 课程预约 |
+| 培训/课程 | `education` | 课时包 + 在线预约 |
+| 咨询/维修 | `consulting` | 时间预约 |
+| 通用 | `generic` | 服务列表 + 下单 |
+
+---
+
+# 5 运维管理
+
+## 5.1 日志与监控
+
+系统内置结构化日志模块，所有日志以 JSON 格式输出：
+
+```json
+{
+  "timestamp": "2026-05-15T01:30:00.000Z",
+  "service": "pi-merchant-framework",
+  "level": "info",
+  "message": "AI request routed (primary)",
+  "metadata": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "routingTimeMs": 3
+  }
+}
+```
+
+**日志级别：**
+
+| 级别 | 使用场景 |
+|------|---------|
+| `debug` | 开发调试信息 |
+| `info` | 正常业务事件（请求、路由决策） |
+| `warn` | 非致命异常（提供商降级、重试） |
+| `error` | 致命错误（所有提供商失败、数据库异常） |
+
+支持通过 `MONITORING_WEBHOOK_URL` 环境变量将日志转发至外部监控平台。
+
+## 5.2 数据库维护
+
+```bash
+# 生成 Prisma Client
+pnpm db:generate
+
+# 执行数据库迁移
+pnpm db:migrate
+
+# 填充测试数据
+pnpm db:seed
+
+# 打开数据库管理界面
+pnpm db:studio
+```
+
+## 5.3 常见运维操作
+
+| 操作 | 步骤 |
+|------|------|
+| 启动开发服务器 | `pnpm dev` |
+| 构建生产版本 | `pnpm build` |
+| 运行单元测试 | `pnpm test` |
+| 运行覆盖率测试 | `pnpm test:coverage` |
+| 类型检查 | `pnpm type-check` |
+| 切换主 AI 提供商 | 修改 `.env` 中 `AI_PRIMARY_PROVIDER` 为 `openai` / `anthropic` / `ollama`，重启服务 |
+| 配置 AI 容错降级 | 修改 `.env` 中 `AI_FALLBACK_PROVIDERS` 为逗号分隔的提供商列表（如 `anthropic,ollama`） |
+| 禁用本地 Ollama | 设置 `.env` 中 `OLLAMA_ENABLED=false`，重启服务 |
+| 查看 AI 路由决策 | 查看服务日志中 `message` 包含 `"AI request routed"` 的条目 |
+| 数据库迁移 | `pnpm db:migrate` |
+| 查看数据库 | `pnpm db:studio` |
+
+---
+
+# 6 附录
+
+## 6.1 术语表
+
+| 术语 | 全称 | 说明 |
+|------|------|------|
+| Monorepo | Monolithic Repository | 单仓库多项目管理模式 |
+| Strategy Pattern | 策略模式 | 定义一族算法，将每个算法封装起来，使它们可以互换 |
+| Factory Pattern | 工厂模式 | 封装对象创建逻辑，调用方无需感知具体类 |
+| Template Method | 模板方法模式 | 基类定义算法骨架，子类实现差异步骤 |
+| Fallback | 容错降级 | 主服务失败时自动切换到备选服务 |
+| U2A Payment | User-to-App Payment | Pi Network 用户向应用支付的支付模式 |
+| RLS | Row Level Security | PostgreSQL 行级安全策略 |
+| ORM | Object-Relational Mapping | 对象关系映射 |
+| SSR | Server-Side Rendering | 服务端渲染 |
+| JWT | JSON Web Token | 用于身份认证的令牌标准 |
+| HMAC | Hash-based Message Authentication Code | 基于哈希的消息认证码 |
+
+## 6.2 文档修订记录
+
+| 版本号 | 修订日期 | 修订说明 | 修订人 |
+|--------|---------|---------|--------|
+| V1.0.0 | 2026-04-18 | 初始版本；包含 Monorepo 架构、中间件安全体系、Pi 支付集成、商户配置化引擎 | 技术团队 |
+| V1.1.0 | 2026-05-15 | 新增多 AI 提供商路由引擎（OpenAI / Anthropic / Ollama）、自动容错降级机制、Template Method 抽象基类及结构化日志追踪；完善单元测试覆盖率至 90%+ | 技术团队 |
+
+---
+
+*本文档版权归 Pioneer AI 技术团队所有。未经许可，不得复制、传播或用于商业用途。*

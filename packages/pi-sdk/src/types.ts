@@ -3,12 +3,37 @@
 export interface PiAuthResult {
   accessToken?: string;
   user: PiUser;
+  token?: string;
 }
 
 export interface PiUser {
   uid: string;
   username: string;
 }
+
+/** AI 模型标识 — 开放为 string 以支持所有提供商的模型名称 */
+export type AIModel = string;
+
+export interface AIRequest {
+  merchantId: string;
+  prompt: string;
+  model?: AIModel;
+  temperature?: number;
+  /** 指定 AI 提供商（可选，不传则使用环境变量 AI_PRIMARY_PROVIDER 配置） */
+  provider?: 'openai' | 'anthropic' | 'ollama';
+}
+
+export interface AIResponse {
+  success: boolean;
+  result?: string;
+  error?: string;
+  /** 实际使用的 AI 提供商 */
+  provider?: string;
+  /** 实际使用的模型名称 */
+  model?: string;
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface PiPaymentData {
   amount: number;
