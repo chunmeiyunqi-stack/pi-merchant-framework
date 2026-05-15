@@ -11,6 +11,9 @@ interface DashboardStats {
   todayRevenue: number;
   totalMembers: number;
   pendingBookings: number;
+  activeServices: number;
+  pendingPayments: number;
+  activeMemberships: number;
 }
 
 export default function DashboardPage() {
@@ -27,14 +30,16 @@ export default function DashboardPage() {
   const cards = [
     { label: '今日订单', value: stats?.todayOrders ?? 0, icon: '📋', color: 'bg-blue-50 border-blue-100' },
     { label: '今日收款 (π)', value: stats?.todayRevenue?.toFixed(2) ?? '0.00', icon: '💰', color: 'bg-green-50 border-green-100' },
-    { label: '总会员数', value: stats?.totalMembers ?? 0, icon: '⭐', color: 'bg-purple-50 border-purple-100' },
+    { label: '活跃服务', value: stats?.activeServices ?? 0, icon: '🛠️', color: 'bg-cyan-50 border-cyan-100' },
+    { label: '待处理支付', value: stats?.pendingPayments ?? 0, icon: '⚠️', color: 'bg-amber-50 border-amber-100' },
+    { label: '活跃会员数', value: stats?.activeMemberships ?? 0, icon: '⭐', color: 'bg-purple-50 border-purple-100' },
     { label: '待核销预约', value: stats?.pendingBookings ?? 0, icon: '📅', color: 'bg-orange-50 border-orange-100' },
   ];
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">数据概览</h1>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {cards.map((card) => (
           <div key={card.label} className={`${card.color} border rounded-2xl p-5`}>
             <div className="text-3xl mb-3">{card.icon}</div>

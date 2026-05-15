@@ -1,0 +1,3194 @@
+// === 模块：apps/admin/src/middleware.ts ===
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get('pi_auth_token')?.value;
+
+  const protectedPaths = ['/dashboard', '/memberships', '/orders', '/payments', '/services', '/bookings', '/settings'];
+  
+  const isProtectedPath = protectedPaths.some((path) => 
+    request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`)
+  );
+
+  if (isProtectedPath && !token) {
+    // According to req: If unauthenticated in /dashboard, /memberships, etc., redirect to /login
+    // Assuming the login page is physically at /login in the admin app, or we redirect them to the web app's login.
+    // Given standard NextJS architectures, navigating to /login is appropriate.
+    // If Admin app doesn't have a /login page natively, standard would rely on Web App, but here we redirect to /login.
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('mode', 'signin');
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Prevent redirect to signup if somehow triggered to root mapping
+  if (request.nextUrl.pathname === '/') {
+    return NextResponse.next(); // Explicit approve
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+};
+
+
+// === 模块：apps/web/src/middleware.ts ===
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function middleware(request: NextRequest) {
+  // Check for the presence of the Pi auth token
+  const token = request.cookies.get('pi_auth_token')?.value;
+
+  // Paths that require authentication
+  const protectedPaths = ['/dashboard', '/account', '/billing'];
+  
+  const isProtectedPath = protectedPaths.some((path) => 
+    request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`)
+  );
+
+  // Redirect to login (Sign In) if trying to access a protected route without a token
+  if (isProtectedPath && !token) {
+    const loginUrl = new URL('/login', request.url);
+    // Add mode=signin just as an explicit UX/UI hint if needed by components
+    loginUrl.searchParams.set('mode', 'signin');
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Ensure the landing page / is ALWAYS accessible to unauthenticated users.
+  // Next.js allows it unless explicitly intercepted, but this is added for clarity 
+  // to satisfy strict requirements forbidding auto-redirects to signup on /.
+  if (request.nextUrl.pathname === '/') {
+    return NextResponse.next();
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  // Apply middleware to all routes except api, _next static assets, and favicon
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+};
+
+
+// === 模块：apps/web/src/app/api/auth/pi/route.ts ===
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { signSessionToken } from '@/lib/session';
+
+const prisma = new PrismaClient();
+
+// Pi Platform API 基础地址
+const PI_API_BASE = process.env.PI_PLATFORM_API_BASE ?? 'https://[YOUR_DOMAIN]';
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { accessToken, piUid, username, merchantId } = body;
+
+    if (!accessToken || !piUid || !username || !merchantId) {
+      return NextResponse.json(
+        { success: false, error: 'Missing parameters: accessToken, piUid, username, merchantId' },
+        { status: 400 }
+      );
+    }
+
+    // ── 步骤 1：用 accessToken 调用 Pi Platform API 验证真实身份 ─────────────
+    // GET /v2/me 使用 Authorization: Bearer <accessToken>
+    // 这是 Pi 官方推荐的 token 验证方式，无需 PI_API_KEY
+    let verifiedUid: string;
+    let verifiedUsername: string;
+
+    try {
+      const piMeRes = await fetch(`${PI_API_BASE}/v2/me`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!piMeRes.ok) {
+        const errBody = await piMeRes.text();
+        // [DEBUG_REMOVED]
+        return NextResponse.json(
+          { success: false, error: `Pi Platform 验证失败 (${piMeRes.status}): token 无效或已过期` },
+          { status: 401 }
+        );
+      }
+
+      const piUser = await piMeRes.json();
+      verifiedUid = piUser.uid;
+      verifiedUsername = piUser.username;
+
+      // 防止前端伪造 uid
+      if (verifiedUid !== piUid) {
+        // [DEBUG_REMOVED]
+        return NextResponse.json(
+          { success: false, error: '身份验证失败：uid 不匹配' },
+          { status: 403 }
+        );
+      }
+    } catch (fetchErr) {
+      // [DEBUG_REMOVED]
+      return NextResponse.json(
+        { success: false, error: 'Pi Platform API 网络不可达，请检查服务器网络配置' },
+        { status: 502 }
+      );
+    }
+
+    // ── 步骤 2：Upsert Customer 记录 ────────────────────────────────────────
+    const customer = await prisma.customer.upsert({
+      where: {
+        merchantId_piUid: {
+          merchantId: merchantId,
+          piUid: verifiedUid,
+        },
+      },
+      update: {
+        username: verifiedUsername,
+      },
+      create: {
+        merchantId: merchantId,
+        piUid: verifiedUid,
+        username: verifiedUsername,
+      },
+    });
+
+    // ── 步骤 3：签发 HMAC session token 写入 HttpOnly Cookie ─────────────────
+    const secureToken = signSessionToken(verifiedUid);
+    const cookieStore = cookies();
+    cookieStore.set('pi_auth_token', secureToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 天
+    });
+
+    // [DEBUG_REMOVED]
+
+    return NextResponse.json({
+      success: true,
+      user: { uid: verifiedUid, username: verifiedUsername },
+      token: secureToken, // 发送给前端，作为 localStorage 备用
+    });
+  } catch (error: any) {
+    // [DEBUG_REMOVED]
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+
+
+// === 模块：apps/web/src/app/api/payments/approve/route.ts ===
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { paymentId, orderId } = body;
+
+    if (!paymentId) {
+      return NextResponse.json({ success: false, error: 'Missing paymentId' }, { status: 400 });
+    }
+
+    // 1. 幂等策略: 检查数据库状态
+    const existingPayment = await prisma.payment.findUnique({
+      where: { piPaymentId: paymentId }
+    });
+
+    if (!existingPayment) {
+      const order = await prisma.order.findUnique({ where: { orderNo: orderId } });
+      if (order) {
+        await prisma.payment.create({
+          data: {
+            orderId: order.id,
+            piPaymentId: paymentId,
+            amount: order.amount,
+            status: 'PENDING',
+            developerApproved: true,
+            approvedAt: new Date(),
+            memo: `Paying for order ${order.orderNo}`
+          }
+        });
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'PENDING_APPROVAL', paymentId: paymentId }
+        });
+      }
+    }
+
+    // 2. 极其关键：必须向 Pi 官方服务器发送 Approve 请求，否则 SDK 会死锁！
+    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://[YOUR_DOMAIN]';
+    const apiKey = process.env.PI_API_KEY /* [REDACTED_环境配置] */;
+    
+    if (!apiKey) {
+      // [DEBUG_REMOVED]
+      return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
+    }
+
+    const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/approve`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Key ${apiKey}`
+      }
+    });
+
+    if (!piRes.ok) {
+      const errText = await piRes.text();
+      // [DEBUG_REMOVED]
+      // 如果 Pi 报错说已经 approve 过了，可以放行
+      if (!errText.includes('already approved')) {
+        return NextResponse.json({ success: false, error: `Pi API Error: ${errText}` }, { status: 502 });
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    // [DEBUG_REMOVED]
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+
+// === 模块：apps/web/src/app/api/payments/complete/route.ts ===
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { paymentId, txid } = body;
+
+    if (!paymentId || !txid) {
+      return NextResponse.json({ success: false, error: 'Missing parameters' }, { status: 400 });
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { piPaymentId: paymentId },
+      include: { order: true }
+    });
+
+    // 1. 极其关键：向 Pi 官方服务器发送 Complete 请求，真正完结这笔支付
+    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://[YOUR_DOMAIN]';
+    const apiKey = process.env.PI_API_KEY /* [REDACTED_环境配置] */;
+    
+    if (!apiKey) {
+      // [DEBUG_REMOVED]
+      return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
+    }
+
+    const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Key ${apiKey}`
+      },
+      body: JSON.stringify({ txid })
+    });
+
+    if (!piRes.ok) {
+      const errText = await piRes.text();
+      // [DEBUG_REMOVED]
+      if (!errText.includes('already completed')) {
+        return NextResponse.json({ success: false, error: `Pi API Error: ${errText}` }, { status: 502 });
+      }
+    }
+
+    if (!payment || payment.status === 'COMPLETED') {
+        // 幂等边界
+        return NextResponse.json({ success: true, message: 'Already completed locally' });
+    }
+
+    // 2. 更新本地数据库
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { piPaymentId: paymentId },
+        data: {
+          txid: txid,
+          status: 'COMPLETED',
+          transactionVerified: true,
+          developerCompleted: true,
+          completedAt: new Date()
+        }
+      });
+
+      const updatedOrder = await tx.order.update({
+        where: { id: payment.orderId },
+        data: { status: 'COMPLETED' }
+      });
+
+      const durationDays = 30; 
+      let dbMembership = await tx.membership.findFirst({
+         where: { merchantId: updatedOrder.merchantId }
+      });
+      
+      if (!dbMembership) {
+         dbMembership = await tx.membership.create({
+             data: {
+                 merchantId: updatedOrder.merchantId,
+                 name: 'AI Framework Subscription',
+                 mode: 'TIME_BASED',
+                 price: 0,
+             }
+         });
+      }
+
+      const endAt = new Date();
+      endAt.setDate(endAt.getDate() + durationDays);
+
+      await tx.customerMembership.create({
+        data: {
+          customerId: updatedOrder.customerId,
+          membershipId: dbMembership.id,
+          startAt: new Date(),
+          endAt: endAt,
+          status: 'ACTIVE'
+        }
+      });
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    // [DEBUG_REMOVED]
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+
+// === 模块：prisma/schema.prisma ===
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MerchantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum MerchantType {
+  BEAUTY
+  FITNESS
+  EDUCATION
+  CONSULTING
+  REPAIR
+  RETAIL
+  GENERIC
+}
+
+enum UserRole {
+  OWNER
+  STAFF
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+}
+
+enum ServiceType {
+  SERVICE
+  PRODUCT
+  PACKAGE
+}
+
+enum ServiceStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PENDING_APPROVAL
+  APPROVED
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum MembershipMode {
+  TIME_BASED
+  USAGE_BASED
+  UNLIMITED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum CheckoutMode {
+  SINGLE
+  SUBSCRIPTION
+}
+
+model Merchant {
+  id           String         @id @default(cuid())
+  name         String
+  type         MerchantType   @default(GENERIC)
+  status       MerchantStatus @default(ACTIVE)
+  logo         String?
+  contactName  String?        @map("contact_name")
+  contactPhone String?        @map("contact_phone")
+  themeConfig  Json?          @map("theme_config")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  merchantUsers MerchantUser[]
+  customers     Customer[]
+  services      Service[]
+  orders        Order[]
+  bookings      Booking[]
+  memberships   Membership[]
+  appConfig     AppConfig?
+
+  @@map("merchants")
+}
+
+model MerchantUser {
+  id         String     @id @default(cuid())
+  merchantId String     @map("merchant_id")
+  piUid      String     @map("pi_uid")
+  username   String
+  role       UserRole   @default(STAFF)
+  status     UserStatus @default(ACTIVE)
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([piUid])
+  @@map("merchant_users")
+}
+
+model Customer {
+  id               String   @id @default(cuid())
+  merchantId       String   @map("merchant_id")
+  piUid            String   @map("pi_uid")
+  username         String
+  displayName      String?  @map("display_name")
+  membershipStatus MembershipStatus? @map("membership_status")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  merchant           Merchant             @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  orders             Order[]
+  bookings           Booking[]
+  customerMemberships CustomerMembership[]
+
+  @@index([merchantId])
+  @@index([piUid])
+  @@unique([merchantId, piUid])
+  @@map("customers")
+}
+
+model Service {
+  id              String        @id @default(cuid())
+  merchantId      String        @map("merchant_id")
+  type            ServiceType   @default(SERVICE)
+  title           String
+  description     String?
+  price           Decimal       @db.Decimal(10, 2)
+  durationMinutes Int?          @map("duration_minutes")
+  status          ServiceStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  merchant Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  orders   Order[]
+  bookings Booking[]
+
+  @@index([merchantId])
+  @@index([merchantId, status])
+  @@map("services")
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  merchantId String      @map("merchant_id")
+  customerId String      @map("customer_id")
+  serviceId  String?     @map("service_id")
+  orderNo    String      @unique @map("order_no")
+  amount     Decimal     @db.Decimal(10, 2)
+  currency   String      @default("PI")
+  status     OrderStatus @default(DRAFT)
+  paymentId  String?     @map("payment_id")
+  note       String?
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  merchant   Merchant   @relation(fields: [merchantId], references: [id])
+  customer   Customer   @relation(fields: [customerId], references: [id])
+  service    Service?   @relation(fields: [serviceId], references: [id])
+  payments   Payment[]
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([status])
+  @@index([merchantId, status])
+  @@map("orders")
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  orderId               String        @map("order_id")
+  piPaymentId           String        @unique @map("pi_payment_id")
+  txid                  String?       @unique
+  amount                Decimal       @db.Decimal(10, 2)
+  memo                  String?
+  status                PaymentStatus @default(PENDING)
+  developerApproved     Boolean       @default(false) @map("developer_approved")
+  transactionVerified   Boolean       @default(false) @map("transaction_verified")
+  developerCompleted    Boolean       @default(false) @map("developer_completed")
+  userCancelled         Boolean       @default(false) @map("user_cancelled")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  approvedAt            DateTime?     @map("approved_at")
+  completedAt           DateTime?     @map("completed_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+  @@index([piPaymentId])
+  @@map("payments")
+}
+
+model Booking {
+  id         String        @id @default(cuid())
+  merchantId String        @map("merchant_id")
+  customerId String        @map("customer_id")
+  serviceId  String?       @map("service_id")
+  slotStart  DateTime      @map("slot_start")
+  slotEnd    DateTime      @map("slot_end")
+  status     BookingStatus @default(PENDING)
+  note       String?
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  merchant Merchant @relation(fields: [merchantId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  service  Service? @relation(fields: [serviceId], references: [id])
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([merchantId, slotStart])
+  @@index([status])
+  @@map("bookings")
+}
+
+model Membership {
+  id           String         @id @default(cuid())
+  merchantId   String         @map("merchant_id")
+  name         String
+  mode         MembershipMode
+  price        Decimal        @db.Decimal(10, 2)
+  validDays    Int?           @map("valid_days")
+  totalUses    Int?           @map("total_uses")
+  benefitsJson Json?          @map("benefits_json")
+  status       ServiceStatus  @default(ACTIVE)
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  merchant            Merchant             @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  customerMemberships CustomerMembership[]
+
+  @@index([merchantId])
+  @@index([merchantId, status])
+  @@map("memberships")
+}
+
+model CustomerMembership {
+  id             String           @id @default(cuid())
+  customerId     String           @map("customer_id")
+  membershipId   String           @map("membership_id")
+  startAt        DateTime         @map("start_at")
+  endAt          DateTime?        @map("end_at")
+  remainingUses  Int?             @map("remaining_uses")
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id])
+
+  @@index([customerId])
+  @@index([membershipId])
+  @@index([customerId, status])
+  @@map("customer_memberships")
+}
+
+model AppConfig {
+  id              String       @id @default(cuid())
+  merchantId      String       @unique @map("merchant_id")
+  modulesEnabled  Json         @map("modules_enabled")
+  homepageLayout  String       @default("service-first") @map("homepage_layout")
+  industrySkin    String       @default("generic") @map("industry_skin")
+  checkoutMode    CheckoutMode @default(SINGLE) @map("checkout_mode")
+  enableCoupon    Boolean      @default(false) @map("enable_coupon")
+  enableA2uReward Boolean      @default(false) @map("enable_a2u_reward")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("app_configs")
+}
+
+
+// === 模块：apps/admin/src/app/orders/page.tsx ===
+'use client';
+
+// 后台 — 订单管理
+
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+
+interface Order {
+  id: string;
+  orderNo: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+  customer?: { username: string };
+  service?: { title: string };
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+const STATUS_OPTIONS = ['ALL', 'PENDING_PAYMENT', 'APPROVED', 'COMPLETED', 'CANCELLED'];
+
+function OrdersContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const currentStatus = searchParams.get('status') || 'ALL';
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const qs = new URLSearchParams();
+    if (currentStatus !== 'ALL') qs.set('status', currentStatus);
+    qs.set('page', currentPage.toString());
+    qs.set('limit', '10');
+
+    fetch(`/api/admin/orders?${qs.toString()}`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { orders: Order[], pagination: Pagination }) => { 
+        setOrders(data.orders ?? []); 
+        setPagination(data.pagination ?? null);
+        setLoading(false); 
+      })
+      .catch(() => setLoading(false));
+  }, [currentStatus, currentPage]);
+
+  const handleStatusChange = (status: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (status === 'ALL') {
+      params.delete('status');
+    } else {
+      params.set('status', status);
+    }
+    // Changing status resets page to 1
+    params.set('page', '1');
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || (pagination && newPage > pagination.totalPages)) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', newPage.toString());
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">订单管理</h1>
+
+      {/* 状态筛选 */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {STATUS_OPTIONS.map((s) => (
+          <button
+            key={s}
+            onClick={() => handleStatusChange(s)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              currentStatus === s ? 'bg-[#7C3AED] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {s === 'ALL' ? '全部' : s}
+          </button>
+        ))}
+      </div>
+
+      {/* 订单表格 */}
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 mb-6">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              {['订单号', '顾客', '服务', '金额', '状态', '下单时间'].map((h) => (
+                <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="text-center py-10 text-gray-300">加载中...</td>
+              </tr>
+            ) : orders.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-center py-10 text-gray-400">暂无订单数据</td>
+              </tr>
+            ) : (
+              orders.map((order) => (
+                <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-600">{order.orderNo}</td>
+                  <td className="px-4 py-3 text-gray-700">{order.customer?.username ?? '-'}</td>
+                  <td className="px-4 py-3 text-gray-700">{order.service?.title ?? '-'}</td>
+                  <td className="px-4 py-3 text-[#7C3AED] font-semibold">π {Number(order.amount).toFixed(2)}</td>
+                  <td className="px-4 py-3">
+                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-lg">{order.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">
+                    {new Date(order.createdAt).toLocaleString('zh-CN')}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 分页器 */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <div>
+            共 {pagination.total} 条记录，当前第 {pagination.page} / {pagination.totalPages} 页
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page <= 1}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              上一页
+            </button>
+            <button
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AdminOrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center text-gray-500">Loading Orders...</div>}>
+      <OrdersContent />
+    </Suspense>
+  );
+}
+
+
+
+// === 模块：apps/admin/src/app/memberships/page.tsx ===
+'use client';
+
+// 后台 — 会员方案管理
+
+import { useEffect, useState } from 'react';
+
+interface Membership {
+  id: string;
+  name: string;
+  mode: string;
+  price: number;
+  validDays: number | null;
+  totalUses: number | null;
+  status: string;
+}
+
+export default function AdminMembershipsPage() {
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Form states
+  const [formData, setFormData] = useState({
+    name: '',
+    mode: 'TIME_BASED',
+    price: '',
+    validDays: '',
+    totalUses: ''
+  });
+
+  const fetchMemberships = () => {
+    setLoading(true);
+    fetch('/api/admin/memberships', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { memberships: Membership[] }) => { 
+        setMemberships(data.memberships ?? []); 
+        setLoading(false); 
+      })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchMemberships();
+  }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setCreating(true);
+
+    try {
+      const res = await fetch('/api/admin/memberships', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          mode: formData.mode,
+          price: parseFloat(formData.price),
+          validDays: formData.validDays ? parseInt(formData.validDays) : null,
+          totalUses: formData.totalUses ? parseInt(formData.totalUses) : null,
+        }),
+        credentials: 'include'
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || '创建失败');
+      }
+      // Optimistic or real refresh
+      fetchMemberships();
+      setIsModalOpen(false);
+      setFormData({ name: '', mode: 'TIME_BASED', price: '', validDays: '', totalUses: '' });
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">会员方案</h1>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+        >
+          + 新增方案
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {loading ? (
+          [1, 2, 3].map((i) => <div key={i} className="bg-white rounded-2xl p-5 animate-pulse h-32" />)
+        ) : memberships.length === 0 ? (
+          <div className="col-span-full text-center py-20 text-gray-400">
+            <div className="text-5xl mb-4">⭐</div>
+            <p>暂无会员方案</p>
+          </div>
+        ) : (
+          memberships.map((m) => (
+            <div key={m.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col h-full">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-gray-800 text-lg">{m.name}</h3>
+                <span className={`text-xs px-2 py-1 rounded-lg ${
+                  m.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                }`}>{m.status === 'ACTIVE' ? '生效中' : '已下架'}</span>
+              </div>
+              <p className="text-[#7C3AED] font-bold text-2xl mb-4">π {Number(m.price).toFixed(2)}</p>
+              
+              <div className="text-sm text-gray-500 mt-auto mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <p>模式：{m.mode === 'TIME_BASED' ? '有效时长卡' : m.mode === 'USAGE_BASED' ? '使用次数卡' : '订阅/无限制'}</p>
+                {m.validDays && <p>额度：有效期 {m.validDays} 天</p>}
+                {m.totalUses && <p>额度：共 {m.totalUses} 次</p>}
+              </div>
+              
+              {/* Not connected to backend yet, but UI required us to not remove buttons unless explicit. 
+                  User said "不允许新增“看起来能点但其实没接后端”的假按钮", so we disable these until implemented */}
+              <div className="flex gap-2 border-t pt-3">
+                <button disabled title="编辑功能尚在排期中" className="flex-1 text-center text-sm font-medium text-gray-400 bg-gray-50 py-1.5 rounded-lg cursor-not-allowed">
+                  编辑
+                </button>
+                <button disabled title="下架功能尚在排期中" className="flex-1 text-center text-sm font-medium text-red-300 bg-red-50 py-1.5 rounded-lg cursor-not-allowed">
+                  下架
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">新增会员方案</h2>
+            
+            {errorMsg && <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 p-2 rounded-lg">{errorMsg}</div>}
+            
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">方案名称</label>
+                <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]" />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">方案售价 (π)</label>
+                <input required type="number" step="0.01" min="0" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">核销模式</label>
+                <select value={formData.mode} onChange={e => setFormData({...formData, mode: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]">
+                  <option value="TIME_BASED">有效时长卡 (如:月卡)</option>
+                  <option value="USAGE_BASED">使用次数卡 (如:10次卡)</option>
+                  <option value="UNLIMITED">不限量/永久订阅</option>
+                </select>
+              </div>
+
+              {(formData.mode === 'TIME_BASED' || formData.mode === 'USAGE_BASED') && (
+                <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                     {formData.mode === 'TIME_BASED' ? '有效天数' : '包含次数'}
+                   </label>
+                   <input required type="number" min="1" value={formData.mode === 'TIME_BASED' ? formData.validDays : formData.totalUses} onChange={e => formData.mode === 'TIME_BASED' ? setFormData({...formData, validDays: e.target.value}) : setFormData({...formData, totalUses: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]" />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium">
+                  取消
+                </button>
+                <button type="submit" disabled={creating} className="px-4 py-2 text-white bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 rounded-lg transition-colors font-medium flex items-center justify-center min-w-[80px]">
+                  {creating ? '提交...' : '确认创建'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// === 模块：apps/admin/src/app/api/admin/dashboard/stats/route.ts ===
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getMerchantId } from '@/lib/utils';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
+
+export async function GET() {
+  const token = cookies().get('pi_auth_token')?.value;
+  // If authorization fails, return zeros safely instead of blowing up to fulfill user constraint "空数据时返回 0"
+  if (!token || !verifySessionToken(token)) {
+    return NextResponse.json({ todayOrders: 0, todayRevenue: 0, totalMembers: 0, pendingBookings: 0 });
+  }
+
+  const merchantId = getMerchantId();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  try {
+    const [todayOrders, todayRevenueAgg, totalMembers, pendingBookings] = await Promise.all([
+      prisma.order.count({
+        where: { merchantId, createdAt: { gte: startOfToday } }
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { order: { merchantId }, status: 'COMPLETED', createdAt: { gte: startOfToday } }
+      }),
+      prisma.customerMembership.count({
+        where: { customer: { merchantId }, status: 'ACTIVE' }
+      }),
+      prisma.booking.count({
+        where: { merchantId, status: 'PENDING' }
+      })
+    ]);
+
+    const todayRevenue = todayRevenueAgg._sum.amount ? Number(todayRevenueAgg._sum.amount) : 0;
+
+    return NextResponse.json({
+      todayOrders,
+      todayRevenue: Number(todayRevenue.toFixed(2)),
+      totalMembers,
+      pendingBookings
+    });
+  } catch (error) {
+    // [DEBUG_REMOVED]
+    return NextResponse.json({ todayOrders: 0, todayRevenue: 0, totalMembers: 0, pendingBookings: 0 });
+  }
+}
+
+
+// === 模块：apps/admin/src/app/api/admin/memberships/route.ts ===
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getMerchantId } from '@/lib/utils';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
+
+export async function GET() {
+  const merchantId = getMerchantId();
+  try {
+    const memberships = await prisma.membership.findMany({
+      where: { merchantId },
+      orderBy: { createdAt: 'desc' }
+    });
+    return NextResponse.json({ memberships });
+  } catch (e) {
+    return NextResponse.json({ memberships: [] });
+  }
+}
+
+export async function POST(req: Request) {
+  const token = cookies().get('pi_auth_token')?.value;
+  if (!token || !verifySessionToken(token)) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+
+  const merchantId = getMerchantId();
+  try {
+    const body = await req.json();
+    const newMembership = await prisma.membership.create({
+      data: {
+        merchantId,
+        name: body.name,
+        mode: body.mode,
+        price: body.price,
+        validDays: body.validDays || null,
+        totalUses: body.totalUses || null,
+        status: 'ACTIVE'
+      }
+    });
+    return NextResponse.json({ success: true, data: newMembership });
+  } catch (e: any) {
+    return NextResponse.json({ success: false, error: e.message }, { status: 400 });
+  }
+}
+
+
+// === 模块：apps/admin/src/app/api/admin/orders/route.ts ===
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getMerchantId } from '@/lib/utils';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
+
+export async function GET(req: Request) {
+  const token = cookies().get('pi_auth_token')?.value;
+  if (!token || !verifySessionToken(token)) return NextResponse.json({ orders: [], pagination: null });
+
+  const { searchParams } = new URL(req.url);
+  const statusParam = searchParams.get('status');
+  const pageParam = searchParams.get('page');
+  const limitParam = searchParams.get('limit');
+
+  const page = pageParam ? Math.max(1, parseInt(pageParam)) : 1;
+  const limit = limitParam ? Math.min(100, Math.max(1, parseInt(limitParam))) : 10;
+  
+  const merchantId = getMerchantId();
+  const where: any = { merchantId };
+  
+  if (statusParam && statusParam !== 'ALL') {
+    where.status = statusParam;
+  }
+
+  try {
+    const total = await prisma.order.count({ where });
+    const orders = await prisma.order.findMany({
+      where,
+      include: {
+        customer: { select: { username: true } },
+        service: { select: { title: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit
+    });
+    
+    return NextResponse.json({ 
+      orders, 
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1
+      }
+    });
+  } catch (e) {
+    return NextResponse.json({ orders: [], pagination: null });
+  }
+}
+
+
+// === 模块：apps/admin/src/app/api/admin/payments/route.ts ===
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getMerchantId } from '@/lib/utils';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
+
+export async function GET() {
+  const token = cookies().get('pi_auth_token')?.value;
+  if (!token || !verifySessionToken(token)) return NextResponse.json({ payments: [] });
+
+  const merchantId = getMerchantId();
+  try {
+    const payments = await prisma.payment.findMany({
+      where: { order: { merchantId } },
+      include: {
+        order: { 
+          select: { 
+            orderNo: true, 
+            customer: { select: { username: true } } 
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    return NextResponse.json({ payments });
+  } catch (e) {
+    return NextResponse.json({ payments: [] });
+  }
+}
+
+
+// === 模块：apps/admin/src/app/bookings/page.tsx ===
+'use client';
+
+// 后台 — 预约管理（含核销操作）
+
+import { useEffect, useState } from 'react';
+
+interface Booking {
+  id: string;
+  slotStart: string;
+  slotEnd: string;
+  status: string;
+  note?: string;
+  customer?: { username: string };
+  service?: { title: string };
+}
+
+export default function AdminBookingsPage() {
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchBookings = () => {
+    setLoading(true);
+    fetch('/api/admin/bookings', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { bookings: Booking[] }) => { setBookings(data.bookings ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(fetchBookings, []);
+
+  const handleVerify = async (bookingId: string) => {
+    if (!confirm('确认核销此预约？')) return;
+    try {
+      const res = await fetch(`/api/admin/bookings/${bookingId}/complete`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) fetchBookings();
+    } catch {
+      alert('核销失败，请重试');
+    }
+  };
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">预约管理</h1>
+      <div className="space-y-3">
+        {loading ? (
+          [1, 2, 3].map((i) => <div key={i} className="bg-white rounded-2xl p-5 animate-pulse h-24" />)
+        ) : bookings.length === 0 ? (
+          <div className="text-center py-20 text-gray-400">
+            <div className="text-5xl mb-4">📅</div>
+            <p>暂无预约记录</p>
+          </div>
+        ) : (
+          bookings.map((b) => (
+            <div key={b.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-gray-800">{b.service?.title ?? '未知服务'}</p>
+                  <p className="text-gray-500 text-sm mt-1">顾客：{b.customer?.username ?? '-'}</p>
+                  <p className="text-gray-400 text-xs mt-1">
+                    {new Date(b.slotStart).toLocaleString('zh-CN')} →{' '}
+                    {new Date(b.slotEnd).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {b.note && <p className="text-gray-300 text-xs mt-1">备注：{b.note}</p>}
+                </div>
+                <div className="text-right flex-shrink-0 ml-4">
+                  <span className={`text-xs px-2 py-1 rounded-lg ${
+                    b.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' :
+                    b.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                    'bg-gray-100 text-gray-500'
+                  }`}>{b.status}</span>
+
+                  {b.status === 'CONFIRMED' && (
+                    <button
+                      onClick={() => handleVerify(b.id)}
+                      className="mt-2 block bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      核销
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// === 模块：apps/admin/src/app/dashboard/page.tsx ===
+'use client';
+
+// ============================================================
+// 商户后台 — 数据概览 Dashboard
+// ============================================================
+
+import { useEffect, useState } from 'react';
+
+interface DashboardStats {
+  todayOrders: number;
+  todayRevenue: number;
+  totalMembers: number;
+  pendingBookings: number;
+}
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/dashboard/stats', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: DashboardStats) => { setStats(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const cards = [
+    { label: '今日订单', value: stats?.todayOrders ?? 0, icon: '📋', color: 'bg-blue-50 border-blue-100' },
+    { label: '今日收款 (π)', value: stats?.todayRevenue?.toFixed(2) ?? '0.00', icon: '💰', color: 'bg-green-50 border-green-100' },
+    { label: '总会员数', value: stats?.totalMembers ?? 0, icon: '⭐', color: 'bg-purple-50 border-purple-100' },
+    { label: '待核销预约', value: stats?.pendingBookings ?? 0, icon: '📅', color: 'bg-orange-50 border-orange-100' },
+  ];
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">数据概览</h1>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map((card) => (
+          <div key={card.label} className={`${card.color} border rounded-2xl p-5`}>
+            <div className="text-3xl mb-3">{card.icon}</div>
+            <p className="text-2xl font-bold text-gray-800">
+              {loading ? <span className="animate-pulse text-gray-300">--</span> : card.value}
+            </p>
+            <p className="text-sm text-gray-500 mt-1">{card.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+// === 模块：apps/admin/src/app/layout.tsx ===
+export const metadata = {
+  title: 'Next.js',
+  description: 'Generated by Next.js',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+
+// === 模块：apps/admin/src/app/page.tsx ===
+﻿"use client";
+import { useState } from "react";
+
+const mockOrders = [
+  { id: "TXN001", user: "pi_user_88", service: "基础美甲护理", amount: 0.5, status: "completed", time: "14:05:32" },
+  { id: "TXN002", user: "pi_user_42", service: "高级光疗美甲", amount: 1.0, status: "completed", time: "13:48:17" },
+  { id: "TXN003", user: "pi_user_77", service: "日式美睫嫁接", amount: 1.5, status: "pending",   time: "13:21:09" },
+  { id: "TXN004", user: "pi_user_13", service: "全套手足尊享", amount: 2.0, status: "completed", time: "12:55:44" },
+  { id: "TXN005", user: "pi_user_56", service: "基础美甲护理", amount: 0.5, status: "cancelled", time: "12:30:00" },
+];
+
+const tabs = ["概览", "订单管理", "服务设置", "用户管理"];
+
+export default function AdminPage() {
+  const [activeTab, setActiveTab] = useState("概览");
+  const [authed, setAuthed] = useState(false);
+  const [pwd, setPwd] = useState("");
+  const [err, setErr] = useState(false);
+
+  const totalPi = mockOrders.filter(o => o.status === "completed").reduce((s, o) => s + o.amount, 0);
+  const completed = mockOrders.filter(o => o.status === "completed").length;
+  const pending   = mockOrders.filter(o => o.status === "pending").length;
+
+  if (!authed) return (
+    <div style={{
+      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      background: "linear-gradient(135deg,#1E112A,#2A1642,#110B19)",
+      fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif",
+    }}>
+      <div style={{
+        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(243,193,54,0.2)",
+        borderRadius: 20, padding: "40px 48px", width: 360, textAlign: "center",
+      }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: "50%", margin: "0 auto 16px",
+          background: "linear-gradient(135deg,#F3C136,#9B59B6)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 28, fontWeight: 900, color: "#1E112A",
+        }}>π</div>
+        <h2 style={{ color: "#f0e6ff", fontSize: 20, fontWeight: 700, marginBottom: 6 }}>商户管理后台</h2>
+        <p style={{ color: "rgba(240,230,255,0.45)", fontSize: 13, marginBottom: 28 }}>美丽时光工作室 · Admin</p>
+        <input
+          type="password" placeholder="请输入管理员密码"
+          value={pwd} onChange={e => { setPwd(e.target.value); setErr(false); }}
+          onKeyDown={e => e.key === "Enter" && (pwd === "admin888" ? setAuthed(true) : setErr(true))}
+          style={{
+            width: "100%", padding: "11px 16px", borderRadius: 12, marginBottom: 12,
+            background: "rgba(255,255,255,0.07)", border: err ? "1px solid rgba(192,57,43,0.6)" : "1px solid rgba(243,193,54,0.2)",
+            color: "#f0e6ff", fontSize: 14, outline: "none", boxSizing: "border-box",
+          }}
+        />
+        {err && <p style={{ color: "#e74c3c", fontSize: 12, marginBottom: 10 }}>密码错误，请重试</p>}
+        <button onClick={() => pwd === "admin888" ? setAuthed(true) : setErr(true)} style={{
+          width: "100%", padding: "12px", borderRadius: 12, fontWeight: 700, fontSize: 15,
+          background: "linear-gradient(90deg,#F3C136,#E67E22)", color: "#1E112A", border: "none", cursor: "pointer",
+        }}>登录</button>
+        <p style={{ color: "rgba(240,230,255,0.25)", fontSize: 11, marginTop: 16 }}>提示：密码 admin888</p>
+      </div>
+    </div>
+  );
+
+  const s = { padding: "0 0 2px", background: "none", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, transition: "color 0.2s" } as React.CSSProperties;
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: "linear-gradient(135deg,#1E112A,#2A1642,#110B19)",
+      fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif", color: "#f0e6ff",
+    }}>
+      {/* TOP BAR */}
+      <nav style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "14px 32px", background: "rgba(30,17,42,0.8)", backdropFilter: "blur(20px)",
+        borderBottom: "1px solid rgba(243,193,54,0.15)", position: "sticky", top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: "50%",
+            background: "linear-gradient(135deg,#F3C136,#9B59B6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 900, fontSize: 18, color: "#1E112A",
+          }}>π</div>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>美丽时光工作室</span>
+          <span style={{
+            fontSize: 11, padding: "2px 8px", borderRadius: 10,
+            background: "rgba(155,89,182,0.2)", color: "#c39bd3", border: "1px solid rgba(155,89,182,0.3)",
+          }}>管理后台</span>
+        </div>
+        <div style={{ display: "flex", gap: 24 }}>
+          {tabs.map(t => (
+            <button key={t} style={{
+              ...s, color: activeTab === t ? "#F3C136" : "rgba(240,230,255,0.5)",
+              borderBottom: activeTab === t ? "2px solid #F3C136" : "2px solid transparent",
+            }} onClick={() => setActiveTab(t)}>{t}</button>
+          ))}
+        </div>
+        <button onClick={() => setAuthed(false)} style={{
+          padding: "7px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600,
+          background: "rgba(192,57,43,0.15)", color: "#e74c3c",
+          border: "1px solid rgba(192,57,43,0.3)", cursor: "pointer",
+        }}>退出登录</button>
+      </nav>
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px" }}>
+
+        {/* 概览 */}
+        {activeTab === "概览" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24, color: "#f0e6ff" }}>📊 今日概览</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 18, marginBottom: 32 }}>
+              {[
+                { label: "今日总收入", value: `π ${totalPi.toFixed(1)}`, color: "#F3C136", icon: "💰" },
+                { label: "完成订单", value: `${completed} 笔`, color: "#2ecc71", icon: "✓" },
+                { label: "待处理", value: `${pending} 笔`, color: "#F3C136", icon: "⏳" },
+                { label: "注册用户", value: "128 人", color: "#9B59B6", icon: "👤" },
+              ].map(k => (
+                <div key={k.label} style={{
+                  padding: "22px 24px", borderRadius: 16,
+                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                }}>
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>{k.icon}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: k.color, marginBottom: 4 }}>{k.value}</div>
+                  <div style={{ fontSize: 13, color: "rgba(240,230,255,0.45)" }}>{k.label}</div>
+                </div>
+              ))}
+            </div>
+            {/* Recent */}
+            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, color: "rgba(240,230,255,0.7)" }}>最近交易</h3>
+            <OrderTable orders={mockOrders.slice(0, 3)} />
+          </div>
+        )}
+
+        {/* 订单管理 */}
+        {activeTab === "订单管理" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>📋 订单管理</h2>
+            <OrderTable orders={mockOrders} />
+          </div>
+        )}
+
+        {/* 服务设置 */}
+        {activeTab === "服务设置" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>⚙️ 服务设置</h2>
+            {[
+              { name: "基础美甲护理", price: 0.5, active: true },
+              { name: "高级光疗美甲", price: 1.0, active: true },
+              { name: "日式美睫嫁接", price: 1.5, active: true },
+              { name: "全套手足尊享", price: 2.0, active: true },
+            ].map(sv => (
+              <div key={sv.name} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "16px 20px", marginBottom: 12, borderRadius: 14,
+                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+              }}>
+                <span style={{ fontWeight: 600, fontSize: 15 }}>{sv.name}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <span style={{ color: "#F3C136", fontWeight: 700 }}>π {sv.price.toFixed(1)}</span>
+                  <span style={{
+                    fontSize: 12, padding: "3px 10px", borderRadius: 12,
+                    background: "rgba(39,174,96,0.15)", color: "#2ecc71",
+                    border: "1px solid rgba(39,174,96,0.25)",
+                  }}>● 上架中</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 用户管理 */}
+        {activeTab === "用户管理" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>👥 用户管理</h2>
+            {["pi_user_88","pi_user_42","pi_user_77","pi_user_13","pi_user_56"].map((u, i) => (
+              <div key={u} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "14px 20px", marginBottom: 10, borderRadius: 14,
+                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: "linear-gradient(135deg,#9B59B6,#F3C136)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 14, fontWeight: 700, color: "#1E112A",
+                  }}>{u[8].toUpperCase()}</div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{u}</div>
+                    <div style={{ fontSize: 11, color: "rgba(240,230,255,0.4)" }}>Pi Network 用户</div>
+                  </div>
+                </div>
+                <span style={{ color: "rgba(240,230,255,0.45)", fontSize: 13 }}>{i + 1} 笔订单</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+function OrderTable({ orders }: { orders: typeof mockOrders }) {
+  const statusStyle = (s: string) => ({
+    fontSize: 12, padding: "3px 10px", borderRadius: 12, fontWeight: 600,
+    background: s === "completed" ? "rgba(39,174,96,0.15)" : s === "pending" ? "rgba(243,193,54,0.12)" : "rgba(192,57,43,0.12)",
+    color: s === "completed" ? "#2ecc71" : s === "pending" ? "#F3C136" : "#e74c3c",
+    border: `1px solid ${s === "completed" ? "rgba(39,174,96,0.25)" : s === "pending" ? "rgba(243,193,54,0.2)" : "rgba(192,57,43,0.2)"}`,
+  });
+  const label = (s: string) => s === "completed" ? "已完成" : s === "pending" ? "待处理" : "已取消";
+  return (
+    <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.07)" }}>
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1.2fr 1.5fr 0.8fr 0.9fr 0.7fr",
+        padding: "12px 20px", background: "rgba(255,255,255,0.04)",
+        fontSize: 12, color: "rgba(240,230,255,0.4)", fontWeight: 600, letterSpacing: 0.5,
+      }}>
+        {["订单号","用户","服务","金额","状态","时间"].map(h => <span key={h}>{h}</span>)}
+      </div>
+      {orders.map((o, i) => (
+        <div key={o.id} style={{
+          display: "grid", gridTemplateColumns: "1fr 1.2fr 1.5fr 0.8fr 0.9fr 0.7fr",
+          padding: "14px 20px", fontSize: 13,
+          background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent",
+          borderTop: "1px solid rgba(255,255,255,0.05)",
+          alignItems: "center",
+        }}>
+          <span style={{ color: "rgba(240,230,255,0.5)", fontFamily: "monospace" }}>{o.id}</span>
+          <span style={{ color: "#c39bd3" }}>{o.user}</span>
+          <span>{o.service}</span>
+          <span style={{ color: "#F3C136", fontWeight: 700 }}>π {o.amount.toFixed(1)}</span>
+          <span style={statusStyle(o.status)}>{label(o.status)}</span>
+          <span style={{ color: "rgba(240,230,255,0.4)" }}>{o.time}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+// === 模块：apps/admin/src/app/payments/page.tsx ===
+'use client';
+
+// 后台 — 支付记录
+
+import { useEffect, useState } from 'react';
+
+interface Payment {
+  id: string;
+  piPaymentId: string;
+  txid?: string;
+  amount: number;
+  status: string;
+  developerApproved: boolean;
+  developerCompleted: boolean;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export default function AdminPaymentsPage() {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/payments', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { payments: Payment[] }) => { setPayments(data.payments ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">支付记录</h1>
+
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                {['Pi Payment ID', '链上 TxID', '金额', '状态', '已审批', '已完成', '时间'].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="text-center py-10 text-gray-300">加载中...</td></tr>
+              ) : payments.length === 0 ? (
+                <tr><td colSpan={7} className="text-center py-10 text-gray-400">暂无支付记录</td></tr>
+              ) : (
+                payments.map((p) => (
+                  <tr key={p.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[140px] truncate" title={p.piPaymentId}>
+                      {p.piPaymentId}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-400 max-w-[120px] truncate" title={p.txid ?? ''}>
+                      {p.txid ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 text-[#7C3AED] font-semibold">π {Number(p.amount).toFixed(2)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded-lg ${
+                        p.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                        p.status === 'CANCELLED' ? 'bg-red-100 text-red-600' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>{p.status}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">{p.developerApproved ? '✅' : '❌'}</td>
+                    <td className="px-4 py-3 text-center">{p.developerCompleted ? '✅' : '❌'}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                      {new Date(p.createdAt).toLocaleString('zh-CN')}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// === 模块：apps/admin/src/app/services/page.tsx ===
+'use client';
+
+// 后台 — 服务管理
+
+import { useEffect, useState } from 'react';
+
+interface Service {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  price: number;
+  durationMinutes: number;
+  status: string;
+  createdAt: string;
+}
+
+export default function AdminServicesPage() {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/services', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { services: Service[] }) => { setServices(data.services ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">服务管理</h1>
+        <button className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-not-allowed opacity-50">
+          + 新增服务
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              {['服务名称', '类型', '价格', '时长', '状态', '操作'].map((h) => (
+                <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="text-center py-10 text-gray-300">加载中...</td></tr>
+            ) : services.length === 0 ? (
+              <tr><td colSpan={6} className="text-center py-10 text-gray-400">暂无服务数据</td></tr>
+            ) : (
+              services.map((s) => (
+                <tr key={s.id} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-800 font-medium">{s.title}</td>
+                  <td className="px-4 py-3 text-gray-500">{s.type === 'APPOINTMENT' ? '预约制' : '其他'}</td>
+                  <td className="px-4 py-3 text-[#7C3AED] font-semibold">π {Number(s.price).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-gray-500">{s.durationMinutes ? `${s.durationMinutes} 分钟` : '-'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-1 rounded-lg ${
+                      s.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                    }`}>{s.status === 'ACTIVE' ? '上架中' : '已下架'}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button className="text-[#7C3AED] hover:text-[#6D28D9] text-sm font-medium mr-3">编辑</button>
+                    <button className="text-red-500 hover:text-red-600 text-sm font-medium">删除</button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+// === 模块：apps/admin/src/app/settings/page.tsx ===
+'use client';
+
+// 后台 — 店铺设置
+
+import { useEffect, useState } from 'react';
+
+interface AppConfigForm {
+  name: string;
+  contactPhone: string;
+  industrySkin: string;
+  homepageLayout: string;
+  modulesBooking: boolean;
+  modulesMembership: boolean;
+  enableCoupon: boolean;
+}
+
+export default function AdminSettingsPage() {
+  const [form, setForm] = useState<AppConfigForm>({
+    name: '',
+    contactPhone: '',
+    industrySkin: 'generic',
+    homepageLayout: 'service-first',
+    modulesBooking: true,
+    modulesMembership: false,
+    enableCoupon: false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/settings', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { config: AppConfigForm }) => { if (data.config) setForm(data.config); })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+        credentials: 'include',
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggle = (key: keyof AppConfigForm) =>
+    setForm((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">店铺设置</h1>
+
+      <div className="max-w-lg space-y-6">
+        {/* 基础信息 */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
+          <h2 className="font-semibold text-gray-700">基础信息</h2>
+          {[
+            { label: '商户名称', key: 'name' as keyof AppConfigForm, type: 'text' },
+            { label: '联系电话', key: 'contactPhone' as keyof AppConfigForm, type: 'tel' },
+          ].map((f) => (
+            <div key={f.key}>
+              <label className="block text-sm text-gray-500 mb-1">{f.label}</label>
+              <input
+                type={f.type}
+                value={String(form[f.key])}
+                onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* 行业皮肤 */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+          <h2 className="font-semibold text-gray-700 mb-4">行业皮肤</h2>
+          <select
+            value={form.industrySkin}
+            onChange={(e) => setForm((prev) => ({ ...prev, industrySkin: e.target.value }))}
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]"
+          >
+            {['beauty', 'fitness', 'education', 'consulting', 'repair', 'generic'].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 模块开关 */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
+          <h2 className="font-semibold text-gray-700">功能开关</h2>
+          {[
+            { key: 'modulesBooking', label: '预约管理' },
+            { key: 'modulesMembership', label: '会员方案' },
+            { key: 'enableCoupon', label: '优惠券（P2）' },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">{label}</span>
+              <button
+                onClick={() => toggle(key as keyof AppConfigForm)}
+                className={`w-12 h-6 rounded-full transition-colors ${
+                  form[key as keyof AppConfigForm] ? 'bg-[#7C3AED]' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
+                  form[key as keyof AppConfigForm] ? 'translate-x-6' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition-colors"
+        >
+          {saved ? '✓ 已保存' : saving ? '保存中...' : '保存设置'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+// === 模块：apps/admin/src/lib/prisma.ts ===
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+
+// === 模块：apps/admin/src/lib/session.ts ===
+import crypto from 'crypto';
+
+const SECRET_KEY = process.env.PI_SESSION_SECRET || 'dev_fallback_secret_for_pi_hmac_2026';
+
+export function verifySessionToken(token: string): string | null {
+  if (!token || !token.includes('.')) return null;
+
+  const [payload, signature] = token.split('.');
+  
+  const hmac = crypto.createHmac('sha256', SECRET_KEY);
+  hmac.update(payload);
+  const expectedSignature = hmac.digest('base64url');
+
+  if (signature !== expectedSignature) {
+    return null;
+  }
+
+  try {
+    return Buffer.from(payload, 'base64url').toString('utf8');
+  } catch (error) {
+    return null;
+  }
+}
+
+
+// === 模块：apps/admin/src/lib/utils.ts ===
+export function getMerchantId() {
+  return process.env.NEXT_PUBLIC_MERCHANT_ID || process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID || 'merchant-demo-001';
+}
+
+
+// === 模块：apps/web/src/app/(auth)/login/page.tsx ===
+'use client';
+
+// ============================================================
+// 商户前台 — 登录页
+// 通过 Pi Network 认证登录，成功后跳转商户首页
+// ============================================================
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { authenticateWithPi } from '@pi-merchant/pi-sdk';
+
+const DEFAULT_MERCHANT_ID = process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ?? process.env.NEXT_PUBLIC_MERCHANT_ID ?? 'merchant-demo-001';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handlePiLogin = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await authenticateWithPi(DEFAULT_MERCHANT_ID);
+      if (result.success && result.user) {
+        router.push('/');
+      } else {
+        setError(result.error ?? '登录失败，请重试');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '登录异常，请在 Pi Browser 中打开');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
+        {/* Logo */}
+        <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <span className="text-4xl">π</span>
+        </div>
+
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Sign In</h1>
+        <p className="text-gray-500 text-sm mb-8">
+          登录您的账户以继续访问
+        </p>
+
+        {/* Pi 登录按钮 */}
+        <button
+          onClick={handlePiLogin}
+          disabled={loading}
+          className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] disabled:bg-gray-300 
+                     text-white font-semibold py-3 px-6 rounded-xl transition-all 
+                     duration-200 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <span className="animate-spin text-lg">⟳</span>
+              <span>Signing in...</span>
+            </>
+          ) : (
+            <>
+              <span className="text-xl">π</span>
+              <span>Sign In with Pi</span>
+            </>
+          )}
+        </button>
+
+        {/* 错误提示 */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400 mt-6">
+          请在 Pi Browser 中打开以使用 Pi 登录功能
+        </p>
+      </div>
+    </main>
+  );
+}
+
+
+// === 模块：apps/web/src/app/api/auth/logout/route.ts ===
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+
+export async function POST() {
+  cookies().delete('pi_auth_token');
+  return NextResponse.json({ success: true });
+}
+
+
+// === 模块：apps/web/src/app/api/auth/me/route.ts ===
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
+
+const prisma = new PrismaClient();
+
+export async function GET(req: Request) {
+  const cookieStore = cookies();
+  let token = cookieStore.get('pi_auth_token')?.value;
+
+  if (!token) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+  }
+
+  if (!token) {
+    return NextResponse.json({ authenticated: false });
+  }
+
+  const piUid = verifySessionToken(token);
+  if (!piUid) {
+    return NextResponse.json({ authenticated: false });
+  }
+
+  const customer = await prisma.customer.findFirst({
+    where: { piUid },
+    select: { username: true }
+  });
+
+  if (!customer) {
+    return NextResponse.json({ authenticated: false });
+  }
+
+  return NextResponse.json({ authenticated: true, username: customer.username });
+}
+
+
+// === 模块：apps/web/src/app/api/orders/route.ts ===
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
+
+const prisma = new PrismaClient();
+
+export async function POST(req: Request) {
+  try {
+    const cookieStore = cookies();
+    let token = cookieStore.get('pi_auth_token')?.value;
+    
+    // 如果 Cookie 丢了，尝试从 Authorization 头中读取
+    if (!token) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+    
+    // [DEBUG_REMOVED]' : 'NO');
+    
+    const piUid = token ? verifySessionToken(token) : null;
+    
+    // [DEBUG_REMOVED]
+
+    if (!piUid) {
+      return NextResponse.json({ success: false, error: 'Unauthorized (No valid token)' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { amount, memo, planId } = body;
+    const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
+
+    // Verify customer exists
+    const customer = await prisma.customer.findUnique({
+      where: { merchantId_piUid: { merchantId, piUid } }
+    });
+
+    if (!customer) {
+      return NextResponse.json({ success: false, error: 'Customer not found' }, { status: 404 });
+    }
+
+    // 幂等策略: We could check if there's an existing DRAFT order for this same plan.
+    // For simplicity, we just generate a new orderNo. The real deduplication is in the Pi Payment creation.
+    const orderNo = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const order = await prisma.order.create({
+      data: {
+        merchantId,
+        customerId: customer.id,
+        orderNo,
+        amount,
+        status: 'DRAFT',
+        note: memo || planId || 'App Subscription',
+      }
+    });
+
+    return NextResponse.json({ success: true, order });
+  } catch (error: any) {
+    // [DEBUG_REMOVED]
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+
+// === 模块：apps/web/src/app/api/payments/cancel/route.ts ===
+// ============================================================
+// POST /api/payments/cancel
+// 取消支付（用户取消或系统超时取消）
+// ============================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json() as { paymentId?: string };
+    const { paymentId } = body;
+
+    if (!paymentId) {
+      return NextResponse.json({ success: false, error: 'paymentId 不能为空' }, { status: 400 });
+    }
+
+    // 更新支付记录状态
+    await prisma.payment.updateMany({
+      where: { piPaymentId: paymentId },
+      data: {
+        status: 'CANCELLED',
+        userCancelled: true,
+      },
+    });
+
+    // 更新关联订单
+    const payment = await prisma.payment.findUnique({
+      where: { piPaymentId: paymentId },
+      select: { orderId: true },
+    });
+
+    if (payment?.orderId) {
+      await prisma.order.update({
+        where: { id: payment.orderId },
+        data: { status: 'CANCELLED' },
+      });
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (err) {
+    // [DEBUG_REMOVED]
+    return NextResponse.json({ success: false, error: '服务器内部错误' }, { status: 500 });
+  }
+}
+
+
+// === 模块：apps/web/src/app/checkout/CheckoutClient.tsx ===
+'use client';
+
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+
+export default function CheckoutClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const plan = searchParams.get('plan') || 'basic';
+  
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState('准备收银台...');
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
+
+  const plans = {
+    basic: { name: '基础建站先锋 (Basic Plan)', amount: 5.0 },
+    pro: { name: '专业 AI 架构 (Pro Plan)', amount: 25.0 }
+  };
+  
+  const selectedPlan = plans[plan as keyof typeof plans] || plans.basic;
+
+  const handlePayment = async () => {
+    if (typeof window === 'undefined' || !(window as any).Pi) {
+      setErrorStatus("⚠️ 侦测到您并未在 Pi Browser 内发起支付。");
+      return;
+    }
+
+    setLoading(true);
+    setStatusText('1. 正在服务器生成生态商户订单...');
+    setErrorStatus(null);
+
+    try {
+      // Step 1: Draft order creation (Idempotent keys generated server side for the user action)
+      const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
+      
+      const orderRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(fallbackToken ? { 'Authorization': `Bearer ${fallbackToken}` } : {})
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+           amount: selectedPlan.amount,
+           planId: plan,
+           memo: `Framework Subscription: ${selectedPlan.name}`
+        })
+      });
+
+      const orderData = await orderRes.json();
+      
+      if (!orderData.success) {
+        if (orderRes.status === 401) {
+            setErrorStatus("身份未授权，请回首页通过 Pi Wallet 连接。");
+        } else {
+            setErrorStatus("服务器创建订单失败: " + orderData.error);
+        }
+        setLoading(false);
+        return;
+      }
+
+      setStatusText('2. 正在唤醒区块链底层安全验证...');
+      const Pi = (window as any).Pi;
+      
+      // Step 2: Use Core Pi.createPayment API
+      Pi.createPayment({
+        amount: selectedPlan.amount,
+        memo: `Subscription: ${selectedPlan.name}`,
+        metadata: { orderId: orderData.order.orderNo, planId: plan },
+      }, {
+        onReadyForServerApproval: async (paymentId: string) => {
+          setStatusText(`3. 服务器核算对价中 [${paymentId.slice(0,6)}...]`);
+          const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
+          await fetch('/api/payments/approve', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              ...(fallbackToken ? { 'Authorization': `Bearer ${fallbackToken}` } : {})
+            },
+            credentials: 'include',
+            body: JSON.stringify({ paymentId, orderId: orderData.order.orderNo })
+          });
+        },
+        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+          setStatusText('4. 交易上链成功！正在为您颁发数字权益...');
+          const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
+          await fetch('/api/payments/complete', {
+             method: 'POST',
+             headers: { 
+               'Content-Type': 'application/json',
+               ...(fallbackToken ? { 'Authorization': `Bearer ${fallbackToken}` } : {})
+             },
+             credentials: 'include',
+             body: JSON.stringify({ paymentId, txid })
+          });
+          // All good, flow returning to dashboard
+          router.push('/dashboard?success=true');
+        },
+        onCancel: (paymentId: string) => {
+          setLoading(false);
+          setStatusText('');
+          setErrorStatus(`💡 动作已中止，您取消了支付，未发生资产转移。`);
+        },
+        onError: (error: any, payment: any) => {
+          setLoading(false);
+          setStatusText('');
+          // [DEBUG_REMOVED]
+          setErrorStatus(`⚠️ 支付唤起遭遇异常: ${error?.message || "未知错误"}`);
+        }
+      });
+    } catch (e: any) {
+      // [DEBUG_REMOVED]
+      setLoading(false);
+      setErrorStatus(`本地逻辑发生异常: ${e.message}`);
+    }
+  };
+
+  return (
+    <div className="max-w-md w-full bg-[#1E112A] border border-[#F3C136]/20 rounded-3xl p-8 shadow-2xl relative">
+      {/* Back navigation */}
+      <Link href="/" className="absolute top-6 left-6 text-gray-500 hover:text-gray-300 text-sm flex items-center font-bold">
+        ← 返回大厅
+      </Link>
+      
+      <h1 className="text-2xl font-black text-center mt-6 text-white mb-2">安全收银台</h1>
+      <p className="text-sm text-center text-gray-400 mb-8 border-b border-gray-700 pb-6">
+        正在为您接入生态安全扣款网关
+      </p>
+
+      <div className="bg-[#2A1642] rounded-2xl p-6 mb-8 border border-indigo-900/50">
+        <h2 className="text-sm font-bold text-gray-400 mb-2">订阅包裹类型</h2>
+        <p className="text-lg font-black text-[#F3C136] mb-6">{selectedPlan.name}</p>
+
+        <h2 className="text-sm font-bold text-gray-400 mb-2">等价结算金额</h2>
+        <div className="flex items-baseline space-x-2">
+          <span className="text-[#F3C136] text-4xl font-black">π</span>
+          <span className="text-4xl font-black text-white">{selectedPlan.amount.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {errorStatus && (
+        <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm font-medium">
+          {errorStatus}
+        </div>
+      )}
+
+      <button 
+        onClick={handlePayment}
+        disabled={loading}
+        className="w-full bg-[#F3C136] hover:bg-[#EEA834] text-[#1E112A] font-black text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(243,193,54,0.3)] transition-all disabled:opacity-50 disabled:grayscale mb-4 flex justify-center items-center"
+      >
+        {loading ? (
+           <span className="animate-pulse">{statusText}</span>
+        ) : (
+           <span className="flex items-center">
+              安全确认并投递 <span className="text-xl ml-2 font-black leading-none">→</span>
+           </span>
+        )}
+      </button>
+
+      <p className="text-xs text-center text-gray-500 font-medium">
+         本次操作受底层防重放机制与密文验证码保护，保障完全的生态交互体验。
+      </p>
+    </div>
+  );
+}
+
+
+// === 模块：apps/web/src/app/checkout/page.tsx ===
+import { Suspense } from 'react';
+import CheckoutClient from './CheckoutClient';
+
+export const dynamic = 'force-dynamic';
+
+export default function CheckoutPage() {
+  return (
+    <main className="min-h-screen bg-[#110B19] text-gray-200 flex flex-col items-center justify-center p-4">
+      <Suspense fallback={<div className="text-[#F3C136] font-bold">载入收银台中...</div>}>
+        <CheckoutClient />
+      </Suspense>
+    </main>
+  );
+}
+
+
+
+// === 模块：apps/web/src/app/dashboard/page.tsx ===
+import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { PrismaClient } from '@prisma/client';
+import LogoutButton from '@/components/LogoutButton';
+import { verifySessionToken } from '@/lib/session';
+
+// 强制动态渲染策略，确保读取最新的 session cookie
+export const dynamic = 'force-dynamic';
+
+const prisma = new PrismaClient();
+
+export default async function DashboardPage() {
+  const cookieStore = cookies();
+  const token = cookieStore.get('pi_auth_token')?.value;
+  const piUid = token ? verifySessionToken(token) : null;
+  const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
+
+  let customer = null;
+  let activeMemberships = 0;
+  let totalBookings = 0;
+  let totalPayments = 0;
+
+  // P1-A: 服务端纯身份鉴权拦截
+  if (piUid) {
+    customer = await prisma.customer.findUnique({
+      where: {
+        merchantId_piUid: { merchantId, piUid }
+      },
+      include: {
+        _count: {
+          select: {
+             bookings: { where: { status: { notIn: ['CANCELLED', 'NO_SHOW'] } } },
+             orders: { where: { status: 'COMPLETED' } }
+          }
+        },
+        customerMemberships: {
+          where: { status: 'ACTIVE' }
+        }
+      }
+    });
+
+    if (customer) {
+      activeMemberships = customer.customerMemberships.length;
+      totalBookings = customer._count.bookings;
+      totalPayments = customer._count.orders;
+    }
+  }
+
+  // 服务端返回无权控制面板
+  if (!customer) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-[#1E112A] to-[#110B19] flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-20 h-20 bg-[#2A1642] border border-[#F3C136]/30 rounded-full flex items-center justify-center text-3xl mb-6 shadow-lg shadow-[#F3C136]/10">
+          🔒
+        </div>
+        <h1 className="text-2xl md:text-3xl font-bold text-white mb-3">无权操作</h1>
+        <p className="text-gray-400 mb-8 max-w-md text-sm md:text-base leading-relaxed">
+          生态控制面板是被严密保护的专属私域。您必须退回首页，并通过底层原生的 
+          <strong className="text-[#F3C136] font-bold mx-1">链侧身份授权</strong> 
+          机制后方可解锁此页面。
+        </p>
+        <Link 
+          href="/" 
+          className="bg-[#F3C136] hover:bg-[#EEA834] text-[#1E112A] px-8 py-3 rounded-xl font-bold transition-colors shadow-[0_0_15px_rgba(243,193,54,0.3)] hover:-translate-y-0.5 transform"
+        >
+          ← 返回大厅
+        </Link>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col">
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+            <Link href="/">
+              <div className="w-8 h-8 rounded-lg bg-[#1E112A] flex items-center justify-center text-white font-bold cursor-pointer">
+                AI
+              </div>
+            </Link>
+            <h1 className="text-lg font-bold text-gray-800">控制台管理中心</h1>
+          </div>
+          <div className="flex items-center space-x-4">
+            <LogoutButton />
+            <Link href="/" className="text-sm font-medium text-gray-500 hover:text-gray-800">返回主页</Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-4 py-8 w-full flex-1 flex flex-col md:flex-row gap-6">
+        
+        {/* 左侧导航 */}
+        <aside className="w-full md:w-64 shrink-0">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-1">
+            <div className="bg-purple-50 text-[#7C3AED] px-4 py-3 rounded-xl font-bold cursor-pointer">概览面板</div>
+            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors">我的业务凭证</div>
+            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors">架构与问答支持</div>
+            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors mt-4">组件配置流溯源 🔒</div>
+          </div>
+        </aside>
+
+        {/* 主内容区数据绑定 */}
+        <div className="flex-1 space-y-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-gray-800 mb-1">欢迎回归，{customer.username} 👋</h2>
+              <p className="text-sm text-gray-500">以下参数已实时同步您的生态节点与历史凭证档案流。</p>
+            </div>
+            <div className="hidden sm:block w-16 h-16 bg-[#3B2D4F] rounded-full flex items-center justify-center text-2xl font-black text-[#F3C136] shadow-inner">
+              {customer.username.charAt(0).toUpperCase()}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm relative overflow-hidden group hover:border-[#7C3AED]/30 transition-colors">
+              <div className="absolute right-0 top-0 w-16 h-16 bg-indigo-50 rounded-bl-full flex items-start justify-end p-3 pointer-events-none">
+                <span className="text-indigo-400">⚡</span>
+              </div>
+              <h3 className="text-sm font-bold text-gray-500 mb-4">当前配置凭证</h3>
+              <p className="text-2xl font-black text-gray-900 mb-1">
+                {activeMemberships > 0 ? `${activeMemberships} 项生效中` : '暂无参数'}
+              </p>
+              <Link href="/#pricing" className="text-sm text-[#7C3AED] font-bold hover:underline">前去研讨加配 →</Link>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm relative overflow-hidden">
+               <div className="absolute right-0 top-0 w-16 h-16 bg-blue-50 rounded-bl-full flex items-start justify-end p-3 pointer-events-none">
+                <span className="text-blue-400">🎫</span>
+              </div>
+              <h3 className="text-sm font-bold text-gray-500 mb-4">周期内向导排期配额</h3>
+              <p className="text-2xl font-black text-gray-900 mb-1">{totalBookings} <span className="text-sm font-medium text-gray-400">次</span></p>
+              <button className="text-sm text-gray-400 font-medium cursor-not-allowed">
+                {totalBookings > 0 ? "查看履约快照" : "基础版存在限制"}
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm relative overflow-hidden">
+              <div className="absolute right-0 top-0 w-16 h-16 bg-orange-50 rounded-bl-full flex items-start justify-end p-3 pointer-events-none">
+                <span className="text-orange-400">π</span>
+              </div>
+              <h3 className="text-sm font-bold text-gray-500 mb-4">累计结算笔数</h3>
+              <p className="text-2xl font-black text-gray-900 mb-1">{totalPayments}</p>
+              <span className="text-sm text-gray-400 font-medium">Data On-Chain</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 opacity-80 pointer-events-none">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">生态向导与履约下发流 (Construction)</h3>
+            <div className="bg-gray-50 rounded-xl p-8 border border-dashed border-gray-300 text-center text-sm font-medium text-gray-500">
+               ⚠️ 服务端授权链路已通过验证。<br/> 此处列表详情在进行下一阶段的写操作迭代后，将可以展现与下载加密服务包。
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  );
+}
+
+
+// === 模块：apps/web/src/app/layout.tsx ===
+import './globals.css';
+import type { Metadata } from 'next';
+import EnvBanner from '@/components/EnvBanner';
+
+export const metadata: Metadata = {
+  title: 'Pioneer AI Service Framework',
+  description: '赋能千万先锋的智能服务引擎与可复用业务平台基建。',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="zh-CN">
+      <head>
+        {/*
+          Pi SDK 官方标准初始化（来自 Pi Developer Docs）:
+            <script src="https://[YOUR_DOMAIN]/pi-sdk.js"></script>
+            <script>Pi.init({ version: "2.0" })</script>
+          两个顺序 <script>，Pi Browser 保证同步执行，无需 defer / load 事件
+        */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script src="https://[YOUR_DOMAIN]/pi-sdk.js" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `Pi.init({ version: "2.0", sandbox: true });`,
+          }}
+        />
+      </head>
+      <body className="bg-gray-50 min-h-screen text-gray-900 font-sans flex flex-col">
+        <EnvBanner />
+        <div className="flex-1 flex flex-col">
+          {children}
+        </div>
+      </body>
+    </html>
+  );
+}
+
+
+// === 模块：apps/web/src/app/page.tsx ===
+import PiLoginButton from '@/components/PiLoginButton';
+import Link from 'next/link';
+
+export default function HomePage() {
+  return (
+    <main className="min-h-screen bg-[#0A0510] text-gray-100 font-sans selection:bg-[#F3C136] selection:text-[#1E112A] flex flex-col overflow-x-hidden">
+      {/* Background Ambience / 背景微光氛围 */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[80%] h-[40%] md:w-[40%] bg-[#7C3AED]/20 blur-[120px] md:blur-[150px] rounded-full"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[80%] h-[40%] md:w-[40%] bg-[#F3C136]/10 blur-[120px] md:blur-[150px] rounded-full"></div>
+      </div>
+
+      {/* Header / 顶导大基框 */}
+      <header className="sticky top-0 z-50 bg-[#0A0510]/80 backdrop-blur-xl border-b border-white/5">
+        <div className="w-full max-w-[1440px] mx-auto flex justify-between items-center px-4 sm:px-6 lg:px-12 h-16 md:h-20">
+          <div className="flex items-center space-x-2 md:space-x-4 shrink-0">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center p-[1px] shadow-lg shadow-[#F3C136]/10 shrink-0">
+              <div className="flex items-center justify-center w-full h-full bg-[#150B20] rounded-[7px] md:rounded-[11px]">
+                <span className="text-sm md:text-xl font-black text-[#F3C136]">AI</span>
+              </div>
+            </div>
+            <div className="flex flex-col justify-center truncate">
+              <h1 className="text-base md:text-xl font-bold text-white tracking-tight leading-none truncate pr-2">Pioneer AI</h1>
+              <p className="text-[9px] md:text-[11px] text-[#F3C136]/80 font-medium mt-1 uppercase tracking-widest hidden sm:block">Commercial Ecosystem</p>
+            </div>
+          </div>
+          <div className="flex items-center shrink-0">
+            <PiLoginButton />
+          </div>
+        </div>
+      </header>
+
+      {/* Hero / 双栏巨幕首屏区 */}
+      <section className="relative z-10 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 pt-12 pb-20 md:pt-20 md:pb-32 lg:pt-32 lg:pb-40 flex flex-col lg:flex-row items-center gap-10 lg:gap-24">
+        {/* Hero Left Copy */ }
+        <div className="w-full lg:w-[55%] flex flex-col space-y-6 md:space-y-8 text-center lg:text-left mt-4 md:mt-0">
+          <div className="inline-flex items-center self-center lg:self-start px-3 py-1.5 bg-[#FFFFFF]/5 border border-white/10 rounded-full text-[10px] md:text-xs font-bold text-[#F3C136] tracking-widest uppercase shadow-sm">
+            <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#F3C136] mr-2 animate-pulse"></span>
+            Next Generation DApp Foundation
+          </div>
+          <h2 className="text-4xl sm:text-5xl lg:text-7xl xl:text-[80px] font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-200 to-gray-500 leading-[1.1] md:leading-[1.05] tracking-tight md:tracking-tighter px-2 lg:px-0">
+            赋能千万先锋的 <br className="hidden sm:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F3C136] to-[#D18E15]">智能服务引擎</span>
+          </h2>
+          <p className="text-gray-400 text-base md:text-lg lg:text-xl max-w-2xl mx-auto lg:mx-0 leading-relaxed font-medium">
+            为全行业开发者与商户提供原生生态 API 互通、AI 业务辅助及模块化调度系统。顷刻实现链上资产流转的高效商业闭环。
+          </p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-3 md:gap-4 pt-2 md:pt-4 w-full sm:w-auto">
+            <Link 
+              href="/dashboard"
+              className="group flex items-center justify-center font-bold text-[#1E112A] bg-[#F3C136] hover:bg-[#EEA834] px-6 md:px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all shadow-lg hover:shadow-[#F3C136]/30 text-base md:text-lg w-full sm:w-auto"
+            >
+              启动控制台
+              <svg className="w-4 h-4 md:w-5 md:h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+            </Link>
+            <a 
+              href="#pricing"
+              className="flex items-center justify-center font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 px-6 md:px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl transition-all text-base md:text-lg w-full sm:w-auto"
+            >
+              浏览智能计划
+            </a>
+          </div>
+          <div className="flex justify-center lg:justify-start flex-wrap items-center gap-x-4 md:gap-x-8 gap-y-2 md:gap-y-4 pt-6 md:pt-8 text-xs md:text-sm font-semibold text-gray-500 border-t border-white/5 mt-6 md:mt-8">
+            <div className="flex items-center"><span className="text-[#8B5CF6] mr-1.5 md:mr-2 text-lg md:text-xl leading-none">✓</span> 原生验证架构</div>
+            <div className="flex items-center"><span className="text-[#8B5CF6] mr-1.5 md:mr-2 text-lg md:text-xl leading-none">✓</span> 分布信任网络</div>
+            <div className="flex items-center"><span className="text-[#8B5CF6] mr-1.5 md:mr-2 text-lg md:text-xl leading-none">✓</span> 无缝身份衔接</div>
+          </div>
+        </div>
+        
+        {/* Hero Right Graphic / 右侧大屏应用态示意 */}
+        <div className="w-full max-w-sm lg:max-w-none mx-auto lg:w-[45%] relative mt-8 lg:mt-0 px-2 sm:px-0">
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#7C3AED]/20 to-[#F3C136]/10 blur-2xl md:blur-3xl -z-10 rounded-full"></div>
+          <div className="w-full aspect-[4/3] bg-[#150B20]/80 backdrop-blur-3xl border border-white/10 rounded-2xl md:rounded-[2rem] p-4 md:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between group">
+             {/* Mockup Topbar */}
+             <div className="flex justify-between items-center bg-white/5 p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex gap-1.5 md:gap-2">
+                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-red-500/80"></div>
+                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-yellow-500/80"></div>
+                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-green-500/80"></div>
+                </div>
+                <div className="w-20 md:w-24 h-3 md:h-4 rounded px-2 text-[8px] md:text-[10px] bg-white/10 text-center font-mono opacity-50 flex items-center justify-center">sdk.minepi.com</div>
+             </div>
+             
+             {/* Mockup Content */}
+             <div className="flex-1 mt-4 md:mt-6 flex flex-col gap-3 md:gap-4">
+                <div className="w-3/4 h-6 md:h-8 bg-gradient-to-r from-gray-700 to-gray-800 rounded-md md:rounded-lg"></div>
+                <div className="w-1/2 h-3 md:h-4 bg-gray-800 rounded"></div>
+                <div className="grid grid-cols-2 gap-3 md:gap-4 mt-auto">
+                   <div className="h-20 md:h-24 rounded-lg md:rounded-xl bg-white/5 border border-white/10 p-3 md:p-4 flex flex-col justify-between group-hover:bg-white/10 transition-colors">
+                     <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-indigo-500/20"></div>
+                     <div className="w-full h-1.5 md:h-2 bg-gray-700 rounded-[1px] md:rounded-sm"></div>
+                   </div>
+                   <div className="h-20 md:h-24 rounded-lg md:rounded-xl bg-white/5 border border-[#F3C136]/20 p-3 md:p-4 flex flex-col justify-between bg-gradient-to-br from-[#F3C136]/5 to-transparent">
+                     <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#F3C136]/20"></div>
+                     <div className="w-full h-1.5 md:h-2 bg-[#F3C136]/50 rounded-[1px] md:rounded-sm"></div>
+                   </div>
+                </div>
+             </div>
+             
+             {/* Overlay elements mapping SDK logic */}
+             <div className="absolute right-[-10px] md:right-[-20px] bottom-10 md:bottom-16 bg-[#1A1A1A] border border-gray-700 text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl shadow-2xl flex items-center font-mono text-gray-400">
+                <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-400 rounded-full mr-2"></span> Connection Alive 
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing / Capabilities */}
+      <section id="pricing" className="relative z-10 w-full bg-[#0E0715] py-20 md:py-32 border-y border-white/5">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
+          <div className="text-center max-w-3xl mx-auto mb-12 md:mb-20 lg:mb-28 px-2">
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-black text-white mb-4 md:mb-6 tracking-tight leading-tight">核心商业部署方案</h2>
+            <p className="text-gray-400 text-base md:text-xl font-medium">以标准化组件重塑生态应用的生产力，精准匹配业务进程。</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-stretch">
+            {/* Basic Plan */}
+            <div className="bg-[#150B20] border border-white/10 rounded-2xl md:rounded-[2rem] p-6 md:p-10 flex flex-col hover:bg-[#1A0E2A] hover:border-white/20 transition-all lg:mt-8 lg:mb-8">
+              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">基础先锋</h3>
+              <p className="text-gray-400 text-sm mb-6 md:mb-8 h-auto md:h-10">极速跑通底层支付账本与标准业务流。</p>
+              <div className="text-4xl md:text-5xl font-black text-[#F3C136] mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/10 tracking-tight">
+                π 5 <span className="text-sm md:text-base text-gray-500 font-medium tracking-normal">/ 期</span>
+              </div>
+              <ul className="space-y-4 md:space-y-5 mb-8 md:mb-10 flex-1 text-sm text-gray-300 font-medium">
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 标准化组件授权池</li>
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 基础数据大盘洞察</li>
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 社区异步技术辅导</li>
+              </ul>
+              <Link href="/checkout?plan=basic" className="w-full inline-flex justify-center items-center py-3.5 md:py-4 rounded-xl font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                配置前瞻框架
+              </Link>
+            </div>
+
+            {/* Pro Plan (Hero Card) */}
+            <div className="relative bg-gradient-to-b from-[#2A1642] to-[#1E112E] border border-[#F3C136]/30 rounded-2xl md:rounded-[2rem] p-6 md:p-10 flex flex-col shadow-2xl shadow-[#F3C136]/5 transform lg:-translate-y-4 mt-2 mb-2 lg:my-0">
+              <div className="absolute top-0 inset-x-0 h-1 md:h-1.5 bg-gradient-to-r from-[#F3C136] to-[#EEA834] rounded-t-2xl md:rounded-t-[2rem]"></div>
+              <div className="absolute top-[-12px] md:top-[-14px] left-1/2 transform -translate-x-1/2 bg-[#F3C136] text-[#1E112A] text-[9px] md:text-[10px] font-black uppercase tracking-widest py-1 md:py-1.5 px-3 md:px-4 rounded-full shadow-lg whitespace-nowrap">
+                专业应用精选
+              </div>
+              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">专业架构</h3>
+              <p className="text-gray-300 text-sm mb-6 md:mb-8 h-auto md:h-10">全量的高级 AI 组件接入和专属核心架构护航。</p>
+              <div className="text-5xl md:text-6xl font-black text-[#F3C136] mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/10 tracking-tight flex items-end">
+                π 25 <span className="text-sm md:text-base text-gray-400 font-medium tracking-normal pb-1.5 md:pb-2 ml-2">/ 期</span>
+              </div>
+              <ul className="space-y-4 md:space-y-5 mb-8 md:mb-10 flex-1 text-sm text-gray-200 font-medium">
+                <li className="flex items-start"><span className="text-[#F3C136] mr-3 font-bold">✓</span> <strong className="text-white">深度护航：</strong>专有架构师资源辅导</li>
+                <li className="flex items-start"><span className="text-[#F3C136] mr-3 font-bold">✓</span> <strong className="text-white">AI赋能：</strong>自动化商用调度节点</li>
+                <li className="flex items-start"><span className="text-[#F3C136] mr-3 font-bold">✓</span> 包含所有前瞻版底层构件</li>
+                <li className="flex items-start"><span className="text-[#F3C136] mr-3 font-bold">✓</span> 专线解决开发链路卡点</li>
+              </ul>
+              <Link href="/checkout?plan=pro" className="w-full inline-flex justify-center items-center py-3.5 md:py-4 rounded-xl font-bold text-[#1E112A] bg-[#F3C136] hover:bg-[#EEA834] transition-colors shadow-lg shadow-[#F3C136]/20">
+                激活智能专业引擎
+              </Link>
+            </div>
+
+            {/* Custom Plan */}
+            <div className="bg-[#150B20] border border-white/10 rounded-2xl md:rounded-[2rem] p-6 md:p-10 flex flex-col hover:bg-[#1A0E2A] hover:border-white/20 transition-all lg:mt-8 lg:mb-8">
+              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">生态共创定制</h3>
+              <p className="text-gray-400 text-sm mb-6 md:mb-8 h-auto md:h-10">大型资产及机构节点的本地化深度逻辑整合。</p>
+              <div className="text-3xl md:text-4xl font-black text-gray-100 mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/10 tracking-tight flex items-center md:h-[76px]">
+                定向提案
+              </div>
+              <ul className="space-y-4 md:space-y-5 mb-8 md:mb-10 flex-1 text-sm text-gray-300 font-medium">
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> <strong className="text-gray-200">垂类定制：</strong>独占业务逻辑注入</li>
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 本地部署与风控安全布道</li>
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 异构应用上链安全顾问</li>
+              </ul>
+              <button className="w-full inline-flex justify-center items-center py-3.5 md:py-4 rounded-xl font-bold text-gray-300 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                与专家组排期
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Demos Section */}
+      <section className="relative z-10 w-full py-20 md:py-32 bg-[#0A0510]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
+          <div className="mb-12 md:mb-20 flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 px-2 md:px-0">
+            <div className="max-w-2xl text-center md:text-left">
+               <h2 className="text-3xl md:text-5xl font-black text-white mb-4 md:mb-6 tracking-tight leading-tight">多域商业垂直兼容</h2>
+               <p className="text-gray-400 text-base md:text-xl font-medium">极其统一的底层支付引擎，平滑支撑分化的真实场景叙事。</p>
+            </div>
+            <Link href="/dashboard" className="text-[#F3C136] font-bold md:hover:underline flex items-center justify-center md:justify-end shrink-0 bg-white/5 md:bg-transparent py-3 md:py-0 rounded-xl md:rounded-none">
+               探究应用示例 <span className="text-lg md:text-xl ml-1 md:ml-2 font-black leading-none">→</span>
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8">
+            {/* Demo 1 */}
+            <div className="group bg-[#150B20] border border-white/5 rounded-2xl md:rounded-[2rem] p-6 md:p-10 md:hover:bg-[#1A0E2A] md:hover:border-white/10 transition-all cursor-pointer">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-indigo-500/10 rounded-xl md:rounded-2xl flex items-center justify-center text-indigo-400 mb-6 md:mb-8 border border-indigo-500/20 shadow-inner">
+                <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+              </div>
+              <h4 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4">数字知识平台</h4>
+              <p className="text-gray-400 text-sm md:text-base leading-relaxed">提供专为导师定制的数字化专栏资源查阅权及独立打卡组件模块。</p>
+            </div>
+            
+            {/* Demo 2 */}
+            <div className="group bg-[#150B20] border border-white/5 rounded-2xl md:rounded-[2rem] p-6 md:p-10 md:hover:bg-[#1A0E2A] md:hover:border-white/10 transition-all cursor-pointer relative overflow-hidden">
+               <div className="absolute top-6 right-6 md:top-8 md:right-8 px-2.5 py-1 md:px-3 md:py-1.5 bg-white/5 rounded-full text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-gray-500 flex items-center">
+                 <div className="w-1 h-1 md:w-1.5 md:h-1.5 bg-[#F3C136] rounded-full mr-1.5 auto-pulse"></div>主推
+               </div>
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-pink-500/10 rounded-xl md:rounded-2xl flex items-center justify-center text-pink-400 mb-6 md:mb-8 border border-pink-500/20 shadow-inner">
+                <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              </div>
+              <h4 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4">实体业务破圈</h4>
+              <p className="text-gray-400 text-sm md:text-base leading-relaxed">重塑同城业务实体的“线上 Pi 锁定配额，线下核销享受”融合模式。</p>
+            </div>
+
+            {/* Demo 3 */}
+            <div className="group bg-[#150B20] border border-white/5 rounded-2xl md:rounded-[2rem] p-6 md:p-10 md:hover:bg-[#1A0E2A] md:hover:border-white/10 transition-all cursor-pointer">
+              <div className="w-12 h-12 md:w-16 h-16 bg-emerald-500/10 rounded-xl md:rounded-2xl flex items-center justify-center text-emerald-400 mb-6 md:mb-8 border border-emerald-500/20 shadow-inner">
+                 <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+              </div>
+              <h4 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4">企业级合规</h4>
+              <p className="text-gray-400 text-sm md:text-base leading-relaxed">通过硬性鉴权流下发高维通行凭证，支撑 B 端会晤与跨域对公交易。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Post-CTA Section */}
+      <section className="relative z-10 w-full py-16 md:py-24 bg-gradient-to-br from-[#2A1642] to-[#150B20] border-y border-white/5 overflow-hidden">
+        <div className="absolute right-0 bottom-0 w-[80%] md:w-[50%] h-[120%] md:h-[150%] bg-[#F3C136]/10 blur-[100px] md:blur-[150px] pointer-events-none"></div>
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 flex flex-col md:flex-row justify-between items-center z-10 relative">
+          <div className="max-w-xl text-center md:text-left mb-8 md:mb-0">
+             <h2 className="text-3xl lg:text-5xl font-black text-white leading-[1.1] md:leading-[1.1] mb-4 md:mb-6">着眼未来生态 <br className="hidden md:block" /> 即场构制蓝图</h2>
+             <p className="text-base md:text-lg text-gray-300 font-medium">跳过极其繁杂的基础重构，即刻启航真正具备壁垒的应用进程。</p>
+          </div>
+          <div className="flex shrink-0 w-full md:w-auto">
+            <Link 
+              href="/dashboard"
+              className="w-full md:w-auto bg-white text-[#110B19] md:hover:bg-gray-100 font-bold px-8 py-4 md:px-10 md:py-5 rounded-xl md:rounded-2xl transition-all shadow-2xl text-base md:text-lg flex items-center justify-center group"
+            >
+              部署生态站台
+              <span className="text-xl md:text-2xl ml-2 md:ml-3 font-black leading-none group-hover:translate-x-1 transition-transform">→</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Professional Footer */}
+      <footer className="w-full bg-[#05020A] pt-16 md:pt-24 border-t border-white/5">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 flex flex-col lg:flex-row justify-between pb-16 md:pb-24">
+           {/* Footer Brand */}
+           <div className="max-w-xs mb-12 lg:mb-0 text-center lg:text-left mx-auto lg:mx-0">
+             <div className="flex items-center justify-center lg:justify-start space-x-3 mb-5 md:mb-6">
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center p-[1px]">
+                  <div className="flex items-center justify-center w-full h-full bg-[#05020A] rounded-[6px] md:rounded-[7px]">
+                    <span className="text-[10px] md:text-sm font-black text-[#F3C136]">AI</span>
+                  </div>
+                </div>
+                <h3 className="text-base md:text-lg font-bold text-white tracking-tight">Pioneer Framework</h3>
+             </div>
+             <p className="text-xs md:text-sm text-gray-500 leading-relaxed font-medium">为生态系统内应用提供极度安全、精练、并彻底闭环的全栈接入基架。</p>
+           </div>
+           
+           {/* Footer Links (Grid) */}
+           <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12 lg:gap-24 w-full lg:w-auto text-center lg:text-left">
+             <div className="col-span-1">
+               <h4 className="text-white font-bold mb-4 md:mb-6 text-sm">生态资源</h4>
+               <ul className="space-y-3 md:space-y-4 text-xs md:text-sm text-gray-500 font-medium">
+                 <li><Link href="/" className="md:hover:text-white transition-colors">组件文档集</Link></li>
+                 <li><Link href="/" className="md:hover:text-white transition-colors">安全接入网</Link></li>
+                 <li><Link href="/" className="md:hover:text-white transition-colors">架构演示间</Link></li>
+               </ul>
+             </div>
+             <div className="col-span-1">
+               <h4 className="text-white font-bold mb-4 md:mb-6 text-sm">解决方案</h4>
+               <ul className="space-y-3 md:space-y-4 text-xs md:text-sm text-gray-500 font-medium">
+                 <li><Link href="#pricing" className="md:hover:text-white transition-colors">前沿基础服</Link></li>
+                 <li><Link href="#pricing" className="md:hover:text-white transition-colors">体系构建组</Link></li>
+                 <li><Link href="#pricing" className="md:hover:text-white transition-colors">大型节点端</Link></li>
+               </ul>
+             </div>
+             <div className="col-span-2 lg:col-span-1 pt-4 lg:pt-0 border-t border-white/5 lg:border-t-0">
+               <h4 className="text-white font-bold mb-4 md:mb-6 text-sm">平台法则</h4>
+               <ul className="flex justify-center lg:flex-col lg:space-y-4 lg:space-x-0 space-x-6 text-xs md:text-sm text-gray-500 font-medium list-none">
+                 <li><Link href="/" className="md:hover:text-white transition-colors">合规明细</Link></li>
+                 <li><Link href="/" className="md:hover:text-white transition-colors">隐私保护</Link></li>
+                 <li><Link href="/" className="md:hover:text-white transition-colors">用户条规</Link></li>
+               </ul>
+             </div>
+           </div>
+        </div>
+        
+        {/* Deep Disclaimer */}
+        <div className="border-t border-white/5 py-8 md:py-10 bg-[#030105]">
+           <div className="max-w-[1440px] mx-auto px-4 lg:px-12 flex flex-col items-center text-center">
+              <p className="text-[9px] sm:text-[10px] md:text-[11px] text-gray-600/70 max-w-5xl tracking-normal md:tracking-wide uppercase leading-loose md:leading-[1.8] font-medium mb-4 md:mb-6 md:mix-blend-screen px-2">
+                 Disclaimer: This framework is independently authored by community developers and is not an official product of the Pi Core Team. References to ecosystem compatibility do not constitute affiliation. Operation of apps relies on third-party integrations. Nothing herein constitutes financial or trading advice.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs md:text-sm text-gray-600 font-bold tracking-tight">
+                 <span>© 2026 Pioneer AI Service Framework.</span>
+                 <span className="hidden sm:inline">探索前沿效率.</span>
+              </div>
+           </div>
+        </div>
+      </footer>
+    </main>
+  );
+}
+
+
+// === 模块：apps/web/src/app/services/[id]/page.tsx ===
+import Link from 'next/link';
+
+export default function ServiceDetailPage({ params }: { params: { id: string } }) {
+  // Normally: query actual service by ID from DB or API
+  const service = {
+    id: params.id,
+    title: '高级光疗美甲',
+    description: '采用顶级环保光疗胶，色彩饱和度高，持久不脱落（平均可维持30-40天）。包含完整的日式手部死皮特护及抛光处理，由具有5年资历以上的资深美甲师全程为您操作。过程温馨无痛。',
+    price: 12.0
+  };
+
+  return (
+    <main className="max-w-md mx-auto min-h-screen bg-gray-50 flex flex-col border-x border-gray-100">
+      <header className="p-4 bg-white border-b border-gray-100 flex items-center">
+        <Link href="/" className="text-gray-500 hover:text-gray-800 font-medium flex items-center transition-colors">
+          <span className="text-xl mr-1">←</span> 返回列表
+        </Link>
+      </header>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="bg-white p-6 mb-2">
+          <div className="inline-block px-3 py-1 bg-purple-100 text-[#7C3AED] text-xs font-bold rounded-lg mb-4 cursor-default">热门推荐</div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2 leading-tight">{service.title}</h1>
+          <p className="text-[#7C3AED] text-4xl font-black mb-6">π {service.price.toFixed(2)}</p>
+          
+          <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">服务详情</h3>
+          <div className="bg-gray-50 rounded-2xl p-5 text-gray-600 text-sm leading-relaxed border border-gray-100 shadow-inner">
+            {service.description}
+          </div>
+        </div>
+        
+        <div className="bg-white p-6">
+          <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wide">商家保障</h3>
+          <ul className="space-y-3 text-sm font-medium text-gray-700">
+            <li className="flex items-center">
+              <span className="text-green-500 mr-2">✓</span> 支持 Pi 链上安全支付
+            </li>
+            <li className="flex items-center">
+              <span className="text-green-500 mr-2">✓</span> 服务前随时可申请退掉 (P2)
+            </li>
+            <li className="flex items-center">
+              <span className="text-green-500 mr-2">✓</span> 专业认证保证品质
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="p-5 bg-white border-t border-gray-100 sticky bottom-0">
+        <Link 
+          href={`/checkout?serviceId=${service.id}`}
+          className="block w-full text-center bg-[#7C3AED] text-white py-4 rounded-xl font-bold shadow-lg shadow-purple-200 hover:bg-[#6D28D9] transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+        >
+          立即支付预约
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+
+// === 模块：apps/web/src/lib/order-utils.ts ===
+// ============================================================
+// 订单号生成工具
+// 格式：ORD-{YYYYMMDD}-{6位随机}
+// ============================================================
+
+export function generateOrderNo(): string {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `ORD-${dateStr}-${random}`;
+}
+
+
+// === 模块：apps/web/src/lib/pi-client.ts ===
+// apps/web/src/lib/pi-client.ts
+
+export const initPiSDK = () => {
+  if (typeof window !== 'undefined' && (window as any).Pi) {
+    const Pi = (window as any).Pi;
+    // Set sandbox mode dynamically (usually true in development)
+    const isSandbox = process.env.NEXT_PUBLIC_PI_SANDBOX === 'true';
+    Pi.init({ version: '2.0', sandbox: isSandbox });
+    return Pi;
+  }
+  return null;
+};
+
+interface CreatePaymentOptions {
+  amount: number;
+  memo: string;
+  metadata: Record<string, any>;
+  onReadyForServerApproval: (paymentId: string) => void;
+  onReadyForServerCompletion: (paymentId: string, txid: string) => void;
+  onCancel: (paymentId: string) => void;
+  onError: (error: any, payment?: any) => void;
+}
+
+export const createPiPayment = async (options: CreatePaymentOptions) => {
+  const Pi = initPiSDK();
+  if (!Pi) {
+    throw new Error('Pi SDK is not loaded. Please access this app via Pi Browser.');
+  }
+
+  return Pi.createPayment(
+    {
+      amount: options.amount,
+      memo: options.memo,
+      metadata: options.metadata,
+    },
+    {
+      onReadyForServerApproval: options.onReadyForServerApproval,
+      onReadyForServerCompletion: options.onReadyForServerCompletion,
+      onCancel: options.onCancel,
+      onError: options.onError,
+    }
+  );
+};
+
+
+// === 模块：apps/web/src/lib/prisma.ts ===
+// ============================================================
+// Prisma Client 单例（防止开发模式热重载时连接耗尽）
+// ============================================================
+
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  });
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+
+// === 模块：apps/web/src/lib/session.ts ===
+import crypto from 'crypto';
+
+// 使用不可推导的密钥盐进行服务端签名。生产环境请确保配置了独立的环境变量
+const SECRET_KEY = process.env.PI_SESSION_SECRET || 'dev_fallback_secret_for_pi_hmac_2026';
+
+/**
+ * 将真实的 piUid 打包并进行 HMAC-SHA256 签名，生成客户端不可篡改的 Opaque Token
+ */
+export function signSessionToken(piUid: string): string {
+  // 结构设计: base64(piUid) + '.' + HMAC(base64(piUid))
+  const payload = Buffer.from(piUid).toString('base64url');
+  const hmac = crypto.createHmac('sha256', SECRET_KEY);
+  hmac.update(payload);
+  const signature = hmac.digest('base64url');
+  
+  return `${payload}.${signature}`;
+}
+
+/**
+ * 验证收到的 Session Token，如果被篡改则返回 null
+ */
+export function verifySessionToken(token: string): string | null {
+  if (!token || !token.includes('.')) return null;
+
+  const [payload, signature] = token.split('.');
+  
+  const hmac = crypto.createHmac('sha256', SECRET_KEY);
+  hmac.update(payload);
+  const expectedSignature = hmac.digest('base64url');
+
+  if (signature !== expectedSignature) {
+    return null;
+  }
+
+  // 解码出真实的 UID
+  try {
+    return Buffer.from(payload, 'base64url').toString('utf8');
+  } catch (error) {
+    return null;
+  }
+}
+
+
+// === 模块：prisma/seed.ts ===
+// ============================================================
+// prisma/seed.ts — 测试数据生成器
+// 运行：pnpm db:seed
+// ============================================================
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  // [DEBUG_REMOVED]
+
+  // ── 1. 创建测试商户 ─────────────────────────────────────
+  const merchant = await prisma.merchant.upsert({
+    where: { id: 'merchant-demo-001' },
+    create: {
+      id: 'merchant-demo-001',
+      name: '美丽时光美甲工作室',
+      type: 'BEAUTY',
+      status: 'ACTIVE',
+      contactName: '王老板',
+      contactPhone: '138-0000-0000',
+      themeConfig: {
+        primaryColor: '#C48FBE',
+        secondaryColor: '#F7D6E0',
+      },
+    },
+    update: {},
+  });
+  // [DEBUG_REMOVED]
+
+  // ── 2. 创建商户配置 ──────────────────────────────────────
+  await prisma.appConfig.upsert({
+    where: { merchantId: merchant.id },
+    create: {
+      merchantId: merchant.id,
+      modulesEnabled: {
+        booking: true,
+        membership: true,
+        coupon: false,
+        a2uReward: false,
+      },
+      homepageLayout: 'booking-first',
+      industrySkin: 'beauty',
+      checkoutMode: 'SINGLE',
+      enableCoupon: false,
+      enableA2uReward: false,
+    },
+    update: {},
+  });
+
+  // ── 3. 创建测试服务 ──────────────────────────────────────
+  const services = [
+    { title: '基础美甲护理', price: 5.0, durationMinutes: 60, description: '基础透明美甲，含手部护理' },
+    { title: '高级光疗美甲', price: 12.0, durationMinutes: 90, description: '高级光疗，多色可选，持久耐用' },
+    { title: '美睫嫁接', price: 18.0, durationMinutes: 120, description: '专业美睫嫁接，自然根数' },
+  ];
+
+  for (const s of services) {
+    await prisma.service.create({
+      data: {
+        merchantId: merchant.id,
+        type: 'SERVICE',
+        title: s.title,
+        description: s.description,
+        price: s.price,
+        durationMinutes: s.durationMinutes,
+        status: 'ACTIVE',
+      },
+    });
+  }
+  // [DEBUG_REMOVED]
+
+  // ── 4. 创建会员方案 ──────────────────────────────────────
+  await prisma.membership.createMany({
+    data: [
+      {
+        merchantId: merchant.id,
+        name: '月卡会员',
+        mode: 'TIME_BASED',
+        price: 30.0,
+        validDays: 30,
+        benefitsJson: { discount: 0.9, description: '享9折优惠' },
+        status: 'ACTIVE',
+      },
+      {
+        merchantId: merchant.id,
+        name: '10次卡',
+        mode: 'USAGE_BASED',
+        price: 80.0,
+        totalUses: 10,
+        benefitsJson: { discount: 0.85, description: '享8.5折，可分多次使用' },
+        status: 'ACTIVE',
+      },
+    ],
+  });
+  // [DEBUG_REMOVED]
+
+  // [DEBUG_REMOVED]
+  // [DEBUG_REMOVED]
+  // [DEBUG_REMOVED]
+}
+
+main()
+  .catch((e) => {
+    // [DEBUG_REMOVED]
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());
+

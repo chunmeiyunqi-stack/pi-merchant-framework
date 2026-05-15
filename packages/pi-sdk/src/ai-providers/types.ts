@@ -96,6 +96,14 @@ export interface AIProvider {
   chat(request: AIProviderRequest): Promise<AIProviderResponse>;
 
   /**
+   * 发送流式聊天请求
+   * @param request - 统一格式的请求
+   * @returns 异步流式数据块迭代器
+   * @throws Error 当 API 调用初始失败时
+   */
+  generateStream(request: AIProviderRequest): AsyncIterable<AIStreamChunk>;
+
+  /**
    * 检查提供商是否可用（API Key 存在、服务可达等）
    * 用于 Factory 路由时的预检查
    */

@@ -86,3 +86,44 @@ export async function generateMerchantAiResponse({
     };
   }
 }
+
+/**
+ * 生成商户 AI 流式响应
+ *
+ * @param request - AI 请求参数
+ * @returns AI 流式块异步迭代器
+ */
+export async function* streamMerchantAiResponse({
+  merchantId,
+  prompt,
+  model,
+  temperature,
+  provider,
+}: AIRequest): AsyncIterable<AIStreamChunk> {
+  const factory = getProviderFactory();
+
+  try {
+    const stream = factory.routeStream(
+      {
+        messages: [
+          { role: 'system', content: buildSystemPrompt(merchantId) },
+          { role: 'user', content: prompt },
+        ],
+        model,
+        temperature: temperature ?? 0.6,
+        maxTokens: 512,
+      },
+      provider as AIProviderName | undefined
+    );
+
+    yield* stream;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logError('AI stream service call failed', error, {
+      merchantId,
+      requestedProvider: provider,
+      promptPreview: prompt.slice(0, 120),
+    });
+    throw new Error(errorMessage || 'AI stream service unavailable right now.');
+  }
+}

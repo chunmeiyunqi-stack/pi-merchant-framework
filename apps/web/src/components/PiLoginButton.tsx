@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { authenticateWithPi } from '@pi-merchant/pi-sdk';
 
 export default function PiLoginButton() {
   const [username, setUsername] = useState<string | null>(null);
@@ -27,66 +28,21 @@ export default function PiLoginButton() {
 
     setLoading(true);
     try {
-      const Pi = (window as any).Pi;
-
-      // 官方文档标准写法：Pi.authenticate(scopes, onIncompletePaymentFound)
-      // onIncompletePaymentFound 处理上次未完成的支付，用 async 确保 fetch 完成后再继续
-      const authResult = await Pi.authenticate(
-        ['payments', 'username'],
-        async function onIncompletePaymentFound(payment: any) {
-          console.warn('[PiLogin] 发现未完成支付，处理中:', payment.identifier);
-          try {
-            const { identifier: paymentId, status, transaction } = payment;
-            if (!status.developer_approved) {
-              await fetch('/api/payments/approve', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentId, orderId: payment.metadata?.orderId }),
-              });
-            } else if (status.developer_approved && !status.developer_completed && transaction?.txid) {
-              await fetch('/api/payments/complete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentId, txid: transaction.txid }),
-              });
-            }
-          } catch (err) {
-            // 不 rethrow —— 未完成支付处理失败不应阻断本次握手
-            console.error('[PiLogin] 处理未完成支付出错（继续握手）:', err);
-          }
+      const authResult = await authenticateWithPi(process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001');
+      if (authResult.success && authResult.user) {
+        if (authResult.token) {
+          localStorage.setItem('pi_auth_token_fallback', authResult.token);
         }
-      );
-
-      console.log('[PiLogin] Pi.authenticate 成功，uid:', authResult.user.uid);
-
-      // 将 accessToken 发给后端，后端用 GET /v2/me 验证后签发 session cookie
-      const res = await fetch('/api/auth/pi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          accessToken: authResult.accessToken,
-          piUid: authResult.user.uid,
-          username: authResult.user.username,
-          merchantId: process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001',
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        if (data.token) {
-          localStorage.setItem('pi_auth_token_fallback', data.token);
-        }
-        setUsername(data.user?.username ?? authResult.user.username);
+        setUsername(authResult.user.username);
         router.push('/dashboard');
-      } else {
-        console.error('[PiLogin] 后端验证失败:', data.error);
-        alert('身份验证失败: ' + (data.error ?? '未知错误'));
+        return;
       }
+
+      console.error('[PiLogin] 后端验证失败:', authResult.error);
+      alert('身份验证失败: ' + (authResult.error ?? '未知错误'));
     } catch (error: any) {
       console.error('[PiLogin] 握手异常:', error);
-      alert('握手中止，请重试。错误: ' + (error.message ?? '未知'));
+      alert('握手中止，请重试。错误: ' + (error?.message ?? '未知'));
     } finally {
       setLoading(false);
     }

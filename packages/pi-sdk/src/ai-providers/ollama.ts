@@ -139,4 +139,79 @@ export class OllamaProvider extends BaseAIProvider {
         : undefined,
     };
   }
+
+  /**
+   * 执行 Ollama 流式调用
+   */
+  protected async *executeStream(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): AsyncIterable<AIStreamChunk> {
+    const model = request.model ?? this.config.defaultModel;
+
+    const payload = {
+      model,
+      messages: request.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      stream: true,
+      options: {
+        temperature: request.temperature ?? 0.6,
+        num_predict: request.maxTokens ?? 512,
+      },
+    };
+
+    const response = await fetch(`${this.config.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body returned from Ollama');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+
+          try {
+            const data = JSON.parse(trimmedLine) as OllamaChatResponse;
+            if (data.done) {
+              yield { content: '', done: true };
+              return;
+            }
+            if (data.message?.content) {
+              yield { content: data.message.content, done: false };
+            }
+          } catch (e) {
+            console.warn('Ollama stream JSON parse error', e);
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
 }

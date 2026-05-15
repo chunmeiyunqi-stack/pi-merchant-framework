@@ -319,4 +319,98 @@ describe('AIProviderFactory', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2); // OpenAI + Ollama
     });
   });
+
+  describe('routeStream() - Stream Routing', () => {
+    let mockGenerateStreamOpenAI: jest.Mock;
+    let mockGenerateStreamAnthropic: jest.Mock;
+    
+    beforeEach(() => {
+      mockGenerateStreamOpenAI = jest.fn();
+      mockGenerateStreamAnthropic = jest.fn();
+      
+      const openai = factory.getProvider('openai') as OpenAIProvider;
+      openai.isAvailable = jest.fn().mockReturnValue(true);
+      openai.generateStream = mockGenerateStreamOpenAI;
+
+      const anthropic = factory.getProvider('anthropic') as AnthropicProvider;
+      anthropic.isAvailable = jest.fn().mockReturnValue(true);
+      anthropic.generateStream = mockGenerateStreamAnthropic;
+      
+      const ollama = factory.getProvider('ollama') as OllamaProvider;
+      ollama.isAvailable = jest.fn().mockReturnValue(true);
+    });
+
+    it('should route stream to primary provider', async () => {
+      async function* mockStream() {
+        yield { content: 'hello', done: false };
+        yield { content: ' world', done: true };
+      }
+      mockGenerateStreamOpenAI.mockReturnValue(mockStream());
+
+      const stream = factory.routeStream({ messages: [{ role: 'user', content: 'test' }] });
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(mockGenerateStreamOpenAI).toHaveBeenCalledTimes(1);
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0].content).toBe('hello');
+    });
+
+    it('should fallback if primary stream fails on FIRST chunk (connection failure)', async () => {
+      // Primary fails immediately
+      async function* failStream() {
+        throw new Error('Connection failed');
+        yield { content: 'never reached', done: true };
+      }
+      mockGenerateStreamOpenAI.mockReturnValue(failStream());
+
+      // Fallback succeeds
+      async function* fallbackStream() {
+        yield { content: 'fallback success', done: true };
+      }
+      mockGenerateStreamAnthropic.mockReturnValue(fallbackStream());
+
+      const stream = factory.routeStream({ messages: [{ role: 'user', content: 'test' }] });
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(mockGenerateStreamOpenAI).toHaveBeenCalledTimes(1);
+      expect(mockGenerateStreamAnthropic).toHaveBeenCalledTimes(1);
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0].content).toBe('fallback success');
+    });
+
+    it('should NOT fallback if primary stream fails AFTER yielding chunks', async () => {
+      async function* partialStream() {
+        yield { content: 'part 1', done: false };
+        throw new Error('Mid-stream failure');
+      }
+      mockGenerateStreamOpenAI.mockReturnValue(partialStream());
+
+      const stream = factory.routeStream({ messages: [{ role: 'user', content: 'test' }] });
+      const chunks = [];
+      
+      let caughtError: Error | null = null;
+      try {
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+      } catch (e) {
+        caughtError = e as Error;
+      }
+
+      // Should have thrown
+      expect(caughtError).toBeDefined();
+      expect(caughtError?.message).toBe('Mid-stream failure');
+      // Should NOT have called fallback
+      expect(mockGenerateStreamAnthropic).not.toHaveBeenCalled();
+      // Should have yielded the first chunk before failing
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0].content).toBe('part 1');
+    });
+  });
 });

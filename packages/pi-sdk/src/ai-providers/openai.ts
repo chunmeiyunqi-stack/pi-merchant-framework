@@ -126,4 +126,85 @@ export class OpenAIProvider extends BaseAIProvider {
         : undefined,
     };
   }
+
+  /**
+   * 执行 OpenAI 流式调用
+   */
+  protected async *executeStream(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): AsyncIterable<AIStreamChunk> {
+    const model = request.model ?? this.config.defaultModel;
+
+    const payload = {
+      model,
+      messages: request.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      temperature: request.temperature ?? 0.6,
+      max_tokens: request.maxTokens ?? 512,
+      stream: true,
+    };
+
+    const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal, // Used to abort connection if user stops
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body returned from OpenAI');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        // Keep the last incomplete line in the buffer
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+          if (trimmedLine === 'data: [DONE]') {
+            yield { content: '', done: true };
+            return;
+          }
+
+          if (trimmedLine.startsWith('data: ')) {
+            const dataStr = trimmedLine.slice(6);
+            try {
+              const data = JSON.parse(dataStr);
+              const content = data.choices?.[0]?.delta?.content;
+              if (content) {
+                yield { content, done: false };
+              }
+            } catch (e) {
+              // Ignore parse errors for incomplete chunks just in case, though SSE should emit full JSON per line
+              console.warn('OpenAI stream JSON parse error', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
 }

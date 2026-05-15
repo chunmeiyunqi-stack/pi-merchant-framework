@@ -213,6 +213,136 @@ export class AIProviderFactory {
   }
 
   /**
+   * 路由流式请求到合适的提供商（含首次连接自动容错）
+   *
+   * 容错边界（关键限制）：
+   *   - Fallback 仅在建立连接、首个 Token 接收前触发。
+   *   - 一旦开始推送数据（首个 chunk 成功 yield），将锁定提供商，中断时直接抛出错误，不再降级。
+   *
+   * @param request - 统一格式的 AI 请求
+   * @param requestedProvider - 请求级别指定的提供商（可选）
+   * @returns 异步流式数据块迭代器，附带 routing 决策信息（在首个 chunk 前无法获取，故仅记录日志）
+   */
+  async *routeStream(
+    request: AIProviderRequest,
+    requestedProvider?: AIProviderName
+  ): AsyncIterable<AIStreamChunk> {
+    const routeStart = Date.now();
+    const skipped: Array<{ provider: AIProviderName; reason: string }> = [];
+
+    // ── 场景 1: 请求指定了提供商 → 直连，不 fallback ──
+    if (requestedProvider) {
+      const provider = this.providers.get(requestedProvider);
+      if (!provider) {
+        throw new Error(`Unknown AI provider: ${requestedProvider}`);
+      }
+      if (!provider.isAvailable()) {
+        throw new Error(`AI provider '${requestedProvider}' is not available`);
+      }
+      logEvent('AI stream routed (direct)', { provider: requestedProvider });
+      yield* provider.generateStream(request);
+      return;
+    }
+
+    // ── 场景 2: 使用主提供商 + fallback 链 ──
+    const providersToTry: AIProviderName[] = [
+      this.primaryProvider,
+      ...this.fallbackOrder.filter((name) => name !== this.primaryProvider),
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const providerName of providersToTry) {
+      const provider = this.providers.get(providerName);
+      if (!provider || !provider.isAvailable()) {
+        skipped.push({ provider: providerName, reason: !provider ? 'not registered' : 'not available' });
+        continue;
+      }
+
+      const isFallback = providerName !== this.primaryProvider;
+      let streamStarted = false;
+      let iterator: AsyncIterator<AIStreamChunk> | null = null;
+
+      try {
+        const stream = provider.generateStream(request);
+        iterator = stream[Symbol.asyncIterator]();
+
+        // 尝试获取首个 chunk
+        const firstResult = await iterator.next();
+        
+        // 如果成功获取首个 chunk，说明连接已建立，锁定当前提供商
+        streamStarted = true;
+        
+        if (isFallback) {
+          logWarn('AI stream routed via fallback', {
+            primary: this.primaryProvider,
+            actual: providerName,
+            skipped,
+            routingTimeMs: Date.now() - routeStart,
+          });
+        } else {
+          logEvent('AI stream routed (primary)', {
+            provider: providerName,
+            routingTimeMs: Date.now() - routeStart,
+          });
+        }
+
+        if (!firstResult.done) {
+          yield firstResult.value;
+        } else {
+          // Stream immediately finished?
+          return;
+        }
+
+        // 继续 yield 剩余的 chunks
+        while (true) {
+          const result = await iterator.next();
+          if (result.done) break;
+          yield result.value;
+        }
+
+        // 成功完成，直接退出
+        return;
+
+      } catch (error) {
+        if (streamStarted) {
+          // 如果流已经开始，禁止 fallback，直接抛出错误
+          logError(`AI stream interrupted for ${providerName}`, error, { provider: providerName });
+          throw error;
+        }
+
+        // 流尚未开始（连接失败或超时），允许 fallback
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        skipped.push({ provider: providerName, reason: errorMessage });
+        lastError = error instanceof Error ? error : new Error(errorMessage);
+
+        logWarn(`AI provider '${providerName}' stream failed, trying next...`, {
+          provider: providerName,
+          error: errorMessage,
+        });
+      } finally {
+        if (iterator && typeof iterator.return === 'function' && !streamStarted) {
+           // If we failed before starting or we are falling back, close the iterator to release resources
+           iterator.return().catch(() => {});
+        }
+      }
+    }
+
+    // 所有提供商的首个请求都失败
+    logError('All AI stream providers failed', lastError, {
+      attemptedProviders: providersToTry,
+      skipped,
+      routingTimeMs: Date.now() - routeStart,
+    });
+
+    throw new Error(
+      `All AI stream providers failed. Last error: ${lastError?.message ?? 'Unknown'}. ` +
+      `Attempted: ${providersToTry.join(', ')}. ` +
+      `Skipped: ${skipped.map((s) => `${s.provider}(${s.reason})`).join(', ')}`
+    );
+  }
+
+  /**
    * 解析 AI_PRIMARY_PROVIDER 环境变量
    * 默认值: 'openai'
    */

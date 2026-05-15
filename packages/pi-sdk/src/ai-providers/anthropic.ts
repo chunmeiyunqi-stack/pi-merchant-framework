@@ -161,4 +161,103 @@ export class AnthropicProvider extends BaseAIProvider {
         : undefined,
     };
   }
+
+  /**
+   * 执行 Anthropic 流式调用
+   */
+  protected async *executeStream(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): AsyncIterable<AIStreamChunk> {
+    const model = request.model ?? this.config.defaultModel;
+
+    const systemMessage = request.messages.find((m) => m.role === 'system');
+    const chatMessages = request.messages
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
+    const payload: Record<string, unknown> = {
+      model,
+      max_tokens: request.maxTokens ?? 512,
+      messages: chatMessages,
+      stream: true,
+    };
+
+    if (systemMessage) {
+      payload.system = systemMessage.content;
+    }
+    if (request.temperature !== undefined) {
+      payload.temperature = request.temperature;
+    }
+
+    const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.config.apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body returned from Anthropic');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+          // Anthropic SSE format:
+          // event: content_block_delta
+          // data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}
+          // We can just look for data lines
+          if (trimmedLine.startsWith('data: ')) {
+            const dataStr = trimmedLine.slice(6);
+            if (dataStr === '[DONE]') {
+              yield { content: '', done: true };
+              return;
+            }
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
+                const content = data.delta.text;
+                if (content) {
+                  yield { content, done: false };
+                }
+              } else if (data.type === 'message_stop') {
+                yield { content: '', done: true };
+                return;
+              }
+            } catch (e) {
+              console.warn('Anthropic stream JSON parse error', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
 }

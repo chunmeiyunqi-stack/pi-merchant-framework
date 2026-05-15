@@ -66,6 +66,18 @@ export abstract class BaseAIProvider implements AIProvider {
     signal: AbortSignal
   ): Promise<AIProviderResponse>;
 
+  /**
+   * 执行具体的流式 API 调用
+   * 由子类实现，生成流式事件
+   *
+   * @param request - 统一格式请求
+   * @param signal - AbortSignal 用于超时和用户取消
+   */
+  protected abstract executeStream(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): AsyncIterable<AIStreamChunk>;
+
   // ── 基类提供的通用实现 ──
 
   /**
@@ -109,6 +121,56 @@ export abstract class BaseAIProvider implements AIProvider {
       throw error;
     } finally {
       clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * 发送流式请求（模板方法）
+   * 
+   * 与 chat 不同，流式请求只对"初始连接"进行超时控制，
+   * 建立连接后由底层控制，如果客户端中断则通过 signal 传递。
+   */
+  async *generateStream(request: AIProviderRequest): AsyncIterable<AIStreamChunk> {
+    if (!this.isAvailable()) {
+      throw new Error(`${this.getDisplayName()} is not configured or not available`);
+    }
+
+    const controller = new AbortController();
+    // 首次连接超时，假设设为固定的 10s 或配置的超时，这里我们不清除timeout，
+    // 因为 stream 生命周期较长，但如果是整个请求的超时就会强行断开。
+    // 为了支持更长的 stream 生成，建议不设置硬性的整体超时，只依赖前端 abort，
+    // 但为了防止死连接，可以设置一个较长的兜底超时或者取消超时。
+    // 在这里我们仅将 signal 传给底层，由底层在 fetch 建立时抛出错误，
+    // 且一旦 stream 开始 yielding，底层不会抛出 fallback，而是按错误结束 stream。
+    
+    // 为了安全起见，我们不在基类为整个流式周期加固定定时器，而是依赖客户端 AbortSignal（路由层会传入）
+    // 或者仅处理底层的 initial connection timeout.
+    // 简单起见，我们仅传递 controller.signal 给 executeStream。
+    // 注意：这里的 catch 可以捕获建立流之前的错误（即 fallback 所需的错误）。
+    
+    try {
+      // 记录流开始
+      logEvent(`${this.getDisplayName()} stream started`, {
+        provider: this.name,
+        model: request.model ?? this.config.defaultModel,
+      });
+
+      yield* this.executeStream(request, controller.signal);
+
+      // 记录流结束
+      logEvent(`${this.getDisplayName()} stream completed`, {
+        provider: this.name,
+        model: request.model ?? this.config.defaultModel,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        const timeoutError = new Error(
+          `${this.getDisplayName()} stream request timed out or was aborted`
+        );
+        logError(timeoutError.message, null, { provider: this.name });
+        throw timeoutError;
+      }
+      throw error;
     }
   }
 

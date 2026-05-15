@@ -8,7 +8,15 @@ export async function GET() {
   const token = cookies().get('pi_auth_token')?.value;
   // If authorization fails, return zeros safely instead of blowing up to fulfill user constraint "空数据时返回 0"
   if (!token || !verifySessionToken(token)) {
-    return NextResponse.json({ todayOrders: 0, todayRevenue: 0, totalMembers: 0, pendingBookings: 0 });
+    return NextResponse.json({
+      todayOrders: 0,
+      todayRevenue: 0,
+      totalMembers: 0,
+      pendingBookings: 0,
+      activeServices: 0,
+      pendingPayments: 0,
+      activeMemberships: 0,
+    });
   }
 
   const merchantId = getMerchantId();
@@ -16,7 +24,7 @@ export async function GET() {
   startOfToday.setHours(0, 0, 0, 0);
 
   try {
-    const [todayOrders, todayRevenueAgg, totalMembers, pendingBookings] = await Promise.all([
+    const [todayOrders, todayRevenueAgg, totalMembers, pendingBookings, activeServices, pendingPayments, activeMemberships] = await Promise.all([
       prisma.order.count({
         where: { merchantId, createdAt: { gte: startOfToday } }
       }),
@@ -24,11 +32,20 @@ export async function GET() {
         _sum: { amount: true },
         where: { order: { merchantId }, status: 'COMPLETED', createdAt: { gte: startOfToday } }
       }),
-      prisma.customerMembership.count({
-        where: { customer: { merchantId }, status: 'ACTIVE' }
+      prisma.customer.count({
+        where: { merchantId }
       }),
       prisma.booking.count({
         where: { merchantId, status: 'PENDING' }
+      }),
+      prisma.service.count({
+        where: { merchantId, status: 'ACTIVE' }
+      }),
+      prisma.payment.count({
+        where: { status: 'PENDING', order: { merchantId } }
+      }),
+      prisma.customerMembership.count({
+        where: { customer: { merchantId }, status: 'ACTIVE' }
       })
     ]);
 
@@ -38,10 +55,21 @@ export async function GET() {
       todayOrders,
       todayRevenue: Number(todayRevenue.toFixed(2)),
       totalMembers,
-      pendingBookings
+      pendingBookings,
+      activeServices,
+      pendingPayments,
+      activeMemberships,
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ todayOrders: 0, todayRevenue: 0, totalMembers: 0, pendingBookings: 0 });
+    return NextResponse.json({
+      todayOrders: 0,
+      todayRevenue: 0,
+      totalMembers: 0,
+      pendingBookings: 0,
+      activeServices: 0,
+      pendingPayments: 0,
+      activeMemberships: 0,
+    });
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { signSessionToken } from '@/lib/session';
+import { logEvent } from '@pi-merchant/pi-sdk';
 
 const prisma = new PrismaClient();
 
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 7, // 7 天
     });
 
-    console.log('[Auth/Pi] 握手成功 — user:', verifiedUsername, '/ customerId:', customer.id);
+    logEvent('user.authenticated', { user: verifiedUsername, merchantId, customerId: customer.id });
 
     return NextResponse.json({
       success: true,
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
       token: secureToken, // 发送给前端，作为 localStorage 备用
     });
   } catch (error: any) {
+    logEvent('auth.pi.error', { error: error?.message ?? String(error) });
     console.error('[Auth/Pi] 内部错误:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
