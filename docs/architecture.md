@@ -44,14 +44,14 @@
 
 本项目采用 **pnpm Workspace + Turborepo** 管理：
 
-| 包 | 职责 | 依赖方向 |
-|----|------|---------|
-| `packages/types` | 业务类型定义 | 无依赖，被所有包引用 |
-| `packages/pi-sdk` | Pi SDK 封装 | → types |
-| `packages/config` | 商户配置 + 行业预设 | → types |
-| `packages/ui` | 共用 UI 组件 | → types, config |
-| `apps/web` | 商户前台 | → pi-sdk, config, ui, types |
-| `apps/admin` | 商户后台 | → types, ui |
+| 包                | 职责                | 依赖方向                    |
+| ----------------- | ------------------- | --------------------------- |
+| `packages/types`  | 业务类型定义        | 无依赖，被所有包引用        |
+| `packages/pi-sdk` | Pi SDK 封装         | → types                     |
+| `packages/config` | 商户配置 + 行业预设 | → types                     |
+| `packages/ui`     | 共用 UI 组件        | → types, config             |
+| `apps/web`        | 商户前台            | → pi-sdk, config, ui, types |
+| `apps/admin`      | 商户后台            | → types, ui                 |
 
 **依赖方向**：packages 之间只能向上依赖，apps 可以引用所有 packages。
 
@@ -102,10 +102,11 @@ merchants (1)
  │                       │                     │
  │                       │ upsert customers    │
  │                       │ sign JWT            │
- │◄─── Set-Cookie: pi_session (HttpOnly JWT)   │
+│◄─── Set-Cookie: pi_auth_token (HttpOnly JWT)   │
 ```
 
 Session 存储：
+
 - 后端签发 JWT，存入 **HttpOnly Cookie**（防 XSS）
 - JWT Payload：`{ sub: customerId, piUid, username, merchantId }`
 - 有效期：7 天
@@ -136,16 +137,16 @@ MerchantConfig (packages/config)
 
 ### 状态码规范
 
-| 场景 | 状态码 |
-|------|--------|
-| 成功 | 200 |
-| 创建成功 | 201 |
-| 参数错误 | 400 |
-| 未认证 | 401 |
-| 无权限 | 403 |
-| 不存在 | 404 |
-| Pi Platform 异常 | 502 |
-| 服务器内部错误 | 500 |
+| 场景             | 状态码 |
+| ---------------- | ------ |
+| 成功             | 200    |
+| 创建成功         | 201    |
+| 参数错误         | 400    |
+| 未认证           | 401    |
+| 无权限           | 403    |
+| 不存在           | 404    |
+| Pi Platform 异常 | 502    |
+| 服务器内部错误   | 500    |
 
 ### 响应体规范
 
@@ -186,6 +187,7 @@ vercel.com
 ### P2：SaaS 多租户
 
 只需：
+
 1. 增加 `platform_admins` 表（平台管理员）
 2. 增加 `tenant_plans` 表（订阅套餐）
 3. 中间件层注入 `merchantId`（通过子域名或 URL 参数）

@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import EnvBanner from '@/components/EnvBanner';
+import FooterLegal from '@/components/FooterLegal';
 
 export const metadata: Metadata = {
   title: 'Pioneer AI Service Framework',
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-gray-50 min-h-screen text-gray-900 font-sans flex flex-col">
         <EnvBanner />
         <div className="flex-1 flex flex-col">{children}</div>
+        <FooterLegal />
       </body>
     </html>
   );

@@ -4,7 +4,8 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "lib": ["esnext", "dom"],
-    "types": ["node"]
+    "types": ["node"],
+    "incremental": false
   },
   "include": ["src/**/*"]
 }

@@ -10,5 +10,5 @@ export * from './ai-providers';
 
 // Phase 3.2: 商业化核心能力
 export * from './license';
-export * from './tenant';
 export * from './usage';
+export * from './tenant';

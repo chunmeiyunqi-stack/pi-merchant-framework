@@ -19,7 +19,7 @@ interface RouteParams {
 export async function GET(request: Request, { params }: RouteParams): Promise<Response> {
   // 鉴权
   const cookieStore = cookies();
-  const token = cookieStore.get('pi_session')?.value;
+  const token = cookieStore.get('pi_auth_token')?.value;
   if (!token || !verifySessionToken(token)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

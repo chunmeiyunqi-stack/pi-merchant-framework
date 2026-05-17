@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, OrderStatus } from '@prisma/client';
 import { getMerchantId } from '@/lib/utils';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
@@ -22,7 +22,10 @@ export async function GET(req: Request) {
   const where: Prisma.OrderWhereInput = { merchantId };
 
   if (statusParam && statusParam !== 'ALL') {
-    where.status = statusParam;
+    // statusParam comes from query string (string). Prisma expects the enum type `OrderStatus` or a filter.
+    // Cast to `OrderStatus` to satisfy the type system while preserving existing behaviour.
+    const status = statusParam as OrderStatus;
+    where.status = status;
   }
 
   try {

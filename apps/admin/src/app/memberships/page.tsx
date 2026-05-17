@@ -72,7 +72,9 @@ export default function AdminMembershipsPage() {
       setIsModalOpen(false);
       setFormData({ name: '', mode: 'TIME_BASED', price: '', validDays: '', totalUses: '' });
     } catch (err: unknown) {
-      setErrorMsg(err.message);
+      // err is unknown; use type guard to safely access message
+      if (err instanceof Error) setErrorMsg(err.message);
+      else setErrorMsg(typeof err === 'string' ? err : 'Unknown error');
     } finally {
       setCreating(false);
     }
