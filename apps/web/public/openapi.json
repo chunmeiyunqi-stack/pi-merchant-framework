@@ -1,0 +1,63 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "先锋人工智能服务框架 API V2.0.0",
+    "version": "2.0.0",
+    "description": "基于 Pi Network 的 AI 商户白标框架标准化接口文档"
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/pi": {
+      "post": {
+        "summary": "Pi Network 商户用户认证与登录",
+        "description": "使用 Pi Platform 的 accessToken 验证用户身份并在本地签发会话。",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accessToken": {
+                    "type": "string"
+                  },
+                  "piUid": {
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  },
+                  "merchantId": {
+                    "type": "string"
+                  }
+                },
+                "required": ["accessToken", "piUid", "username", "merchantId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数缺失"
+          },
+          "401": {
+            "description": "认证失败"
+          }
+        }
+      }
+    }
+  },
+  "tags": []
+}
