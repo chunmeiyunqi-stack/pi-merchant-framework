@@ -1,0 +1,7 @@
+﻿feat(docs): 集成 Swagger/OpenAPI 文档，完善核心接口规范
+
+- 添加 next-swagger-doc 集成配置
+- 生成 OpenAPI 3.0 规范 (apps/web/public/openapi.json)
+- 添加 /api/docs 路由及 Swagger UI 页面
+- 完善 /api/auth/pi, /api/ai/stream 等接口 JSDoc 注释
+- 补充单元测试覆盖率报告 (43%+)
