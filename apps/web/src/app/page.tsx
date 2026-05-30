@@ -433,7 +433,7 @@ export default function HomePage() {
               <ul className="space-y-3 md:space-y-4 text-xs md:text-sm text-gray-500 font-medium">
                 <li>
                   <Link href="#pricing" className="md:hover:text-white transition-colors">
-                    前沿基础服
+                    前沿基础服务
                   </Link>
                 </li>
                 <li>
@@ -463,7 +463,7 @@ export default function HomePage() {
                 </li>
                 <li>
                   <Link href="/" className="md:hover:text-white transition-colors">
-                    用户条规
+                    用户条款
                   </Link>
                 </li>
               </ul>

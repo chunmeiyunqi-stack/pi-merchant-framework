@@ -1,11 +1,31 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import EnvBanner from '@/components/EnvBanner';
 import FooterLegal from '@/components/FooterLegal';
 
 export const metadata: Metadata = {
   title: 'Pioneer AI Service Framework',
   description: '赋能千万先锋的智能服务引擎与可复用业务平台基建。',
+  applicationName: 'Pioneer AI Service Framework',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'Pioneer AI Service Framework',
+    statusBarStyle: 'default',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#1a1a2e',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
