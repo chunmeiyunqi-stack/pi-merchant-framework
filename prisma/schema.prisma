@@ -92,6 +92,12 @@ enum CheckoutMode {
   SUBSCRIPTION
 }
 
+enum GenerationType {
+  TEXT
+  IMAGE
+  VIDEO
+}
+
 model Merchant {
   id           String         @id @default(cuid())
   name         String
@@ -111,6 +117,7 @@ model Merchant {
   bookings      Booking[]
   memberships   Membership[]
   appConfig     AppConfig?
+  generationHistories GenerationHistory[]
 
   @@map("merchants")
 }
@@ -144,6 +151,7 @@ model Customer {
   orders             Order[]
   bookings           Booking[]
   customerMemberships CustomerMembership[]
+  generationHistories GenerationHistory[]
 
   @@index([merchantId])
   @@index([piUid])
@@ -297,4 +305,36 @@ model AppConfig {
   merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("app_configs")
+}
+
+model GenerationHistory {
+  id               String         @id @default(cuid())
+  merchantId       String         @map("merchant_id")
+  customerId       String?        @map("customer_id")
+  piUid            String?        @map("pi_uid")
+  type             GenerationType @default(TEXT)
+  provider         String         @default("openai")
+  model            String
+  prompt           String
+  response         String?        @default("")
+  imageUrl         String?        @map("image_url")
+  videoUrl         String?        @map("video_url")
+  promptTokens     Int?           @map("prompt_tokens")
+  completionTokens Int?           @map("completion_tokens")
+  totalTokens      Int?           @map("total_tokens")
+  durationMs       Int?           @map("duration_ms")
+  status           String         @default("completed")
+  errorMessage     String?        @map("error_message")
+  metadata         Json?
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  merchant Merchant @relation(fields: [merchantId], references: [id])
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([merchantId, createdAt])
+  @@index([piUid])
+  @@index([type, status, createdAt])
+  @@map("generation_histories")
 }

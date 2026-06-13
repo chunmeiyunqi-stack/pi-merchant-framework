@@ -3,6 +3,14 @@ import crypto from 'crypto';
 // 使用不可推导的密钥盐进行服务端签名。生产环境请确保配置了独立的环境变量
 const SECRET_KEY = process.env.PI_SESSION_SECRET || 'dev_fallback_secret_for_pi_hmac_2026';
 
+// Debug: surface whether the process is using env-provided secret or the fallback
+try {
+  const source = process.env.PI_SESSION_SECRET ? 'env' : 'fallback';
+  console.error('[session] SECRET_KEY source:', source);
+} catch (e) {
+  /* ignore */
+}
+
 /**
  * 将真实的 piUid 打包并进行 HMAC-SHA256 签名，生成客户端不可篡改的 Opaque Token
  */
@@ -20,22 +28,38 @@ export function signSessionToken(piUid: string): string {
  * 验证收到的 Session Token，如果被篡改则返回 null
  */
 export function verifySessionToken(token: string): string | null {
-  if (!token || !token.includes('.')) return null;
+  if (!token) {
+    console.error('[session] verifySessionToken: missing token');
+    return null;
+  }
+
+  if (!token.includes('.')) {
+    console.error('[session] verifySessionToken: token missing separator (expected payload.signature)');
+    return null;
+  }
 
   const [payload, signature] = token.split('.');
+
+  if (!payload || !signature) {
+    console.error('[session] verifySessionToken: empty payload or signature');
+    return null;
+  }
 
   const hmac = crypto.createHmac('sha256', SECRET_KEY);
   hmac.update(payload);
   const expectedSignature = hmac.digest('base64url');
 
   if (signature !== expectedSignature) {
+    console.error('[session] verifySessionToken: signature mismatch', { provided: signature, expected: expectedSignature });
     return null;
   }
 
   // 解码出真实的 UID
   try {
-    return Buffer.from(payload, 'base64url').toString('utf8');
-  } catch (_error) {
+    const uid = Buffer.from(payload, 'base64url').toString('utf8');
+    return uid;
+  } catch (error) {
+    console.error('[session] verifySessionToken: payload base64url decode failed', { error: (error && error.message) || error });
     return null;
   }
 }

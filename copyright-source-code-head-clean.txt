@@ -1,0 +1,1500 @@
+﻿// ============================================================
+// Pioneer AI Framework 鈥?AI 鎻愪緵鍟嗗伐鍘傝矾鐢卞櫒
+//
+// Factory Pattern: 鍔ㄦ€佸垱寤哄拰閫夋嫨 AI 鎻愪緵鍟?// 鏍稿績鍔熻兘锛?//   1. 鏍规嵁 AI_PRIMARY_PROVIDER 鐜鍙橀噺閫夋嫨榛樿鎻愪緵鍟?//   2. 鏀寔璇锋眰绾у埆鎸囧畾鎻愪緵鍟?//   3. 涓绘彁渚涘晢澶辫触鏃惰嚜鍔?Fallback 鍒板閫夋彁渚涘晢
+//   4. 鍏ㄩ摼璺棩蹇楄拷韪矾鐢卞喅绛?// ============================================================
+
+import type {
+  AIProvider,
+  AIProviderName,
+  AIProviderRequest,
+  AIProviderResponse,
+  AIStreamChunk,
+  RoutingDecision,
+} from './types';
+import { OpenAIProvider } from './openai';
+import { AnthropicProvider } from './anthropic';
+import { OllamaProvider } from './ollama';
+import { logEvent, logError, logWarn } from '../logger';
+
+/**
+ * AI 鎻愪緵鍟嗗伐鍘傝矾鐢卞櫒
+ *
+ * 鑱岃矗锛? * - 绠＄悊鎵€鏈夊凡娉ㄥ唽鐨?AI 鎻愪緵鍟嗗疄渚? * - 鏍规嵁閰嶇疆鍜岃姹傚弬鏁伴€夋嫨鍚堥€傜殑鎻愪緵鍟? * - 鍦ㄤ富鎻愪緵鍟嗗け璐ユ椂鑷姩鍒囨崲鍒板閫夋彁渚涘晢
+ * - 璁板綍鎵€鏈夎矾鐢卞喅绛栧拰瀹归敊浜嬩欢
+ */
+export class AIProviderFactory {
+  private providers: Map<AIProviderName, AIProvider> = new Map();
+  private primaryProvider: AIProviderName;
+  private fallbackOrder: AIProviderName[];
+
+  constructor() {
+    // 璇诲彇鐜鍙橀噺閰嶇疆
+    this.primaryProvider = this.parsePrimaryProvider();
+    this.fallbackOrder = this.parseFallbackOrder();
+
+    // 娉ㄥ唽鎵€鏈夋彁渚涘晢
+    this.registerProvider(new OpenAIProvider());
+    this.registerProvider(new AnthropicProvider());
+    this.registerProvider(new OllamaProvider());
+
+    logEvent('AIProviderFactory initialized', {
+      primary: this.primaryProvider,
+      fallbackOrder: this.fallbackOrder,
+      available: this.getAvailableProviders().map((p) => p.name),
+    });
+  }
+
+  /**
+   * 娉ㄥ唽涓€涓?AI 鎻愪緵鍟?   */
+  registerProvider(provider: AIProvider): void {
+    this.providers.set(provider.name, provider);
+  }
+
+  /**
+   * 鑾峰彇鎵€鏈夊凡娉ㄥ唽鐨勬彁渚涘晢
+   */
+  getRegisteredProviders(): AIProviderName[] {
+    return Array.from(this.providers.keys());
+  }
+
+  /**
+   * 鑾峰彇鎵€鏈夊彲鐢ㄧ殑鎻愪緵鍟嗭紙isAvailable() === true锛?   */
+  getAvailableProviders(): AIProvider[] {
+    return Array.from(this.providers.values()).filter((p) => p.isAvailable());
+  }
+
+  /**
+   * 鑾峰彇鎸囧畾鍚嶇О鐨勬彁渚涘晢
+   */
+  getProvider(name: AIProviderName): AIProvider | undefined {
+    return this.providers.get(name);
+  }
+
+  /**
+   * 鑾峰彇褰撳墠涓绘彁渚涘晢鍚嶇О
+   */
+  getPrimaryProviderName(): AIProviderName {
+    return this.primaryProvider;
+  }
+
+  /**
+   * 璺敱璇锋眰鍒板悎閫傜殑鎻愪緵鍟嗭紙鍚嚜鍔ㄥ閿欙級
+   *
+   * 璺敱绛栫暐锛?   *   1. 濡傛灉 request 鎸囧畾浜?provider 鈫?浼樺厛浣跨敤锛堜笉 fallback锛?   *   2. 鍚﹀垯浣跨敤 AI_PRIMARY_PROVIDER 鎸囧畾鐨勬彁渚涘晢
+   *   3. 涓绘彁渚涘晢澶辫触 鈫?鎸?AI_FALLBACK_PROVIDERS 椤哄簭灏濊瘯澶囬€?   *   4. 鎵€鏈夋彁渚涘晢閮藉け璐?鈫?鎶涘嚭鏈€鍚庝竴涓敊璇?   *
+   * @param request - 缁熶竴鏍煎紡鐨?AI 璇锋眰
+   * @param requestedProvider - 璇锋眰绾у埆鎸囧畾鐨勬彁渚涘晢锛堝彲閫夛級
+   * @returns 缁熶竴鏍煎紡鐨?AI 鍝嶅簲
+   */
+  async route(
+    request: AIProviderRequest,
+    requestedProvider?: AIProviderName
+  ): Promise<AIProviderResponse & { routing: RoutingDecision }> {
+    const routeStart = Date.now();
+    const skipped: Array<{ provider: AIProviderName; reason: string }> = [];
+
+    // 鈹€鈹€ 鍦烘櫙 1: 璇锋眰鎸囧畾浜嗘彁渚涘晢 鈫?鐩磋繛锛屼笉 fallback 鈹€鈹€
+    if (requestedProvider) {
+      const provider = this.providers.get(requestedProvider);
+      if (!provider) {
+        throw new Error(`Unknown AI provider: ${requestedProvider}`);
+      }
+      if (!provider.isAvailable()) {
+        throw new Error(
+          `AI provider '${requestedProvider}' is not available (missing API key or disabled)`
+        );
+      }
+
+      const response = await provider.chat(request);
+      const routing: RoutingDecision = {
+        requested: requestedProvider,
+        actual: requestedProvider,
+        fallback: false,
+        routingTimeMs: Date.now() - routeStart,
+      };
+
+      logEvent('AI request routed (direct)', {
+        provider: requestedProvider,
+        model: response.model,
+        routingTimeMs: routing.routingTimeMs,
+      });
+
+      return { ...response, routing };
+    }
+
+    // 鈹€鈹€ 鍦烘櫙 2: 浣跨敤涓绘彁渚涘晢 + fallback 閾?鈹€鈹€
+    const providersToTry: AIProviderName[] = [
+      this.primaryProvider,
+      ...this.fallbackOrder.filter((name) => name !== this.primaryProvider),
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const providerName of providersToTry) {
+      const provider = this.providers.get(providerName);
+
+      // 璺宠繃鏈敞鍐岀殑鎻愪緵鍟?      if (!provider) {
+        skipped.push({ provider: providerName, reason: 'not registered' });
+        continue;
+      }
+
+      // 璺宠繃涓嶅彲鐢ㄧ殑鎻愪緵鍟?      if (!provider.isAvailable()) {
+        skipped.push({ provider: providerName, reason: 'not available' });
+        continue;
+      }
+
+      try {
+        const response = await provider.chat(request);
+        const isFallback = providerName !== this.primaryProvider;
+
+        const routing: RoutingDecision = {
+          actual: providerName,
+          fallback: isFallback,
+          skipped: skipped.length > 0 ? skipped : undefined,
+          routingTimeMs: Date.now() - routeStart,
+        };
+
+        if (isFallback) {
+          logWarn('AI request routed via fallback', {
+            primary: this.primaryProvider,
+            actual: providerName,
+            skipped,
+            routingTimeMs: routing.routingTimeMs,
+          });
+        } else {
+          logEvent('AI request routed (primary)', {
+            provider: providerName,
+            model: response.model,
+            routingTimeMs: routing.routingTimeMs,
+          });
+        }
+
+        return { ...response, routing };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        skipped.push({ provider: providerName, reason: errorMessage });
+        lastError = error instanceof Error ? error : new Error(errorMessage);
+
+        logWarn(`AI provider '${providerName}' failed, trying next...`, {
+          provider: providerName,
+          error: errorMessage,
+          remainingProviders: providersToTry.slice(providersToTry.indexOf(providerName) + 1),
+        });
+      }
+    }
+
+    // 鎵€鏈夋彁渚涘晢閮藉け璐?    const routingTimeMs = Date.now() - routeStart;
+    logError('All AI providers failed', lastError, {
+      attemptedProviders: providersToTry,
+      skipped,
+      routingTimeMs,
+    });
+
+    throw new Error(
+      `All AI providers failed. Last error: ${lastError?.message ?? 'Unknown'}. ` +
+        `Attempted: ${providersToTry.join(', ')}. ` +
+        `Skipped: ${skipped.map((s) => `${s.provider}(${s.reason})`).join(', ')}`
+    );
+  }
+
+  /**
+   * 璺敱娴佸紡璇锋眰鍒板悎閫傜殑鎻愪緵鍟嗭紙鍚娆¤繛鎺ヨ嚜鍔ㄥ閿欙級
+   *
+   * 瀹归敊杈圭晫锛堝叧閿檺鍒讹級锛?   *   - Fallback 浠呭湪寤虹珛杩炴帴銆侀涓?Token 鎺ユ敹鍓嶈Е鍙戙€?   *   - 涓€鏃﹀紑濮嬫帹閫佹暟鎹紙棣栦釜 chunk 鎴愬姛 yield锛夛紝灏嗛攣瀹氭彁渚涘晢锛屼腑鏂椂鐩存帴鎶涘嚭閿欒锛屼笉鍐嶉檷绾с€?   *
+   * @param request - 缁熶竴鏍煎紡鐨?AI 璇锋眰
+   * @param requestedProvider - 璇锋眰绾у埆鎸囧畾鐨勬彁渚涘晢锛堝彲閫夛級
+   * @returns 寮傛娴佸紡鏁版嵁鍧楄凯浠ｅ櫒锛岄檮甯?routing 鍐崇瓥淇℃伅锛堝湪棣栦釜 chunk 鍓嶆棤娉曡幏鍙栵紝鏁呬粎璁板綍鏃ュ織锛?   */
+  async *routeStream(
+    request: AIProviderRequest,
+    requestedProvider?: AIProviderName
+  ): AsyncIterable<AIStreamChunk> {
+    const routeStart = Date.now();
+    const skipped: Array<{ provider: AIProviderName; reason: string }> = [];
+
+    // 鈹€鈹€ 鍦烘櫙 1: 璇锋眰鎸囧畾浜嗘彁渚涘晢 鈫?鐩磋繛锛屼笉 fallback 鈹€鈹€
+    if (requestedProvider) {
+      const provider = this.providers.get(requestedProvider);
+      if (!provider) {
+        throw new Error(`Unknown AI provider: ${requestedProvider}`);
+      }
+      if (!provider.isAvailable()) {
+        throw new Error(`AI provider '${requestedProvider}' is not available`);
+      }
+      logEvent('AI stream routed (direct)', { provider: requestedProvider });
+      yield* provider.generateStream(request);
+      return;
+    }
+
+    // 鈹€鈹€ 鍦烘櫙 2: 浣跨敤涓绘彁渚涘晢 + fallback 閾?鈹€鈹€
+    const providersToTry: AIProviderName[] = [
+      this.primaryProvider,
+      ...this.fallbackOrder.filter((name) => name !== this.primaryProvider),
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const providerName of providersToTry) {
+      const provider = this.providers.get(providerName);
+      if (!provider || !provider.isAvailable()) {
+        skipped.push({
+          provider: providerName,
+          reason: !provider ? 'not registered' : 'not available',
+        });
+        continue;
+      }
+
+      const isFallback = providerName !== this.primaryProvider;
+      let streamStarted = false;
+      let iterator: AsyncIterator<AIStreamChunk> | null = null;
+
+      try {
+        const stream = provider.generateStream(request);
+        iterator = stream[Symbol.asyncIterator]();
+
+        // 灏濊瘯鑾峰彇棣栦釜 chunk
+        const firstResult = await iterator.next();
+
+        // 濡傛灉鎴愬姛鑾峰彇棣栦釜 chunk锛岃鏄庤繛鎺ュ凡寤虹珛锛岄攣瀹氬綋鍓嶆彁渚涘晢
+        streamStarted = true;
+
+        if (isFallback) {
+          logWarn('AI stream routed via fallback', {
+            primary: this.primaryProvider,
+            actual: providerName,
+            skipped,
+            routingTimeMs: Date.now() - routeStart,
+          });
+        } else {
+          logEvent('AI stream routed (primary)', {
+            provider: providerName,
+            routingTimeMs: Date.now() - routeStart,
+          });
+        }
+
+        if (!firstResult.done) {
+          yield firstResult.value;
+        } else {
+          // Stream immediately finished?
+          return;
+        }
+
+        // 缁х画 yield 鍓╀綑鐨?chunks
+        while (true) {
+          const result = await iterator.next();
+          if (result.done) break;
+          yield result.value;
+        }
+
+        // 鎴愬姛瀹屾垚锛岀洿鎺ラ€€鍑?        return;
+      } catch (error) {
+        if (streamStarted) {
+          // 濡傛灉娴佸凡缁忓紑濮嬶紝绂佹 fallback锛岀洿鎺ユ姏鍑洪敊璇?          logError(`AI stream interrupted for ${providerName}`, error, { provider: providerName });
+          throw error;
+        }
+
+        // 娴佸皻鏈紑濮嬶紙杩炴帴澶辫触鎴栬秴鏃讹級锛屽厑璁?fallback
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        skipped.push({ provider: providerName, reason: errorMessage });
+        lastError = error instanceof Error ? error : new Error(errorMessage);
+
+        logWarn(`AI provider '${providerName}' stream failed, trying next...`, {
+          provider: providerName,
+          error: errorMessage,
+        });
+      } finally {
+        if (iterator && typeof iterator.return === 'function' && !streamStarted) {
+          // If we failed before starting or we are falling back, close the iterator to release resources
+          iterator.return().catch(() => {});
+        }
+      }
+    }
+
+    // 鎵€鏈夋彁渚涘晢鐨勯涓姹傞兘澶辫触
+    logError('All AI stream providers failed', lastError, {
+      attemptedProviders: providersToTry,
+      skipped,
+      routingTimeMs: Date.now() - routeStart,
+    });
+
+    throw new Error(
+      `All AI stream providers failed. Last error: ${lastError?.message ?? 'Unknown'}. ` +
+        `Attempted: ${providersToTry.join(', ')}. ` +
+        `Skipped: ${skipped.map((s) => `${s.provider}(${s.reason})`).join(', ')}`
+    );
+  }
+
+  /**
+   * 瑙ｆ瀽 AI_PRIMARY_PROVIDER 鐜鍙橀噺
+   * 榛樿鍊? 'openai'
+   */
+  private parsePrimaryProvider(): AIProviderName {
+    const env = process.env.AI_PRIMARY_PROVIDER?.toLowerCase().trim();
+    const validProviders: AIProviderName[] = ['openai', 'anthropic', 'ollama'];
+
+    if (env && validProviders.includes(env as AIProviderName)) {
+      return env as AIProviderName;
+    }
+
+    return 'openai';
+  }
+
+  /**
+   * 瑙ｆ瀽 AI_FALLBACK_PROVIDERS 鐜鍙橀噺
+   * 鏍煎紡: "anthropic,ollama"锛堥€楀彿鍒嗛殧锛?   * 榛樿鍊? ['anthropic', 'ollama']
+   */
+  private parseFallbackOrder(): AIProviderName[] {
+    const env = process.env.AI_FALLBACK_PROVIDERS?.toLowerCase().trim();
+    const validProviders: AIProviderName[] = ['openai', 'anthropic', 'ollama'];
+
+    if (env) {
+      return env
+        .split(',')
+        .map((s) => s.trim() as AIProviderName)
+        .filter((name) => validProviders.includes(name));
+    }
+
+    // 榛樿 fallback 椤哄簭锛氭帓闄や富鎻愪緵鍟嗗悗鐨勬墍鏈夋彁渚涘晢
+    return validProviders.filter((name) => name !== this.primaryProvider);
+  }
+}
+
+// 鈹€鈹€ 鍗曚緥宸ュ巶瀹炰緥 鈹€鈹€
+// 浣跨敤鎳掑姞杞介伩鍏嶆ā鍧楀鍏ユ椂鐨勫壇浣滅敤
+
+let _factoryInstance: AIProviderFactory | null = null;
+
+/**
+ * 鑾峰彇鍏ㄥ眬 AIProviderFactory 鍗曚緥
+ *
+ * 鎳掑姞杞芥ā寮忥細棣栨璋冪敤鏃跺垵濮嬪寲锛屽悗缁鐢ㄥ悓涓€瀹炰緥銆? * 杩欑‘淇濅簡锛? *   1. 鎻愪緵鍟嗗疄渚嬪湪杩涚▼鐢熷懡鍛ㄦ湡鍐呭鐢紙杩炴帴姹犲弸濂斤級
+ *   2. 鐜鍙橀噺鍦ㄥ疄闄呬娇鐢ㄦ椂璇诲彇锛堣€岄潪妯″潡鍔犺浇鏃讹級
+ */
+export function getProviderFactory(): AIProviderFactory {
+  if (!_factoryInstance) {
+    _factoryInstance = new AIProviderFactory();
+  }
+  return _factoryInstance;
+}
+
+/**
+ * 閲嶇疆宸ュ巶瀹炰緥锛堜粎鐢ㄤ簬娴嬭瘯锛? */
+export function resetProviderFactory(): void {
+  _factoryInstance = null;
+}
+// ============================================================
+// Pioneer AI Framework 鈥?AI 鎻愪緵鍟嗘娊璞″熀绫?//
+// Template Method Pattern: 灏嗛€氱敤娴佺▼锛堣秴鏃舵帶鍒躲€侀敊璇寘瑁呫€?// 缁撴瀯鍖栨棩蹇楋級鍥哄寲鍦ㄥ熀绫讳腑锛屽瓙绫讳粎瀹炵幇宸紓鍖栫殑 API 璋冪敤閫昏緫銆?//
+// 缁ф壙鍏崇郴锛?//   BaseAIProvider (abstract)
+//     鈹溾攢鈹€ OpenAIProvider
+//     鈹溾攢鈹€ AnthropicProvider
+//     鈹斺攢鈹€ OllamaProvider
+// ============================================================
+
+import type {
+  AIProvider,
+  AIProviderConfig,
+  AIProviderName,
+  AIProviderRequest,
+  AIProviderResponse,
+  AIStreamChunk,
+} from './types';
+import { logEvent, logError } from '../logger';
+
+/**
+ * AI 鎻愪緵鍟嗘娊璞″熀绫? *
+ * 灏佽鎵€鏈夋彁渚涘晢鍏辨湁鐨勮涓猴細
+ *   1. 閰嶇疆鍒濆鍖栦笌鏍￠獙
+ *   2. 瓒呮椂鎺у埗锛圓bortController + setTimeout锛? *   3. HTTP 閿欒缁熶竴澶勭悊
+ *   4. 缁撴瀯鍖栨棩蹇楄褰? *   5. AbortError 鈫?鍙瓒呮椂閿欒娑堟伅杞崲
+ *
+ * 瀛愮被鍙渶瀹炵幇浠ヤ笅鎶借薄鏂规硶锛? *   - `isAvailable()`锛氬彲鐢ㄦ€ч妫€鏌? *   - `healthCheck()`锛氭湇鍔″仴搴锋帰閽? *   - `executeChat()`锛氬叿浣?API 璋冪敤涓庡搷搴旇В鏋? */
+export abstract class BaseAIProvider implements AIProvider {
+  abstract readonly name: AIProviderName;
+  protected readonly config: Required<AIProviderConfig>;
+
+  constructor(config: Required<AIProviderConfig>) {
+    this.config = config;
+  }
+
+  // 鈹€鈹€ 瀛愮被蹇呴』瀹炵幇鐨勬娊璞℃柟娉?鈹€鈹€
+
+  /** 妫€鏌ユ彁渚涘晢鏄惁鍙敤锛圓PI Key 瀛樺湪绛夛級 */
+  abstract isAvailable(): boolean;
+
+  /** 鍋ュ悍妫€鏌ワ細瀹為檯鎺㈡祴杩滅▼鏈嶅姟 */
+  abstract healthCheck(): Promise<boolean>;
+
+  /**
+   * 鎵ц鍏蜂綋鐨?API 璋冪敤
+   * 鐢卞瓙绫诲疄鐜帮紝鍖呭惈锛?   *   - 璇锋眰鏍煎紡杞崲锛堢粺涓€鏍煎紡 鈫?鎻愪緵鍟?API 鏍煎紡锛?   *   - HTTP 璇锋眰鍙戦€?   *   - 鍝嶅簲瑙ｆ瀽锛堟彁渚涘晢 API 鏍煎紡 鈫?缁熶竴鏍煎紡锛?   *
+   * @param request - 缁熶竴鏍煎紡璇锋眰
+   * @param signal - AbortSignal 鐢ㄤ簬瓒呮椂鍙栨秷
+   */
+  protected abstract executeChat(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): Promise<AIProviderResponse>;
+
+  /**
+   * 鎵ц鍏蜂綋鐨勬祦寮?API 璋冪敤
+   * 鐢卞瓙绫诲疄鐜帮紝鐢熸垚娴佸紡浜嬩欢
+   *
+   * @param request - 缁熶竴鏍煎紡璇锋眰
+   * @param signal - AbortSignal 鐢ㄤ簬瓒呮椂鍜岀敤鎴峰彇娑?   */
+  protected abstract executeStream(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): AsyncIterable<AIStreamChunk>;
+
+  // 鈹€鈹€ 鍩虹被鎻愪緵鐨勯€氱敤瀹炵幇 鈹€鈹€
+
+  /**
+   * 鍙戦€佽亰澶╄姹傦紙妯℃澘鏂规硶锛?   *
+   * 鎵ц娴佺▼锛?   *   1. 鍙敤鎬ч妫€鏌?   *   2. 鍒涘缓瓒呮椂鎺у埗鍣?   *   3. 濮旀墭瀛愮被鎵ц API 璋冪敤 鈫?executeChat()
+   *   4. 璁板綍缁撴瀯鍖栨棩蹇?   *   5. 瓒呮椂 / 缃戠粶閿欒缁熶竴澶勭悊
+   */
+  async chat(request: AIProviderRequest): Promise<AIProviderResponse> {
+    if (!this.isAvailable()) {
+      throw new Error(`${this.getDisplayName()} is not configured or not available`);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+    try {
+      const response = await this.executeChat(request, controller.signal);
+
+      logEvent(`${this.getDisplayName()} response generated`, {
+        provider: this.name,
+        model: response.model,
+        promptTokens: response.usage?.promptTokens,
+        completionTokens: response.usage?.completionTokens,
+      });
+
+      return response;
+    } catch (error) {
+      // 灏?AbortError 杞崲涓哄彲璇荤殑瓒呮椂閿欒
+      if (error instanceof Error && error.name === 'AbortError') {
+        const timeoutError = new Error(
+          `${this.getDisplayName()} request timed out after ${this.config.timeout}ms`
+        );
+        logError(timeoutError.message, null, { provider: this.name, timeout: this.config.timeout });
+        throw timeoutError;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * 鍙戦€佹祦寮忚姹傦紙妯℃澘鏂规硶锛?   *
+   * 涓?chat 涓嶅悓锛屾祦寮忚姹傚彧瀵?鍒濆杩炴帴"杩涜瓒呮椂鎺у埗锛?   * 寤虹珛杩炴帴鍚庣敱搴曞眰鎺у埗锛屽鏋滃鎴风涓柇鍒欓€氳繃 signal 浼犻€掋€?   */
+  async *generateStream(request: AIProviderRequest): AsyncIterable<AIStreamChunk> {
+    if (!this.isAvailable()) {
+      throw new Error(`${this.getDisplayName()} is not configured or not available`);
+    }
+
+    const controller = new AbortController();
+    // 棣栨杩炴帴瓒呮椂锛屽亣璁捐涓哄浐瀹氱殑 10s 鎴栭厤缃殑瓒呮椂锛岃繖閲屾垜浠笉娓呴櫎timeout锛?    // 鍥犱负 stream 鐢熷懡鍛ㄦ湡杈冮暱锛屼絾濡傛灉鏄暣涓姹傜殑瓒呮椂灏变細寮鸿鏂紑銆?    // 涓轰簡鏀寔鏇撮暱鐨?stream 鐢熸垚锛屽缓璁笉璁剧疆纭€х殑鏁翠綋瓒呮椂锛屽彧渚濊禆鍓嶇 abort锛?    // 浣嗕负浜嗛槻姝㈡杩炴帴锛屽彲浠ヨ缃竴涓緝闀跨殑鍏滃簳瓒呮椂鎴栬€呭彇娑堣秴鏃躲€?    // 鍦ㄨ繖閲屾垜浠粎灏?signal 浼犵粰搴曞眰锛岀敱搴曞眰鍦?fetch 寤虹珛鏃舵姏鍑洪敊璇紝
+    // 涓斾竴鏃?stream 寮€濮?yielding锛屽簳灞備笉浼氭姏鍑?fallback锛岃€屾槸鎸夐敊璇粨鏉?stream銆?
+    // 涓轰簡瀹夊叏璧疯锛屾垜浠笉鍦ㄥ熀绫讳负鏁翠釜娴佸紡鍛ㄦ湡鍔犲浐瀹氬畾鏃跺櫒锛岃€屾槸渚濊禆瀹㈡埛绔?AbortSignal锛堣矾鐢卞眰浼氫紶鍏ワ級
+    // 鎴栬€呬粎澶勭悊搴曞眰鐨?initial connection timeout.
+    // 绠€鍗曡捣瑙侊紝鎴戜滑浠呬紶閫?controller.signal 缁?executeStream銆?    // 娉ㄦ剰锛氳繖閲岀殑 catch 鍙互鎹曡幏寤虹珛娴佷箣鍓嶇殑閿欒锛堝嵆 fallback 鎵€闇€鐨勯敊璇級銆?
+    try {
+      // 璁板綍娴佸紑濮?      logEvent(`${this.getDisplayName()} stream started`, {
+        provider: this.name,
+        model: request.model ?? this.config.defaultModel,
+      });
+
+      yield* this.executeStream(request, controller.signal);
+
+      // 璁板綍娴佺粨鏉?      logEvent(`${this.getDisplayName()} stream completed`, {
+        provider: this.name,
+        model: request.model ?? this.config.defaultModel,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        const timeoutError = new Error(
+          `${this.getDisplayName()} stream request timed out or was aborted`
+        );
+        logError(timeoutError.message, null, { provider: this.name });
+        throw timeoutError;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 閫氱敤 HTTP 鍝嶅簲閿欒澶勭悊
+   * 瀛愮被鍦?executeChat() 涓皟鐢?   */
+  protected async handleHttpError(response: Response, model: string): Promise<never> {
+    const bodyText = await response.text();
+    const errorMsg = `${this.getDisplayName()} API responded with status ${response.status}`;
+    logError(errorMsg, bodyText, {
+      provider: this.name,
+      model,
+      status: response.status,
+    });
+    throw new Error(bodyText || errorMsg);
+  }
+
+  /**
+   * 閫氱敤绌哄唴瀹归敊璇鐞?   * 瀛愮被鍦?executeChat() 涓皟鐢?   */
+  protected handleEmptyContent(data: unknown, model: string): never {
+    const errorMsg = `${this.getDisplayName()} API returned no valid response content`;
+    logError(errorMsg, data, { provider: this.name, model });
+    throw new Error(errorMsg);
+  }
+
+  /**
+   * 閫氱敤鍋ュ悍妫€鏌?HTTP 璇锋眰
+   * 瀛愮被鍙洿鎺ヤ娇鐢ㄦ垨瑕嗗啓
+   */
+  protected async performHealthCheckRequest(url: string, options?: RequestInit): Promise<boolean> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        return response.ok;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 鑾峰彇鎻愪緵鍟嗘樉绀哄悕绉帮紙鐢ㄤ簬鏃ュ織鍜岄敊璇秷鎭級
+   */
+  protected getDisplayName(): string {
+    const names: Record<AIProviderName, string> = {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      ollama: 'Ollama',
+    };
+    return names[this.name] ?? this.name;
+  }
+}
+// ============================================================
+// Pioneer AI Framework 鈥?OpenAI 鎻愪緵鍟嗗疄鐜?//
+// 缁ф壙 BaseAIProvider锛岄€傞厤 OpenAI Chat Completions API
+// 鏀寔 GPT-4o / GPT-4o-mini / GPT-3.5-turbo 绛夋ā鍨?// ============================================================
+
+import { BaseAIProvider } from './base';
+import type { AIProviderRequest, AIProviderResponse, AIStreamChunk } from './types';
+
+const DEFAULT_MODEL = 'gpt-4o-mini';
+const DEFAULT_BASE_URL = '[REDACTED]';
+const DEFAULT_TIMEOUT = 30000;
+
+/**
+ * OpenAI Chat Completions API 鍝嶅簲缁撴瀯
+ */
+interface OpenAIChatResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    message: { role: string; content: string | null };
+    finish_reason: string;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+/**
+ * OpenAI 鎻愪緵鍟? *
+ * 缁ф壙 BaseAIProvider锛屼粎瀹炵幇 OpenAI 鐗规湁鐨勶細
+ *   - API Key 鍙敤鎬ф鏌? *   - /models 绔偣鍋ュ悍鎺㈤拡
+ *   - Chat Completions 璇锋眰鏋勫缓涓庡搷搴旇В鏋? */
+export class OpenAIProvider extends BaseAIProvider {
+  readonly name = 'openai' as const;
+
+  constructor(
+    config?: Partial<{ apiKey: string; baseUrl: string; defaultModel: string; timeout: number }>
+  ) {
+    super({
+      apiKey: config?.apiKey ?? process.env.OPENAI_API_KEY ?? '',
+      baseUrl: config?.baseUrl ?? process.env.OPENAI_API_BASE ?? DEFAULT_BASE_URL,
+      defaultModel: config?.defaultModel ?? DEFAULT_MODEL,
+      timeout: config?.timeout ?? DEFAULT_TIMEOUT,
+    });
+  }
+
+  /**
+   * 妫€鏌?OpenAI API Key 鏄惁宸查厤缃?   */
+  isAvailable(): boolean {
+    return this.config.apiKey.length > 0;
+  }
+
+  /**
+   * 鍋ュ悍妫€鏌ワ細GET /models 楠岃瘉 API Key 鏈夋晥鎬?   */
+  async healthCheck(): Promise<boolean> {
+    if (!this.isAvailable()) return false;
+    return this.performHealthCheckRequest(`${this.config.baseUrl}/models`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${this.config.apiKey}` },
+    });
+  }
+
+  /**
+   * 鎵ц OpenAI Chat Completions API 璋冪敤
+   */
+  protected async executeChat(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): Promise<AIProviderResponse> {
+    const model = request.model ?? this.config.defaultModel;
+
+    const payload = {
+      model,
+      messages: request.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      temperature: request.temperature ?? 0.6,
+      max_tokens: request.maxTokens ?? 512,
+    };
+
+    const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    const data = (await response.json()) as OpenAIChatResponse;
+    const content = data?.choices?.[0]?.message?.content?.trim();
+
+    if (!content) {
+      this.handleEmptyContent(data, model);
+    }
+
+    return {
+      content,
+      model: data.model,
+      provider: 'openai',
+      usage: data.usage
+        ? {
+            promptTokens: data.usage.prompt_tokens,
+            completionTokens: data.usage.completion_tokens,
+            totalTokens: data.usage.total_tokens,
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * 鎵ц OpenAI 娴佸紡璋冪敤
+   */
+  protected async *executeStream(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): AsyncIterable<AIStreamChunk> {
+    const model = request.model ?? this.config.defaultModel;
+
+    const payload = {
+      model,
+      messages: request.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      temperature: request.temperature ?? 0.6,
+      max_tokens: request.maxTokens ?? 512,
+      stream: true,
+    };
+
+    const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal, // Used to abort connection if user stops
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body returned from OpenAI');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        // Keep the last incomplete line in the buffer
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+          if (trimmedLine === 'data: [DONE]') {
+            yield { content: '', done: true };
+            return;
+          }
+
+          if (trimmedLine.startsWith('data: ')) {
+            const dataStr = trimmedLine.slice(6);
+            try {
+              const data = JSON.parse(dataStr);
+              const content = data.choices?.[0]?.delta?.content;
+              if (content) {
+                yield { content, done: false };
+              }
+            } catch (e) {
+              // Ignore parse errors for incomplete chunks just in case, though SSE should emit full JSON per line
+              console.warn('OpenAI stream JSON parse error', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+}
+// ============================================================
+// Pioneer AI Framework 鈥?Anthropic 鎻愪緵鍟嗗疄鐜?//
+// 缁ф壙 BaseAIProvider锛岄€傞厤 Anthropic Messages API
+// 鏀寔 Claude 3.5 Sonnet / Claude 3 Opus / Claude 3 Haiku
+//
+// 鍏抽敭宸紓鐐癸紙鐢辨湰绫诲鐞嗭級锛?//   - system 娑堟伅浣滀负椤跺眰鍙傛暟锛岃€岄潪 messages 鏁扮粍鐨勪竴閮ㄥ垎
+//   - 鍝嶅簲鏍煎紡涓?content[].text锛岄潪 choices[].message.content
+//   - 璁よ瘉澶翠娇鐢?x-api-key锛岄潪 Bearer [REDACTED]
+// ============================================================
+
+import { BaseAIProvider } from './base';
+import type { AIProviderRequest, AIProviderResponse, AIStreamChunk } from './types';
+
+const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const DEFAULT_BASE_URL = '[REDACTED]';
+const DEFAULT_TIMEOUT = 30000;
+const ANTHROPIC_VERSION = '2023-06-01';
+
+/**
+ * Anthropic Messages API 鍝嶅簲缁撴瀯
+ */
+interface AnthropicMessagesResponse {
+  id: string;
+  type: 'message';
+  role: 'assistant';
+  model: string;
+  content: Array<{
+    type: 'text';
+    text: string;
+  }>;
+  stop_reason: string | null;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
+/**
+ * Anthropic 鎻愪緵鍟? *
+ * 缁ф壙 BaseAIProvider锛屼粎瀹炵幇 Anthropic 鐗规湁鐨勶細
+ *   - API Key 鍙敤鎬ф鏌? *   - system 娑堟伅鎻愬彇鍒伴《灞傚弬鏁? *   - x-api-key 璁よ瘉澶? *   - content[0].text 鍝嶅簲瑙ｆ瀽
+ */
+export class AnthropicProvider extends BaseAIProvider {
+  readonly name = 'anthropic' as const;
+
+  constructor(
+    config?: Partial<{ apiKey: string; baseUrl: string; defaultModel: string; timeout: number }>
+  ) {
+    super({
+      apiKey: config?.apiKey ?? process.env.ANTHROPIC_API_KEY ?? '',
+      baseUrl: config?.baseUrl ?? process.env.ANTHROPIC_API_BASE ?? DEFAULT_BASE_URL,
+      defaultModel: config?.defaultModel ?? DEFAULT_MODEL,
+      timeout: config?.timeout ?? DEFAULT_TIMEOUT,
+    });
+  }
+
+  /**
+   * 妫€鏌?Anthropic API Key 鏄惁宸查厤缃?   */
+  isAvailable(): boolean {
+    return this.config.apiKey.length > 0;
+  }
+
+  /**
+   * 鍋ュ悍妫€鏌ワ細鍙戦€佹渶灏忓寲 Messages 璇锋眰楠岃瘉 API Key
+   */
+  async healthCheck(): Promise<boolean> {
+    if (!this.isAvailable()) return false;
+    return this.performHealthCheckRequest(`${this.config.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.config.apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: this.config.defaultModel,
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ping' }],
+      }),
+    });
+  }
+
+  /**
+   * 鎵ц Anthropic Messages API 璋冪敤
+   *
+   * 鏍煎紡杞崲瑕佺偣锛?   *   1. 浠?messages 涓彁鍙?system 娑堟伅 鈫?椤跺眰 system 鍙傛暟
+   *   2. 杩囨护 messages锛屼粎淇濈暀 user / assistant 瑙掕壊
+   *   3. 鍝嶅簲浠?content[0].text 鎻愬彇
+   */
+  protected async executeChat(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): Promise<AIProviderResponse> {
+    const model = request.model ?? this.config.defaultModel;
+
+    // 鎻愬彇 system 娑堟伅锛圓nthropic 瑕佹眰 system 鍦ㄩ《灞傦紝涓嶅湪 messages 涓級
+    const systemMessage = request.messages.find((m) => m.role === 'system');
+    const chatMessages = request.messages
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
+    const payload: Record<string, unknown> = {
+      model,
+      max_tokens: request.maxTokens ?? 512,
+      messages: chatMessages,
+    };
+
+    // 浠呭湪瀛樺湪 system 娑堟伅鏃舵坊鍔犻《灞?system 鍙傛暟
+    if (systemMessage) {
+      payload.system = systemMessage.content;
+    }
+
+    if (request.temperature !== undefined) {
+      payload.temperature = request.temperature;
+    }
+
+    const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.config.apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    const data = (await response.json()) as AnthropicMessagesResponse;
+    const content = data?.content?.[0]?.text?.trim();
+
+    if (!content) {
+      this.handleEmptyContent(data, model);
+    }
+
+    return {
+      content,
+      model: data.model,
+      provider: 'anthropic',
+      usage: data.usage
+        ? {
+            promptTokens: data.usage.input_tokens,
+            completionTokens: data.usage.output_tokens,
+            totalTokens: data.usage.input_tokens + data.usage.output_tokens,
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * 鎵ц Anthropic 娴佸紡璋冪敤
+   */
+  protected async *executeStream(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): AsyncIterable<AIStreamChunk> {
+    const model = request.model ?? this.config.defaultModel;
+
+    const systemMessage = request.messages.find((m) => m.role === 'system');
+    const chatMessages = request.messages
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
+    const payload: Record<string, unknown> = {
+      model,
+      max_tokens: request.maxTokens ?? 512,
+      messages: chatMessages,
+      stream: true,
+    };
+
+    if (systemMessage) {
+      payload.system = systemMessage.content;
+    }
+    if (request.temperature !== undefined) {
+      payload.temperature = request.temperature;
+    }
+
+    const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.config.apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body returned from Anthropic');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+          // Anthropic SSE format:
+          // event: content_block_delta
+          // data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}
+          // We can just look for data lines
+          if (trimmedLine.startsWith('data: ')) {
+            const dataStr = trimmedLine.slice(6);
+            if (dataStr === '[DONE]') {
+              yield { content: '', done: true };
+              return;
+            }
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
+                const content = data.delta.text;
+                if (content) {
+                  yield { content, done: false };
+                }
+              } else if (data.type === 'message_stop') {
+                yield { content: '', done: true };
+                return;
+              }
+            } catch (e) {
+              console.warn('Anthropic stream JSON parse error', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+}
+// ============================================================
+// Pioneer AI Framework 鈥?Ollama 鎻愪緵鍟嗗疄鐜?//
+// 缁ф壙 BaseAIProvider锛岄€傞厤 Ollama 鏈湴鎺ㄧ悊 API
+// 鏀寔 Llama 3.1 / Mistral / Qwen 绛夊紑婧愭ā鍨?//
+// 鍏抽敭鐗圭偣锛?//   - 鏃犻渶 API Key锛堟湰鍦伴儴缃诧級
+//   - 榛樿杩炴帴 localhost:11434
+//   - 浣跨敤 /api/chat 绔偣锛堥潪娴佸紡妯″紡锛?// ============================================================
+
+import { BaseAIProvider } from './base';
+import type { AIProviderRequest, AIProviderResponse, AIStreamChunk } from './types';
+
+const DEFAULT_MODEL = 'llama3.1';
+const DEFAULT_BASE_URL = '[REDACTED]';
+const DEFAULT_TIMEOUT = 60000; // 鏈湴鎺ㄧ悊鍙兘杈冩參锛岀粰浜堟洿闀胯秴鏃?
+/**
+ * Ollama Chat API 鍝嶅簲缁撴瀯
+ */
+interface OllamaChatResponse {
+  model: string;
+  created_at: string;
+  message: {
+    role: string;
+    content: string;
+  };
+  done: boolean;
+  total_duration?: number;
+  load_duration?: number;
+  prompt_eval_count?: number;
+  prompt_eval_duration?: number;
+  eval_count?: number;
+  eval_duration?: number;
+}
+
+/**
+ * Ollama 鎻愪緵鍟? *
+ * 缁ф壙 BaseAIProvider锛屼粎瀹炵幇 Ollama 鐗规湁鐨勶細
+ *   - 鏃?API Key 鐨勫彲鐢ㄦ€ф鏌ワ紙閫氳繃 OLLAMA_ENABLED 鎺у埗锛? *   - /api/tags 绔偣鍋ュ悍鎺㈤拡
+ *   - /api/chat 璇锋眰鏋勫缓锛坰tream: false锛変笌鍝嶅簲瑙ｆ瀽
+ */
+export class OllamaProvider extends BaseAIProvider {
+  readonly name = 'ollama' as const;
+
+  constructor(config?: Partial<{ baseUrl: string; defaultModel: string; timeout: number }>) {
+    super({
+      apiKey: '', // Ollama 鏃犻渶 API Key
+      baseUrl: config?.baseUrl ?? process.env.OLLAMA_API_BASE ?? DEFAULT_BASE_URL,
+      defaultModel: config?.defaultModel ?? process.env.OLLAMA_MODEL ?? DEFAULT_MODEL,
+      timeout: config?.timeout ?? DEFAULT_TIMEOUT,
+    });
+  }
+
+  /**
+   * Ollama 鍙敤鎬ф鏌?   * 鐢变簬鏃犻渶 API Key锛岄€氳繃 OLLAMA_ENABLED 鐜鍙橀噺鎺у埗
+   */
+  isAvailable(): boolean {
+    const enabled = process.env.OLLAMA_ENABLED;
+    // 鏄庣‘绂佺敤鏃惰繑鍥?false锛屽惁鍒欓粯璁ゅ彲鐢紙璁?healthCheck 鍋氬疄闄呴獙璇侊級
+    if (enabled === 'false' || enabled === '0') return false;
+    return true;
+  }
+
+  /**
+   * 鍋ュ悍妫€鏌ワ細GET /api/tags 楠岃瘉 Ollama 鏈嶅姟鏄惁鍦ㄧ嚎
+   */
+  async healthCheck(): Promise<boolean> {
+    return this.performHealthCheckRequest(`${this.config.baseUrl}/api/tags`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * 鎵ц Ollama Chat API 璋冪敤
+   *
+   * 涓?OpenAI 鐨?messages 鏍煎紡绫讳技锛屼絾锛?   *   - 鍝嶅簲鏄崟涓?message 瀵硅薄锛堥潪 choices 鏁扮粍锛?   *   - 浣跨敤 stream: false 鑾峰彇瀹屾暣鍝嶅簲
+   *   - 鍙傛暟閫氳繃 options 瀵硅薄浼犻€掞紙temperature, num_predict锛?   */
+  protected async executeChat(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): Promise<AIProviderResponse> {
+    const model = request.model ?? this.config.defaultModel;
+
+    const payload = {
+      model,
+      messages: request.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      stream: false, // 浣跨敤闈炴祦寮忔ā寮忚幏鍙栧畬鏁村搷搴?      options: {
+        temperature: request.temperature ?? 0.6,
+        num_predict: request.maxTokens ?? 512,
+      },
+    };
+
+    const response = await fetch(`${this.config.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    const data = (await response.json()) as OllamaChatResponse;
+    const content = data?.message?.content?.trim();
+
+    if (!content) {
+      this.handleEmptyContent(data, model);
+    }
+
+    return {
+      content,
+      model: data.model,
+      provider: 'ollama',
+      usage:
+        data.prompt_eval_count !== undefined && data.eval_count !== undefined
+          ? {
+              promptTokens: data.prompt_eval_count,
+              completionTokens: data.eval_count,
+              totalTokens: data.prompt_eval_count + data.eval_count,
+            }
+          : undefined,
+    };
+  }
+
+  /**
+   * 鎵ц Ollama 娴佸紡璋冪敤
+   */
+  protected async *executeStream(
+    request: AIProviderRequest,
+    signal: AbortSignal
+  ): AsyncIterable<AIStreamChunk> {
+    const model = request.model ?? this.config.defaultModel;
+
+    const payload = {
+      model,
+      messages: request.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      stream: true,
+      options: {
+        temperature: request.temperature ?? 0.6,
+        num_predict: request.maxTokens ?? 512,
+      },
+    };
+
+    const response = await fetch(`${this.config.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, model);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body returned from Ollama');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+
+          try {
+            const data = JSON.parse(trimmedLine) as OllamaChatResponse;
+            if (data.done) {
+              yield { content: '', done: true };
+              return;
+            }
+            if (data.message?.content) {
+              yield { content: data.message.content, done: false };
+            }
+          } catch (e) {
+            console.warn('Ollama stream JSON parse error', e);
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+}
+// packages/pi-sdk/src/license/validator.ts
+// License 楠岃瘉鍣細绛惧悕鏍￠獙 + 杩囨湡鏃堕棿 + Feature Gate
+
+import type {
+  License,
+  LicenseFeature,
+  LicenseStatus,
+  LicenseValidationOptions,
+  LicenseValidationResult,
+  SerializedLicense,
+} from './types';
+
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// 甯搁噺
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+/** 鍚?Tier 榛樿寮€鏀剧殑鍔熻兘鐗规€?*/
+export const TIER_FEATURES: Record<License['tier'], LicenseFeature[]> = {
+  starter: ['ai_routing'],
+  professional: ['ai_routing', 'streaming', 'usage_tracking', 'webhook_monitoring'],
+  enterprise: [
+    'ai_routing',
+    'streaming',
+    'multi_tenant',
+    'usage_tracking',
+    'webhook_monitoring',
+    'advanced_analytics',
+  ],
+};
+
+/** 涓磋繎鍒版湡璀﹀憡闃堝€硷紙澶╋級 */
+const EXPIRY_WARNING_DAYS = 30;
+
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// 绛惧悕楠岃瘉
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+/**
+ * 鏋勫缓 License 寰呯鍚嶆暟鎹瓧绗︿覆
+ * 娉ㄦ剰锛氬瓧娈甸『搴忓繀椤讳笌绛惧彂鏃朵繚鎸佷竴鑷? */
+export function buildSignablePayload(license: SerializedLicense): string {
+  return [
+    license.id,
+    license.issuedTo,
+    license.merchantId,
+    license.issuedAt,
+    license.expiresAt,
+    license.tier,
+    license.features.sort().join(','),
+    license.maxRequestsPerMonth?.toString() ?? '',
+    license.maxTenants?.toString() ?? '',
+  ].join('|');
+}
+
+/**
+ * 浣跨敤 Web Crypto API (HMAC-SHA256) 楠岃瘉绛惧悕
+ * 鍦ㄧ敓浜х幆澧冧腑鍙浛鎹负 RSA-SHA256 闈炲绉伴獙璇? */
+export async function verifySignature(
+  payload: string,
+  signature: string,
+  publicKey: string
+): Promise<boolean> {
+  try {
+    // 灏?base64 鍏挜锛圚MAC secret锛夎浆鎹负 CryptoKey
+    const keyData = Uint8Array.from(atob(publicKey), (c) => c.charCodeAt(0));
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const encoder = new TextEncoder();
+    const sigBuffer = Uint8Array.from(atob(signature), (c) => c.charCodeAt(0));
+    return await crypto.subtle.verify('HMAC', cryptoKey, sigBuffer, encoder.encode(payload));
+  } catch {
+    // 绛惧悕鏍煎紡閿欒瑙嗕负鏃犳晥
+    return false;
+  }
+}
+
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// 鍙嶅簭鍒楀寲
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+/**
+ * 灏嗕紶杈撴牸寮忥紙SerializedLicense锛夎繕鍘熶负杩愯鏃?License 瀵硅薄
+ */
+export function deserializeLicense(raw: SerializedLicense): License {
+  return {
+    ...raw,
+    issuedAt: new Date(raw.issuedAt),
+    expiresAt: new Date(raw.expiresAt),
+  };
+}
+
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// 鏍稿績楠岃瘉閫昏緫
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+/**
+ * 楠岃瘉 License 鏄惁鏈夋晥
+ *
+ * @param license 宸插弽搴忓垪鍖栫殑 License 瀵硅薄
+ * @param rawLicense 鍘熷搴忓垪鍖?License锛堢敤浜庣鍚嶉獙璇侊級
+ * @param options 楠岃瘉閫夐」
+ * @returns 楠岃瘉缁撴灉
+ */
+export async function validateLicense(
+  license: License,
+  rawLicense: SerializedLicense,
+  options: LicenseValidationOptions = {}
+): Promise<LicenseValidationResult> {
+  const now = new Date();
+
+  // 1. 杩囨湡妫€鏌?  if (!options.skipExpiryCheck) {
+    if (license.expiresAt < now) {
+      const overdueDays = Math.ceil((now.getTime() - license.expiresAt.getTime()) / 86400000);
+      return {
+        valid: false,
+        status: 'expired',
+        license,
+        daysRemaining: -overdueDays,
+        error: `License expired ${overdueDays} day(s) ago`,
+      };
+    }
+  }
+
+  // 2. 绛惧悕楠岃瘉
+  if (!options.skipSignatureCheck) {
+    const publicKey = process.env.LICENSE_PUBLIC_KEY;
+    if (!publicKey) {
+      return {
+        valid: false,
+        status: 'invalid',
+        error: 'LICENSE_PUBLIC_KEY environment variable is not set',
+      };
+    }
+
+    const payload = buildSignablePayload(rawLicense);
+    const isSignatureValid = await verifySignature(payload, license.signature, publicKey);
+
+    if (!isSignatureValid) {
+      return {
+        valid: false,
+        status: 'invalid',
+        license,
+        error: 'License signature verification failed',
+      };
+    }
+  }
+
+  // 3. Feature Gate 妫€鏌?  if (options.requiredFeatures && options.requiredFeatures.length > 0) {
+    const missingFeatures = options.requiredFeatures.filter((f) => !license.features.includes(f));
+    if (missingFeatures.length > 0) {
+      return {
+        valid: false,
+        status: 'invalid',
+        license,
+        error: `License missing required features: ${missingFeatures.join(', ')}`,
+      };
+    }
+  }
+
+  // 4. 璁＄畻鍓╀綑澶╂暟
+  const daysRemaining = Math.ceil((license.expiresAt.getTime() - now.getTime()) / 86400000);
+
+  return {
+    valid: true,
+    status: 'valid',
+    license,
+    daysRemaining,
+  };
+}
+
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// 宸ュ叿鍑芥暟
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+/**
+ * 妫€鏌?License 鏄惁鍗冲皢鍒版湡锛堥粯璁?30 澶╁唴璀﹀憡锛? */
+export function isExpiringsoon(
+  license: License,
+  thresholdDays: number = EXPIRY_WARNING_DAYS
+): boolean {
+  const now = new Date();
+  const threshold = new Date(now.getTime() + thresholdDays * 86400000);
+  return license.expiresAt < threshold;
+}
+
+/**
+ * 妫€鏌?License 鏄惁寮€鍚簡鎸囧畾鍔熻兘
+ */
+export function hasFeature(license: License, feature: LicenseFeature): boolean {
+  return license.features.includes(feature);
+}
+
+/**
+ * 鍒ゆ柇 License 鏁翠綋鐘舵€? */
+export function getLicenseStatus(license: License): LicenseStatus {
+  const now = new Date();
+  if (license.expiresAt < now) return 'expired';
+  return 'valid';
+}
+// packages/pi-sdk/src/license/manager.ts
+// License 绠＄悊鍣細鍔犺浇 + 鍐呭瓨缂撳瓨 + 寮哄埗鏍￠獙
+
+import { logError, logEvent, logWarn } from '../logger';
+import type { LicenseFeature, LicenseValidationResult, SerializedLicense } from './types';
+import {
+  deserializeLicense,
+  getLicenseStatus,
+  hasFeature,
+  isExpiringsoon,
+  validateLicense,
+} from './validator';
+
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// 鍐呭瓨缂撳瓨
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+interface CachedLicense {
+  result: LicenseValidationResult;
+  cachedAt: number;
+}
+
+/** 缂撳瓨鏈夋晥鏈燂細5 鍒嗛挓 */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+const cache = new Map<string, CachedLicense>();
+
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// 鍔犺浇涓庤В鏋?// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+/**
+ * 浠庣幆澧冨彉閲忓姞杞藉苟瑙ｆ瀽 License
+ * 鐜鍙橀噺 LICENSE_PAYLOAD 搴斿瓨鏀?base64 缂栫爜鐨?JSON
+ */
+export function loadLicenseFromEnv(): SerializedLicense | null {
+  const raw = process.env.LICENSE_PAYLOAD;
+  if (!raw) return null;
+
+  try {
+    const decoded = Buffer.from(raw, 'base64').toString('utf-8');
+    return JSON.parse(decoded) as SerializedLicense;
+  } catch (err) {
+    logError('Failed to parse LICENSE_PAYLOAD', err);
+    return null;
+  }
+}
+
+/**
+ * 浠?JSON 瀛楃涓茶В鏋?License
+ */
+export function parseLicense(json: string): SerializedLicense | null {
+  try {

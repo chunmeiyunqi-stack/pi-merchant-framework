@@ -46,14 +46,14 @@ export default async function DashboardPage() {
     }
   }
 
-  // 服务端返回无权控制面板
+  // 服务端返回无权限控制面板
   if (!customer) {
     return (
       <main className="min-h-screen bg-gradient-to-br from-[#1E112A] to-[#110B19] flex flex-col items-center justify-center p-4 text-center">
         <div className="w-20 h-20 bg-[#2A1642] border border-[#F3C136]/30 rounded-full flex items-center justify-center text-3xl mb-6 shadow-lg shadow-[#F3C136]/10">
-          🔒
+          🔀
         </div>
-        <h1 className="text-2xl md:text-3xl font-bold text-white mb-3">无权操作</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-white mb-3">无权限操作</h1>
         <p className="text-gray-400 mb-8 max-w-md text-sm md:text-base leading-relaxed">
           生态控制面板是被严密保护的专属私域。您必须退回首页，并通过底层原生的
           <strong className="text-[#F3C136] font-bold mx-1">链侧身份授权</strong>
@@ -84,7 +84,7 @@ export default async function DashboardPage() {
           <div className="flex items-center space-x-4">
             <LogoutButton />
             <Link href="/" className="text-sm font-medium text-gray-500 hover:text-gray-800">
-              返回主页
+              返回首页
             </Link>
           </div>
         </div>
@@ -94,18 +94,30 @@ export default async function DashboardPage() {
         {/* 左侧导航 */}
         <aside className="w-full md:w-64 shrink-0">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-1">
-            <div className="bg-purple-50 text-[#7C3AED] px-4 py-3 rounded-xl font-bold cursor-pointer">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-3 bg-purple-50 text-[#7C3AED] px-4 py-3 rounded-xl font-bold transition-colors"
+            >
               概览面板
-            </div>
-            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors">
+            </Link>
+            <Link
+              href="/dashboard/credentials"
+              className="flex items-center gap-3 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium transition-colors"
+            >
               我的业务凭证
-            </div>
-            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors">
-              架构与问答支持
-            </div>
-            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors mt-4">
+            </Link>
+            <Link
+              href="/dashboard/support"
+              className="flex items-center gap-3 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium transition-colors"
+            >
+              架构与授权支持
+            </Link>
+            <Link
+              href="/dashboard/configuration"
+              className="flex items-center gap-3 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium transition-colors mt-4"
+            >
               组件配置流溯源 🔒
-            </div>
+            </Link>
           </div>
         </aside>
 
@@ -114,7 +126,7 @@ export default async function DashboardPage() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-black text-gray-800 mb-1">
-                欢迎回归，{customer.username} 👋
+                欢迎回归，{customer.username} 👢
               </h2>
               <p className="text-sm text-gray-500">
                 以下参数已实时同步您的生态节点与历史凭证档案流。
@@ -128,7 +140,7 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm relative overflow-hidden group hover:border-[#7C3AED]/30 transition-colors">
               <div className="absolute right-0 top-0 w-16 h-16 bg-indigo-50 rounded-bl-full flex items-start justify-end p-3 pointer-events-none">
-                <span className="text-indigo-400">⚡</span>
+                <span className="text-indigo-400">⿻</span>
               </div>
               <h3 className="text-sm font-bold text-gray-500 mb-4">当前配置凭证</h3>
               <p className="text-2xl font-black text-gray-900 mb-1">
@@ -141,7 +153,7 @@ export default async function DashboardPage() {
 
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm relative overflow-hidden">
               <div className="absolute right-0 top-0 w-16 h-16 bg-blue-50 rounded-bl-full flex items-start justify-end p-3 pointer-events-none">
-                <span className="text-blue-400">🎫</span>
+                <span className="text-blue-400">🎿</span>
               </div>
               <h3 className="text-sm font-bold text-gray-500 mb-4">周期内向导排期配额</h3>
               <p className="text-2xl font-black text-gray-900 mb-1">
@@ -167,7 +179,7 @@ export default async function DashboardPage() {
               生态向导与履约下发流 (Construction)
             </h3>
             <div className="bg-gray-50 rounded-xl p-8 border border-dashed border-gray-300 text-center text-sm font-medium text-gray-500">
-              ⚠️ 服务端授权链路已通过验证。
+              ⿻ 服务端授权链路已通过验证。
               <br /> 此处列表详情在进行下一阶段的写操作迭代后，将可以展现与下载加密服务包。
             </div>
           </div>

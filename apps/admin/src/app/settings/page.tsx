@@ -94,6 +94,39 @@ export default function AdminSettingsPage() {
           </select>
         </div>
 
+        {/* AI Provider Configuration (New for V2.0.0) */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
+          <h2 className="font-semibold text-gray-700 flex items-center gap-2">
+            AI 服务配置
+            <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase font-bold">
+              v2.0.0
+            </span>
+          </h2>
+          <div>
+            <label className="block text-sm text-gray-500 mb-1">主提供商 (Primary Provider)</label>
+            <select className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-600">
+              <option value="openai">OpenAI (GPT-4o)</option>
+              <option value="anthropic">Anthropic (Claude 3.5)</option>
+              <option value="ollama">Local Node (Ollama)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-500 mb-1">备选容错序列 (Fallback Chain)</label>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
+                Anthropic
+              </span>
+              <span className="px-3 py-1 bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
+                Ollama
+              </span>
+              <button className="text-indigo-600 text-xs font-bold">+ 添加</button>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-400">
+            * 提示：当主提供商连接超时或额度耗尽时，系统将自动按序列切换至备选驱动。
+          </p>
+        </div>
+
         {/* 模块开关 */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
           <h2 className="font-semibold text-gray-700">功能开关</h2>
