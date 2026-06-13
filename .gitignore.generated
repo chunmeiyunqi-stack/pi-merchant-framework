@@ -1,0 +1,90 @@
+# ----- PiMerchantFramework generated .gitignore (generated) -----
+# NOTE: This is a generated ignore file. Rename to .gitignore to apply.
+
+# Ignore all env files (per request)
+.env*
+
+# Ignore generated documentation (common formats)
+*.pdf
+*.docx
+*.html
+*.md.pdf
+
+# Ignore Python scripts (.py) as requested
+*.py
+
+# Ignore source_code_* files
+source_code_*
+
+# Ignore output*.txt files
+output*.txt
+
+# Node / JS common
+node_modules/
+.pnpm-debug.log
+.pnpm-store/
+.npm/
+package-lock.json
+pnpm-lock.yaml
+
+# Next.js build
+.next/
+.next/*
+.out/
+/dist/
+
+# Coverage
+coverage/
+lcov.info
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.swp
+
+# Build artifacts
+build/
+dist/
+
+# Ignore generated source_code printouts and large outputs
+source_code_print.*
+source_code_combined.*
+output_combined.txt
+fixed_output*.md
+fixed_output*.txt
+
+# Optional: ignore environment-specific local files
+.env.local
+.env.*.local
+
+# Git hooks
+.husky/_
+
+# Misc
+coverage/
+reports/
+
+# If you want to keep .env.example tracked, remove the following line
+# (Currently the user requested to ignore all .env* files, so it's ignored above.)
+
+# End of generated .gitignore
