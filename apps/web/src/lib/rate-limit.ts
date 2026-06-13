@@ -1,3 +1,72 @@
+// Simple in-memory rate limiter for development and single-instance use.
+// Not suitable for multi-instance / production. Persisted in-memory Map.
+
+export interface RateLimitOptions {
+  identifier: string;
+  windowMs: number;
+  maxRequests: number;
+  prefix?: string;
+}
+
+export interface RateLimitResult {
+  limited: boolean;
+  resetAt: number; // epoch ms when window resets
+  remaining: number;
+  limit: number;
+}
+
+type Entry = { count: number; resetAt: number };
+
+const store = new Map<string, Entry>();
+
+export function checkRateLimit(opts: RateLimitOptions): RateLimitResult {
+  const { identifier, windowMs, maxRequests, prefix = 'rl' } = opts;
+  const key = `${prefix}:${identifier}`;
+  const now = Date.now();
+
+  const existing = store.get(key);
+  if (!existing || now > existing.resetAt) {
+    const resetAt = now + windowMs;
+    store.set(key, { count: 1, resetAt });
+    return {
+      limited: 1 > maxRequests,
+      resetAt,
+      remaining: Math.max(0, maxRequests - 1),
+      limit: maxRequests,
+    };
+  }
+
+  existing.count += 1;
+  store.set(key, existing);
+
+  const limited = existing.count > maxRequests;
+  return {
+    limited,
+    resetAt: existing.resetAt,
+    remaining: Math.max(0, maxRequests - existing.count),
+    limit: maxRequests,
+  };
+}
+
+export function buildRateLimitHeaders(result: RateLimitResult): Record<string, string> {
+  return {
+    'X-RateLimit-Limit': String(result.limit),
+    'X-RateLimit-Remaining': String(result.remaining),
+    // reset in unix seconds
+    'X-RateLimit-Reset': String(Math.ceil(result.resetAt / 1000)),
+  };
+}
+
+export function getClientIp(req: Request | { headers?: any } ): string {
+  try {
+    const headers = (req as any).headers;
+    const xff = headers?.get?.('x-forwarded-for') || headers?.get?.('x-real-ip') || headers?.get?.('X-Forwarded-For');
+    if (xff) return String(xff).split(',')[0].trim();
+  } catch (e) {
+    // ignore
+  }
+  return '127.0.0.1';
+}
 // ============================================================
 // Pioneer AI Framework — 速率限制工具
 //
