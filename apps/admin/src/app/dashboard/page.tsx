@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 export default function DashboardPage() {
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
 
   useEffect(() => {
     setTimeout(() => setLoading(false), 1000);
@@ -26,8 +26,13 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{s.label}</p>
+          <div
+            key={s.label}
+            className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+              {s.label}
+            </p>
             <div className="flex items-end justify-between">
               <h2 className={`text-2xl font-black ${s.color}`}>{s.value}</h2>
               <span className="text-[10px] bg-gray-50 px-2 py-1 rounded-full font-bold text-gray-400">
@@ -51,11 +56,11 @@ export default function DashboardPage() {
           <div className="h-64 w-full flex items-end gap-2 px-4">
             {[40, 65, 45, 90, 75, 55, 100].map((h, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                <div 
-                  className="w-full bg-gradient-to-t from-amber-100 to-amber-500 rounded-t-xl transition-all group-hover:brightness-110" 
+                <div
+                  className="w-full bg-gradient-to-t from-amber-100 to-amber-500 rounded-t-xl transition-all group-hover:brightness-110"
                   style={{ height: `${h}%` }}
                 />
-                <span className="text-[10px] text-gray-400 font-bold">Day {i+1}</span>
+                <span className="text-[10px] text-gray-400 font-bold">Day {i + 1}</span>
               </div>
             ))}
           </div>
@@ -72,15 +77,21 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-3 mt-6">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center gap-2 text-gray-500"><span className="w-2 h-2 bg-amber-400 rounded-full" /> OpenAI</span>
+              <span className="flex items-center gap-2 text-gray-500">
+                <span className="w-2 h-2 bg-amber-400 rounded-full" /> OpenAI
+              </span>
               <span className="font-bold">45%</span>
             </div>
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center gap-2 text-gray-500"><span className="w-2 h-2 bg-indigo-600 rounded-full" /> Anthropic</span>
+              <span className="flex items-center gap-2 text-gray-500">
+                <span className="w-2 h-2 bg-indigo-600 rounded-full" /> Anthropic
+              </span>
               <span className="font-bold">30%</span>
             </div>
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center gap-2 text-gray-500"><span className="w-2 h-2 bg-purple-500 rounded-full" /> Ollama</span>
+              <span className="flex items-center gap-2 text-gray-500">
+                <span className="w-2 h-2 bg-purple-500 rounded-full" /> Ollama
+              </span>
               <span className="font-bold">25%</span>
             </div>
           </div>
