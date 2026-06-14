@@ -92,3 +92,6 @@ archive/
 # Local temp scripts
 .scripts/
 
+# Turbo build/cache artifacts
+.turbo/
+
