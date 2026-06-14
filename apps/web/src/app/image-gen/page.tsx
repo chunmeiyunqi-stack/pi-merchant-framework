@@ -79,7 +79,8 @@ export default function ImageGenPage() {
 
       if (!res.ok || !data.success) {
         if (res.status === 401) throw new Error('请先登录后使用图像生成功能');
-        if (res.status === 503) throw new Error('图像生成服务暂未配置，请联系管理员设置 OpenAI API Key');
+        if (res.status === 503)
+          throw new Error('图像生成服务暂未配置，请联系管理员设置 OpenAI API Key');
         if (res.status === 429) throw new Error('请求过于频繁，请稍后再试（每分钟限 20 次）');
         throw new Error(data.error || '图像生成失败，请重试');
       }
@@ -121,7 +122,10 @@ export default function ImageGenPage() {
       <header className="sticky top-0 z-50 bg-[#0A0510]/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <div className="flex items-center space-x-3">
-            <Link href="/dashboard" className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center p-[1px]">
+            <Link
+              href="/dashboard"
+              className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center p-[1px]"
+            >
               <div className="flex items-center justify-center w-full h-full bg-[#150B20] rounded-[7px]">
                 <span className="text-sm font-black text-[#F3C136]">AI</span>
               </div>
@@ -132,10 +136,16 @@ export default function ImageGenPage() {
             </div>
           </div>
           <nav className="flex items-center space-x-3">
-            <Link href="/history" className="text-sm text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5">
+            <Link
+              href="/history"
+              className="text-sm text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
+            >
               历史记录
             </Link>
-            <Link href="/ai" className="text-sm text-[#F3C136] bg-[#F3C136]/10 border border-[#F3C136]/20 px-3 py-1.5 rounded-lg hover:bg-[#F3C136]/20 transition-colors">
+            <Link
+              href="/ai"
+              className="text-sm text-[#F3C136] bg-[#F3C136]/10 border border-[#F3C136]/20 px-3 py-1.5 rounded-lg hover:bg-[#F3C136]/20 transition-colors"
+            >
               AI 对话
             </Link>
           </nav>
@@ -144,7 +154,6 @@ export default function ImageGenPage() {
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
-
           {/* Left Panel — Controls */}
           <div className="lg:col-span-2 space-y-5">
             {/* Prompt Input */}
@@ -153,7 +162,9 @@ export default function ImageGenPage() {
                 <label htmlFor="prompt-input" className="text-sm font-semibold text-white">
                   🖼️ 图像描述
                 </label>
-                <span className={`text-xs font-mono ${charCount > 3500 ? 'text-red-400' : 'text-gray-500'}`}>
+                <span
+                  className={`text-xs font-mono ${charCount > 3500 ? 'text-red-400' : 'text-gray-500'}`}
+                >
                   {charCount}/4000
                 </span>
               </div>
@@ -209,7 +220,11 @@ export default function ImageGenPage() {
                       className="accent-[#F3C136]"
                     />
                     <div>
-                      <p className={`text-sm font-semibold ${model === m.id ? 'text-white' : 'text-gray-300'}`}>{m.name}</p>
+                      <p
+                        className={`text-sm font-semibold ${model === m.id ? 'text-white' : 'text-gray-300'}`}
+                      >
+                        {m.name}
+                      </p>
                       <p className="text-xs text-gray-500">{m.description}</p>
                     </div>
                   </label>
@@ -241,7 +256,9 @@ export default function ImageGenPage() {
                         onChange={() => setSize(opt.value)}
                         className="accent-[#F3C136]"
                       />
-                      <span className={`text-sm font-medium ${size === opt.value ? 'text-white' : 'text-gray-300'}`}>
+                      <span
+                        className={`text-sm font-medium ${size === opt.value ? 'text-white' : 'text-gray-300'}`}
+                      >
                         {opt.label}
                       </span>
                     </div>
@@ -275,7 +292,11 @@ export default function ImageGenPage() {
                       className="accent-[#F3C136]"
                     />
                     <div>
-                      <p className={`text-sm font-semibold ${quality === opt.value ? 'text-white' : 'text-gray-300'}`}>{opt.label}</p>
+                      <p
+                        className={`text-sm font-semibold ${quality === opt.value ? 'text-white' : 'text-gray-300'}`}
+                      >
+                        {opt.label}
+                      </p>
                       <p className="text-xs text-gray-500">{opt.desc}</p>
                     </div>
                   </label>
@@ -293,8 +314,19 @@ export default function ImageGenPage() {
               {loading ? (
                 <>
                   <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   <span>生成中… (最长 30s)</span>
                 </>
@@ -317,7 +349,10 @@ export default function ImageGenPage() {
                   <span>{error}</span>
                 </p>
                 {error.includes('登录') && (
-                  <Link href="/login" className="mt-3 inline-block text-[#F3C136] text-sm font-semibold hover:underline">
+                  <Link
+                    href="/login"
+                    className="mt-3 inline-block text-[#F3C136] text-sm font-semibold hover:underline"
+                  >
                     前往登录 →
                   </Link>
                 )}
@@ -332,7 +367,9 @@ export default function ImageGenPage() {
                     <div className="relative w-20 h-20 mx-auto">
                       <div className="absolute inset-0 rounded-full border-4 border-[#F3C136]/20 animate-ping" />
                       <div className="absolute inset-2 rounded-full bg-gradient-to-br from-[#F3C136]/30 to-[#7C3AED]/30 animate-pulse" />
-                      <div className="absolute inset-0 flex items-center justify-center text-3xl">🎨</div>
+                      <div className="absolute inset-0 flex items-center justify-center text-3xl">
+                        🎨
+                      </div>
                     </div>
                     <div>
                       <p className="text-white font-semibold">AI 正在创作中…</p>
@@ -368,7 +405,10 @@ export default function ImageGenPage() {
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-6 opacity-20">
                       {[...Array(9)].map((_, i) => (
-                        <div key={i} className="aspect-square rounded-xl bg-gradient-to-br from-[#7C3AED]/30 to-[#F3C136]/20" />
+                        <div
+                          key={i}
+                          className="aspect-square rounded-xl bg-gradient-to-br from-[#7C3AED]/30 to-[#F3C136]/20"
+                        />
                       ))}
                     </div>
                   </div>
@@ -382,7 +422,6 @@ export default function ImageGenPage() {
                 {/* Main Preview */}
                 {selectedImage && (
                   <div className="bg-[#150B20] border border-[#F3C136]/20 rounded-2xl overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={selectedImage}
                       alt="Generated"
@@ -390,7 +429,9 @@ export default function ImageGenPage() {
                     />
                     <div className="p-4 border-t border-white/5 flex items-center justify-between">
                       <div className="text-xs text-gray-500 space-y-0.5">
-                        <p className="text-gray-400 font-medium">{model} · {size} · {quality}</p>
+                        <p className="text-gray-400 font-medium">
+                          {model} · {size} · {quality}
+                        </p>
                         {durationMs && <p>生成耗时 {(durationMs / 1000).toFixed(1)}s</p>}
                       </div>
                       <div className="flex space-x-2">
@@ -428,8 +469,11 @@ export default function ImageGenPage() {
                             : 'border-white/10 hover:border-white/30'
                         }`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img.url} alt={`Generated ${i + 1}`} className="w-full h-full object-cover" />
+                        <img
+                          src={img.url}
+                          alt={`Generated ${i + 1}`}
+                          className="w-full h-full object-cover"
+                        />
                       </button>
                     ))}
                   </div>
@@ -438,8 +482,12 @@ export default function ImageGenPage() {
                 {/* Revised prompt */}
                 {images[0]?.revisedPrompt && images[0].revisedPrompt !== prompt.trim() && (
                   <div className="bg-[#0F0A1A] border border-white/5 rounded-xl p-4">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 font-semibold">AI 优化后的提示词</p>
-                    <p className="text-xs text-gray-400 leading-relaxed italic">{images[0].revisedPrompt}</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 font-semibold">
+                      AI 优化后的提示词
+                    </p>
+                    <p className="text-xs text-gray-400 leading-relaxed italic">
+                      {images[0].revisedPrompt}
+                    </p>
                   </div>
                 )}
 

@@ -35,7 +35,11 @@ interface Pagination {
 
 const TYPE_LABELS: Record<GenerationType, { label: string; color: string; icon: string }> = {
   TEXT: { label: '文本', color: 'text-blue-400 bg-blue-400/10 border-blue-400/20', icon: '💬' },
-  IMAGE: { label: '图像', color: 'text-purple-400 bg-purple-400/10 border-purple-400/20', icon: '🎨' },
+  IMAGE: {
+    label: '图像',
+    color: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+    icon: '🎨',
+  },
   VIDEO: { label: '视频', color: 'text-pink-400 bg-pink-400/10 border-pink-400/20', icon: '🎬' },
 };
 
@@ -93,8 +97,10 @@ export default function HistoryPage() {
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleString('zh-CN', {
-      month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
@@ -115,7 +121,10 @@ export default function HistoryPage() {
       <header className="sticky top-0 z-50 bg-[#0A0510]/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <div className="flex items-center space-x-3">
-            <Link href="/dashboard" className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center p-[1px]">
+            <Link
+              href="/dashboard"
+              className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center p-[1px]"
+            >
               <div className="flex items-center justify-center w-full h-full bg-[#150B20] rounded-[7px]">
                 <span className="text-sm font-black text-[#F3C136]">AI</span>
               </div>
@@ -126,10 +135,16 @@ export default function HistoryPage() {
             </div>
           </div>
           <nav className="flex items-center space-x-3">
-            <Link href="/image-gen" className="text-sm text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5">
+            <Link
+              href="/image-gen"
+              className="text-sm text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
+            >
               图像生成
             </Link>
-            <Link href="/ai" className="text-sm text-[#F3C136] bg-[#F3C136]/10 border border-[#F3C136]/20 px-3 py-1.5 rounded-lg hover:bg-[#F3C136]/20 transition-colors">
+            <Link
+              href="/ai"
+              className="text-sm text-[#F3C136] bg-[#F3C136]/10 border border-[#F3C136]/20 px-3 py-1.5 rounded-lg hover:bg-[#F3C136]/20 transition-colors"
+            >
               AI 对话
             </Link>
           </nav>
@@ -179,7 +194,10 @@ export default function HistoryPage() {
           <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 mb-6 text-center">
             <p className="text-red-400 font-medium">{error}</p>
             {error.includes('登录') && (
-              <Link href="/login" className="mt-3 inline-block text-[#F3C136] text-sm font-semibold hover:underline">
+              <Link
+                href="/login"
+                className="mt-3 inline-block text-[#F3C136] text-sm font-semibold hover:underline"
+              >
                 前往登录 →
               </Link>
             )}
@@ -190,7 +208,10 @@ export default function HistoryPage() {
         {loading && !error && (
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="bg-[#150B20] border border-white/5 rounded-2xl p-5 animate-pulse">
+              <div
+                key={i}
+                className="bg-[#150B20] border border-white/5 rounded-2xl p-5 animate-pulse"
+              >
                 <div className="flex items-center space-x-3 mb-3">
                   <div className="w-16 h-5 bg-white/10 rounded-full" />
                   <div className="w-20 h-5 bg-white/5 rounded-full" />
@@ -208,13 +229,21 @@ export default function HistoryPage() {
             <div className="text-5xl mb-4">📭</div>
             <h3 className="text-lg font-bold text-white mb-2">还没有生成记录</h3>
             <p className="text-gray-400 text-sm mb-6">
-              {activeType !== 'ALL' ? `暂无${TYPE_LABELS[activeType].label}类型的记录` : '开始使用 AI 功能，记录将自动保存在这里'}
+              {activeType !== 'ALL'
+                ? `暂无${TYPE_LABELS[activeType].label}类型的记录`
+                : '开始使用 AI 功能，记录将自动保存在这里'}
             </p>
             <div className="flex justify-center space-x-3">
-              <Link href="/ai" className="px-4 py-2 bg-[#F3C136] text-[#1E112A] rounded-xl text-sm font-bold hover:bg-[#EEA834] transition-colors">
+              <Link
+                href="/ai"
+                className="px-4 py-2 bg-[#F3C136] text-[#1E112A] rounded-xl text-sm font-bold hover:bg-[#EEA834] transition-colors"
+              >
                 开始 AI 对话
               </Link>
-              <Link href="/image-gen" className="px-4 py-2 bg-white/5 border border-white/10 text-white rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors">
+              <Link
+                href="/image-gen"
+                className="px-4 py-2 bg-white/5 border border-white/10 text-white rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors"
+              >
                 图像生成
               </Link>
             </div>
@@ -245,21 +274,41 @@ export default function HistoryPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center flex-wrap gap-2 mb-2">
-                          <span className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${typeInfo.color}`}>
+                          <span
+                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${typeInfo.color}`}
+                          >
                             <span>{typeInfo.icon}</span>
                             <span>{typeInfo.label}</span>
                           </span>
-                          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyle}`}>
-                            {item.status === 'completed' ? '已完成' : item.status === 'failed' ? '失败' : item.status === 'pending' ? '等待中' : item.status}
+                          <span
+                            className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyle}`}
+                          >
+                            {item.status === 'completed'
+                              ? '已完成'
+                              : item.status === 'failed'
+                                ? '失败'
+                                : item.status === 'pending'
+                                  ? '等待中'
+                                  : item.status}
                           </span>
-                          <span className="text-xs text-gray-500 font-mono">{item.provider}/{item.model}</span>
+                          <span className="text-xs text-gray-500 font-mono">
+                            {item.provider}/{item.model}
+                          </span>
                         </div>
-                        <p className="text-gray-200 text-sm font-medium truncate pr-4">{item.prompt}</p>
+                        <p className="text-gray-200 text-sm font-medium truncate pr-4">
+                          {item.prompt}
+                        </p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-xs text-gray-500">{formatTime(item.createdAt)}</p>
-                        <p className="text-xs text-gray-600 mt-1">{formatDuration(item.durationMs)}</p>
-                        <span className={`text-gray-500 transition-transform inline-block mt-1 ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {formatDuration(item.durationMs)}
+                        </p>
+                        <span
+                          className={`text-gray-500 transition-transform inline-block mt-1 ${isExpanded ? 'rotate-180' : ''}`}
+                        >
+                          ▾
+                        </span>
                       </div>
                     </div>
                   </button>
@@ -269,14 +318,20 @@ export default function HistoryPage() {
                     <div className="border-t border-white/5 p-5 space-y-4">
                       {/* Prompt */}
                       <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">完整提示词</p>
-                        <p className="text-sm text-gray-300 bg-white/5 rounded-xl p-3 leading-relaxed">{item.prompt}</p>
+                        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">
+                          完整提示词
+                        </p>
+                        <p className="text-sm text-gray-300 bg-white/5 rounded-xl p-3 leading-relaxed">
+                          {item.prompt}
+                        </p>
                       </div>
 
                       {/* Response / Image / Video */}
                       {item.type === 'TEXT' && item.response && (
                         <div>
-                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">AI 回复</p>
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">
+                            AI 回复
+                          </p>
                           <p className="text-sm text-gray-300 bg-white/5 rounded-xl p-3 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
                             {item.response}
                           </p>
@@ -285,8 +340,9 @@ export default function HistoryPage() {
 
                       {item.type === 'IMAGE' && item.imageUrl && (
                         <div>
-                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">生成图像</p>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">
+                            生成图像
+                          </p>
                           <img
                             src={item.imageUrl}
                             alt={item.prompt}
@@ -298,10 +354,26 @@ export default function HistoryPage() {
                       {/* Token Usage */}
                       {(item.promptTokens || item.completionTokens) && (
                         <div className="flex items-center space-x-4 text-xs text-gray-500 pt-2 border-t border-white/5">
-                          <span>输入: <span className="text-gray-400">{item.promptTokens ?? '--'} tokens</span></span>
-                          <span>输出: <span className="text-gray-400">{item.completionTokens ?? '--'} tokens</span></span>
-                          <span>总计: <span className="text-gray-400">{item.totalTokens ?? '--'} tokens</span></span>
-                          <span className="ml-auto">耗时: <span className="text-gray-400">{formatDuration(item.durationMs)}</span></span>
+                          <span>
+                            输入:{' '}
+                            <span className="text-gray-400">
+                              {item.promptTokens ?? '--'} tokens
+                            </span>
+                          </span>
+                          <span>
+                            输出:{' '}
+                            <span className="text-gray-400">
+                              {item.completionTokens ?? '--'} tokens
+                            </span>
+                          </span>
+                          <span>
+                            总计:{' '}
+                            <span className="text-gray-400">{item.totalTokens ?? '--'} tokens</span>
+                          </span>
+                          <span className="ml-auto">
+                            耗时:{' '}
+                            <span className="text-gray-400">{formatDuration(item.durationMs)}</span>
+                          </span>
                         </div>
                       )}
                     </div>

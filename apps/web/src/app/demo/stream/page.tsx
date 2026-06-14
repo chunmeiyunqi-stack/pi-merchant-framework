@@ -6,7 +6,13 @@ import { useChatStream } from '@/hooks/useChatStream';
 export default function StreamDemoPage() {
   const [prompt, setPrompt] = useState('');
   const [provider, setProvider] = useState<string>('');
-  const { messages, isLoading, error, appendMessage, stopGeneration } = useChatStream({
+  const {
+    messages,
+    isLoading,
+    error: _error,
+    appendMessage,
+    stopGeneration,
+  } = useChatStream({
     provider: provider || undefined,
   });
 
@@ -36,9 +42,7 @@ export default function StreamDemoPage() {
               </div>
               <h1 className="text-3xl font-black tracking-tighter">先锋人工智能服务框架</h1>
             </div>
-            <p className="text-neutral-500 font-medium">
-              V2.0.0 智能感知对话终端 · 实时流式响应
-            </p>
+            <p className="text-neutral-500 font-medium">V2.0.0 智能感知对话终端 · 实时流式响应</p>
           </div>
           <div className="flex gap-2">
             <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-[10px] font-bold uppercase tracking-widest border border-green-500/20 flex items-center gap-1.5">
@@ -52,7 +56,9 @@ export default function StreamDemoPage() {
           {/* Sidebar / Config */}
           <div className="lg:col-span-1 space-y-6">
             <div className="p-6 rounded-2xl bg-neutral-900/50 border border-white/5">
-              <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-4">路由引擎配置</h3>
+              <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-4">
+                路由引擎配置
+              </h3>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[10px] text-neutral-500 font-bold">优先服务商</label>
@@ -70,9 +76,11 @@ export default function StreamDemoPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10">
-              <h3 className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-2">架构状态</h3>
+              <h3 className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-2">
+                架构状态
+              </h3>
               <p className="text-[10px] text-neutral-400 leading-relaxed">
                 当前运行在多租户安全沙箱中。所有数据经由 Pi Network OAuth2.0 强鉴权保护。
               </p>
@@ -122,9 +130,11 @@ export default function StreamDemoPage() {
                           }`}
                         >
                           {msg.content}
-                          {isLoading && msg.role === 'assistant' && msg === messages[messages.length - 1] && (
-                            <span className="inline-block w-1 h-4 bg-amber-500 ml-1 animate-pulse align-middle" />
-                          )}
+                          {isLoading &&
+                            msg.role === 'assistant' &&
+                            msg === messages[messages.length - 1] && (
+                              <span className="inline-block w-1 h-4 bg-amber-500 ml-1 animate-pulse align-middle" />
+                            )}
                         </div>
                       </div>
                     ))}

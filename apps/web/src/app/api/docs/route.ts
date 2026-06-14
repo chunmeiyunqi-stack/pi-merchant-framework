@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const spec = getApiDocs();
     return NextResponse.json(spec);
-  } catch (e) {
+  } catch (_e) {
     return NextResponse.json({ error: 'Failed to build OpenAPI spec' }, { status: 500 });
   }
 }
