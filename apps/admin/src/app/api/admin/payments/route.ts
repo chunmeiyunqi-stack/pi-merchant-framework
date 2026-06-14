@@ -3,8 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { getMerchantId } from '@/lib/utils';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
+import { withMetrics } from '@/lib/metrics-middleware';
 
-export async function GET() {
+async function __GET() {
   const token = cookies().get('pi_auth_token')?.value;
   if (!token || !verifySessionToken(token)) return NextResponse.json({ payments: [] });
 
@@ -28,3 +29,5 @@ export async function GET() {
     return NextResponse.json({ payments: [] });
   }
 }
+
+export const GET = withMetrics(__GET);

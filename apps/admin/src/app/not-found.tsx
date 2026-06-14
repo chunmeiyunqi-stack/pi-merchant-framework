@@ -6,16 +6,12 @@ export default function NotFound() {
       <div className="max-w-md w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-700">
         <div className="relative inline-block">
           <div className="absolute inset-0 blur-2xl bg-amber-500/10 rounded-full" />
-          <span className="relative text-8xl font-bold tracking-tighter text-neutral-800">
-            404
-          </span>
+          <span className="relative text-8xl font-bold tracking-tighter text-neutral-800">404</span>
         </div>
-        
+
         <div className="space-y-3">
           <h1 className="text-3xl font-bold tracking-tight">页面未找到</h1>
-          <p className="text-neutral-500 text-lg">
-            您访问的页面不存在或已被移动到新的 AI 节点。
-          </p>
+          <p className="text-neutral-500 text-lg">您访问的页面不存在或已被移动到新的 AI 节点。</p>
         </div>
 
         <div>

@@ -71,7 +71,9 @@ export default function CheckoutPage() {
 
             {/* Account Info */}
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">认证身份</h4>
+              <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">
+                认证身份
+              </h4>
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600" />
                 <div>

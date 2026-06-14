@@ -88,7 +88,7 @@ sequenceDiagram
 
     Note over MW: 🔒 认证检查
     MW->>MW: 检查 pi_auth_token Cookie
-    
+
     alt 未认证 + 受保护路由
         MW-->>C: 302 Redirect → /login
     end
@@ -204,4 +204,4 @@ graph TB
 
 ---
 
-*以上内容为 V2.0.0 用户手册补充材料，包含授权流程图、多租户架构图和系统全景图。*
+_以上内容为 V2.0.0 用户手册补充材料，包含授权流程图、多租户架构图和系统全景图。_

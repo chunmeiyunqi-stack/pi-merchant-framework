@@ -1,4 +1,5 @@
 import { createSwaggerSpec } from 'next-swagger-doc';
+// createSwaggerSpec has no precise types in this project; allow any usage
 import fs from 'fs';
 import path from 'path';
 

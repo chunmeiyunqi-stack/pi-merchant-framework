@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { checkQuota, getTenantById, getMonthlyUsage, summarizeUsage } from '@pi-merchant/pi-sdk';
 import { verifySessionToken } from '@/lib/session';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ interface RouteParams {
  * GET /api/tenant/[tenantId]/usage
  * 查询指定租户的用量统计和配额状态
  */
-export async function GET(request: Request, { params }: RouteParams): Promise<Response> {
+async function __GET(request: Request, { params }: RouteParams): Promise<Response> {
   // 鉴权
   const cookieStore = cookies();
   const token = cookieStore.get('pi_auth_token')?.value;
@@ -69,3 +70,5 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Re
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const GET = withMetrics(__GET);

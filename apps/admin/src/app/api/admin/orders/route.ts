@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import type { Prisma, OrderStatus } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { getMerchantId } from '@/lib/utils';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
+import { withMetrics } from '@/lib/metrics-middleware';
 
-export async function GET(req: Request) {
+async function __GET(req: Request) {
   const token = cookies().get('pi_auth_token')?.value;
   if (!token || !verifySessionToken(token))
     return NextResponse.json({ orders: [], pagination: null });
@@ -19,12 +20,12 @@ export async function GET(req: Request) {
   const limit = limitParam ? Math.min(100, Math.max(1, parseInt(limitParam))) : 10;
 
   const merchantId = getMerchantId();
-  const where: Prisma.OrderWhereInput = { merchantId };
+  const where: any = { merchantId };
 
   if (statusParam && statusParam !== 'ALL') {
     // statusParam comes from query string (string). Prisma expects the enum type `OrderStatus` or a filter.
     // Cast to `OrderStatus` to satisfy the type system while preserving existing behaviour.
-    const status = statusParam as OrderStatus;
+    const status = statusParam as any;
     where.status = status;
   }
 
@@ -54,3 +55,5 @@ export async function GET(req: Request) {
     return NextResponse.json({ orders: [], pagination: null });
   }
 }
+
+export const GET = withMetrics(__GET);

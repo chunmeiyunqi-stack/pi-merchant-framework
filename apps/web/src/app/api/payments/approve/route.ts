@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 const prisma = new PrismaClient();
 
-export async function POST(req: Request) {
+async function __POST(req: Request) {
   try {
     const body = await req.json();
     const { paymentId, orderId } = body;
@@ -74,3 +75,5 @@ export async function POST(req: Request) {
     });
   }
 }
+
+export const POST = withMetrics(__POST);

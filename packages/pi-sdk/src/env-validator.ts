@@ -1,6 +1,6 @@
 /**
  * Environment Variable Validator
- * 
+ *
  * Ensures all required environment variables are present on application startup.
  * Prevents runtime crashes due to missing configuration.
  */
@@ -57,7 +57,7 @@ export function validateEnv(): void {
 
   if (missingVars.length > 0) {
     const errorMsg = `[CRITICAL] Missing required environment variables:\n- ${missingVars.join('\n- ')}\nPlease check your .env file or deployment configuration.`;
-    
+
     // In production, we want to fail fast.
     if (process.env.NODE_ENV === 'production') {
       console.error(errorMsg);

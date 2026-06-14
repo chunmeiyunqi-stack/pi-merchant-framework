@@ -19,9 +19,7 @@
       "post": {
         "summary": "POST /api/ai/query",
         "description": "Auto-generated entry for /api/ai/query",
-        "tags": [
-          "Ai"
-        ],
+        "tags": ["Ai"],
         "responses": {
           "200": {
             "description": "成功"
@@ -43,9 +41,7 @@
       "post": {
         "summary": "POST /api/ai/stream",
         "description": "Auto-generated entry for /api/ai/stream",
-        "tags": [
-          "Ai"
-        ],
+        "tags": ["Ai"],
         "responses": {
           "200": {
             "description": "成功"
@@ -67,9 +63,7 @@
       "post": {
         "summary": "POST /api/auth/logout",
         "description": "Auto-generated entry for /api/auth/logout",
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "responses": {
           "200": {
             "description": "成功"
@@ -91,9 +85,7 @@
       "get": {
         "summary": "GET /api/auth/me",
         "description": "Auto-generated entry for /api/auth/me",
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "responses": {
           "200": {
             "description": "成功"
@@ -105,9 +97,7 @@
       "post": {
         "summary": "POST /api/auth/pi",
         "description": "Auto-generated entry for /api/auth/pi",
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "responses": {
           "200": {
             "description": "成功"
@@ -129,9 +119,7 @@
       "get": {
         "summary": "GET /api/docs",
         "description": "Auto-generated entry for /api/docs",
-        "tags": [
-          "Docs"
-        ],
+        "tags": ["Docs"],
         "responses": {
           "200": {
             "description": "成功"
@@ -143,9 +131,7 @@
       "post": {
         "summary": "POST /api/license/validate",
         "description": "Auto-generated entry for /api/license/validate",
-        "tags": [
-          "License"
-        ],
+        "tags": ["License"],
         "responses": {
           "200": {
             "description": "成功"
@@ -167,9 +153,7 @@
       "post": {
         "summary": "POST /api/orders",
         "description": "Auto-generated entry for /api/orders",
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "responses": {
           "200": {
             "description": "成功"
@@ -191,9 +175,7 @@
       "post": {
         "summary": "POST /api/payments/approve",
         "description": "Auto-generated entry for /api/payments/approve",
-        "tags": [
-          "Payments"
-        ],
+        "tags": ["Payments"],
         "responses": {
           "200": {
             "description": "成功"
@@ -215,9 +197,7 @@
       "post": {
         "summary": "POST /api/payments/cancel",
         "description": "Auto-generated entry for /api/payments/cancel",
-        "tags": [
-          "Payments"
-        ],
+        "tags": ["Payments"],
         "responses": {
           "200": {
             "description": "成功"
@@ -239,9 +219,7 @@
       "post": {
         "summary": "POST /api/payments/complete",
         "description": "Auto-generated entry for /api/payments/complete",
-        "tags": [
-          "Payments"
-        ],
+        "tags": ["Payments"],
         "responses": {
           "200": {
             "description": "成功"
@@ -263,9 +241,7 @@
       "get": {
         "summary": "GET /api/tenant/{tenantId}/usage",
         "description": "Auto-generated entry for /api/tenant/{tenantId}/usage",
-        "tags": [
-          "Tenant"
-        ],
+        "tags": ["Tenant"],
         "responses": {
           "200": {
             "description": "成功"

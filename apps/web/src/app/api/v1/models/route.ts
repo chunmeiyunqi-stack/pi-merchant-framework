@@ -4,8 +4,11 @@
 // ============================================================
 
 import { NextResponse } from 'next/server';
+// Require Node.js runtime for server-side APIs that use Node built-ins (crypto, process, etc.)
+export const runtime = 'nodejs';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
+import { withMetrics } from '@/lib/metrics-middleware';
 // Use dynamic import to avoid edge-runtime issues with the factory singleton
 let _factory: import('@pi-merchant/pi-sdk').AIProviderFactory | null = null;
 async function getFactory() {
@@ -94,7 +97,7 @@ const MODEL_CATALOG: ModelInfo[] = [
   },
 ];
 
-export async function GET() {
+async function __GET() {
   // Verify authentication
   const token = cookies().get('pi_auth_token')?.value;
   if (!token || !verifySessionToken(token)) {
@@ -110,7 +113,9 @@ export async function GET() {
     // Mark models as available based on provider availability
     const models = MODEL_CATALOG.map((model) => ({
       ...model,
-      available: model.available && availableProviders.includes(model.provider as 'openai' | 'anthropic' | 'ollama'),
+      available:
+        model.available &&
+        availableProviders.includes(model.provider as 'openai' | 'anthropic' | 'ollama'),
     }));
 
     return NextResponse.json({
@@ -124,10 +129,22 @@ export async function GET() {
       },
     });
   } catch (error) {
+    console.error('[API Error Stack]:', error);
     const message = error instanceof Error ? error.message : 'Failed to fetch models';
     return NextResponse.json(
-      { success: false, error: message },
+      {
+        success: false,
+        error: message,
+        stack:
+          process.env.NODE_ENV === 'development'
+            ? error instanceof Error
+              ? error.stack
+              : undefined
+            : undefined,
+      },
       { status: 500 }
     );
   }
 }
+
+export const GET = withMetrics(__GET);

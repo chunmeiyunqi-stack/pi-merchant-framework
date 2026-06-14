@@ -3,13 +3,14 @@ import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { signSessionToken } from '@/lib/session';
 import { logEvent } from '@pi-merchant/pi-sdk';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 const prisma = new PrismaClient();
 
 // Pi Platform API 基础地址
 const PI_API_BASE = process.env.PI_PLATFORM_API_BASE ?? 'https://api.minepi.com';
 
-export async function POST(req: Request) {
+async function __POST(req: Request) {
   try {
     const body = await req.json();
     const { accessToken, piUid, username, merchantId: bodyMerchantId } = body;
@@ -125,3 +126,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export const POST = withMetrics(__POST);

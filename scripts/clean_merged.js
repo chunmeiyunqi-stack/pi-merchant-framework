@@ -5,8 +5,14 @@ const outfile = path.join(__dirname, '..', 'source_code_v2.0.0_final_CLEANED.md'
 let s = fs.readFileSync(infile, 'utf8');
 // 1. Sensitive replacements (preserve process.env.*)
 // Replace template-literal patterns like `Bearer ${accessToken}` and `Bearer ${config.apiKey}` and `Key ${apiKey}`
-s = s.replace(/Authorization:\s*`?Bearer \s*\${?accessToken}?`?/g, "Authorization: Bearer [REDACTED]");
-s = s.replace(/Authorization:\s*`?Bearer \s*\${?config\.apiKey}?`?/g, "Authorization: Bearer [REDACTED]");
+s = s.replace(
+  /Authorization:\s*`?Bearer \s*\${?accessToken}?`?/g,
+  'Authorization: Bearer [REDACTED]'
+);
+s = s.replace(
+  /Authorization:\s*`?Bearer \s*\${?config\.apiKey}?`?/g,
+  'Authorization: Bearer [REDACTED]'
+);
 // Replace localhost:11434 -> [LOCAL_OLLAMA_URL]
 s = s.replace(/localhost:11434/g, '[LOCAL_OLLAMA_URL]');
 // Replace http://localhost (any) -> http://[LOCAL_HOST]
@@ -29,7 +35,7 @@ for (let i = 0; i < lines.length; i++) {
     // ensure following is a blank line (we'll add a single blank line)
     out.push('');
     // skip subsequent blank lines
-    while (i+1 < lines.length && lines[i+1].trim() === '') i++;
+    while (i + 1 < lines.length && lines[i + 1].trim() === '') i++;
     continue;
   }
   // Preserve code fence lines (```...)
@@ -52,9 +58,9 @@ for (let i = 0; i < lines.length; i++) {
   // Normalize leading tabs to 2 spaces
   line = line.replace(/^\t+/g, (m) => '  '.repeat(m.length));
   // Convert sequences of 4 spaces to 2 spaces (basic normalization)
-  line = line.replace(/^(( {4})+)/, (m) => '  '.repeat(m.length/4));
+  line = line.replace(/^(( {4})+)/, (m) => '  '.repeat(m.length / 4));
   // Trim trailing spaces
-  line = line.replace(/\s+$/,'');
+  line = line.replace(/\s+$/, '');
   out.push(line);
 }
 // Reconstruct ensuring file separators are followed by one blank line (already inserted)

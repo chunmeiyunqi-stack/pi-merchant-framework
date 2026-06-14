@@ -88,7 +88,7 @@ export function verifySessionToken(token: string): string | null {
       console.error('[session] verifySessionToken: decoded payload empty or invalid');
       return null;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('[session] verifySessionToken: payload base64url decode failed', {
       error: (error && error.message) || error,
     });

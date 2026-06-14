@@ -6,9 +6,7 @@ export default function SupportPage() {
       <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-black text-gray-800 mb-1">架构与授权支持</h2>
-          <p className="text-sm text-gray-500">
-            查阅架构文档、API 密钥管理及授权链路说明。
-          </p>
+          <p className="text-sm text-gray-500">查阅架构文档、API 密钥管理及授权链路说明。</p>
         </div>
       </div>
 
@@ -28,10 +26,7 @@ export default function SupportPage() {
       </div>
 
       <div className="text-center">
-        <Link
-          href="/dashboard"
-          className="text-sm text-[#7C3AED] font-bold hover:underline"
-        >
+        <Link href="/dashboard" className="text-sm text-[#7C3AED] font-bold hover:underline">
           ← 返回概览面板
         </Link>
       </div>

@@ -13,29 +13,29 @@
 
 ### 第一阶段支持的行业
 
-| 行业 | 皮肤标识 | 核心功能 |
-|------|---------|---------|
-| 美容/美甲 | `beauty` | 预约 + 次卡 |
-| 健身 | `fitness` | 月卡 + 课程预约 |
-| 培训/课程 | `education` | 课时包 + 在线预约 |
-| 咨询/维修 | `consulting` | 时间预约 |
-| 通用 | `generic` | 服务列表 + 下单 |
+| 行业      | 皮肤标识     | 核心功能          |
+| --------- | ------------ | ----------------- |
+| 美容/美甲 | `beauty`     | 预约 + 次卡       |
+| 健身      | `fitness`    | 月卡 + 课程预约   |
+| 培训/课程 | `education`  | 课时包 + 在线预约 |
+| 咨询/维修 | `consulting` | 时间预约          |
+| 通用      | `generic`    | 服务列表 + 下单   |
 
 ---
 
 ## 🏗️ 技术栈
 
-| 层级 | 技术 |
-|------|------|
+| 层级     | 技术                                         |
+| -------- | -------------------------------------------- |
 | 前端框架 | Next.js 14 (App Router) + React + TypeScript |
-| UI 样式 | Tailwind CSS |
-| 后端 | Next.js API Routes |
-| 数据库 | PostgreSQL |
-| ORM | Prisma |
-| 包管理 | pnpm (Monorepo) |
-| 构建工具 | Turborepo |
-| 部署 | Vercel / Docker 兼容 |
-| 支付 | Pi Network U2A Payment |
+| UI 样式  | Tailwind CSS                                 |
+| 后端     | Next.js API Routes                           |
+| 数据库   | PostgreSQL                                   |
+| ORM      | Prisma                                       |
+| 包管理   | pnpm (Monorepo)                              |
+| 构建工具 | Turborepo                                    |
+| 部署     | Vercel / Docker 兼容                         |
+| 支付     | Pi Network U2A Payment                       |
 
 ---
 
@@ -131,7 +131,7 @@ import { getIndustryPreset } from '@pi-merchant/config';
 const config = {
   merchantId: 'your-merchant-id',
   info: { name: '美丽时光美甲店', type: 'beauty' },
-  ...getIndustryPreset('beauty'),  // 一行应用行业预设
+  ...getIndustryPreset('beauty'), // 一行应用行业预设
 };
 ```
 
@@ -139,23 +139,23 @@ const config = {
 
 ## 📋 开发优先级
 
-| 优先级 | 功能 | 状态 |
-|--------|------|------|
-| P0 | Pi 用户登录 | 骨架✅ |
-| P0 | 服务列表展示 | 骨架✅ |
-| P0 | 创建订单 + Pi 支付 | 骨架✅ |
-| P0 | 后台查看订单/支付 | 骨架✅ |
-| P1 | 会员方案购买 | 骨架✅ |
-| P1 | 预约管理 | 骨架✅ |
-| P2 | A2U 退款 | 待开发 |
-| P2 | 优惠券 | 待开发 |
+| 优先级 | 功能               | 状态   |
+| ------ | ------------------ | ------ |
+| P0     | Pi 用户登录        | 骨架✅ |
+| P0     | 服务列表展示       | 骨架✅ |
+| P0     | 创建订单 + Pi 支付 | 骨架✅ |
+| P0     | 后台查看订单/支付  | 骨架✅ |
+| P1     | 会员方案购买       | 骨架✅ |
+| P1     | 预约管理           | 骨架✅ |
+| P2     | A2U 退款           | 待开发 |
+| P2     | 优惠券             | 待开发 |
 
 ---
 
 ## 📚 文档索引
 
 - [支付流程文档](./docs/payment-flow.md)
-- [系统架构文档](./docs/architecture.md)  
+- [系统架构文档](./docs/architecture.md)
 - [MVP 开发排期](./docs/mvp-roadmap.md)
 - [商户配置指南](./docs/merchant-config-guide.md)
 - [数据库设计](./docs/database-design.md)
@@ -174,3 +174,24 @@ const config = {
 ## 📄 License
 
 MIT
+
+---
+
+## 监控与可观测性
+
+项目已集成 Prometheus 与 Grafana 的监控栈。
+
+- 启动监控堆栈：
+
+```bash
+docker-compose -f docker-compose.monitoring.yml up -d
+```
+
+- Grafana: http://localhost:3001 （默认账号 admin / admin）
+- Prometheus: http://localhost:9090
+
+- Prometheus 已配置抓取目标：`host.docker.internal:3000/api/metrics`，抓取间隔 10s。
+
+- 项目内指标端点：`GET /api/metrics`，由 `src/app/api/metrics/route.ts` 提供。
+
+如需在代码中记录或使用指标，请参阅 `src/lib/metrics.ts` 中的指标定义（`http_requests_total`, `http_request_duration_seconds`, `ai_provider_requests_total`, `ai_fallback_activations_total`, `active_sessions`, `rate_limit_hits_total`）。

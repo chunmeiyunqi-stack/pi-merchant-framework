@@ -5,8 +5,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { withMetrics } from '@/lib/metrics-middleware';
 
-export async function POST(request: NextRequest) {
+async function __POST(request: NextRequest) {
   try {
     const body = (await request.json()) as { paymentId?: string };
     const { paymentId } = body;
@@ -43,3 +44,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: '服务器内部错误' }, { status: 500 });
   }
 }
+
+export const POST = withMetrics(__POST);

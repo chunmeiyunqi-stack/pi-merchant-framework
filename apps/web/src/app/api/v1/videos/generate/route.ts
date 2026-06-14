@@ -13,6 +13,7 @@ import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { logEvent, logError } from '@pi-merchant/pi-sdk';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ const VIDEO_GENERATION_TIMEOUT_MS = 120_000;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPrisma = typeof prisma & { generationHistory: any };
 
-export async function POST(req: Request) {
+async function __POST(req: Request) {
   const startTime = Date.now();
 
   // Verify authentication - verifySessionToken returns the piUid string or null
@@ -141,8 +142,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Video generation failed';
+    const errorMessage = error instanceof Error ? error.message : 'Video generation failed';
 
     if (historyId) {
       await db.generationHistory
@@ -154,7 +154,9 @@ export async function POST(req: Request) {
             durationMs: Date.now() - startTime,
           },
         })
-        .catch(() => {/* ignore */});
+        .catch(() => {
+          /* ignore */
+        });
     }
 
     logError('Video generation failed', error, {
@@ -163,12 +165,11 @@ export async function POST(req: Request) {
       promptPreview: prompt.slice(0, 100),
     });
 
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
+
+export const POST = withMetrics(__POST);
 
 // ──────────────────────────────────────────────────────────────
 // Runway ML provider handler (stub — to be completed when API key is available)
@@ -206,7 +207,7 @@ async function handleRunwayGeneration(params: {
     });
 
     clearTimeout(timeoutId);
-    const data = await response.json() as { id?: string; error?: string };
+    const data = (await response.json()) as { id?: string; error?: string };
     const durationMs = Date.now() - startTime;
 
     if (!response.ok) {
@@ -252,7 +253,9 @@ async function handleRunwayGeneration(params: {
           durationMs: Date.now() - startTime,
         },
       })
-      .catch(() => {/* ignore */});
+      .catch(() => {
+        /* ignore */
+      });
 
     return NextResponse.json(
       { success: false, error: errorMessage },

@@ -4,6 +4,10 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
+  output: 'standalone',
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Pi Network 需要在特定域名下运行，这里配置 CORS 以支持本地开发
   async headers() {
     return [

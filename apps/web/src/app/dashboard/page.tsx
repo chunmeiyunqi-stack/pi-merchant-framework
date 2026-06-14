@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   const piUid = token ? verifySessionToken(token) : null;
   const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
 
-  let customer = null;
+  let customer: any = null;
   let activeMemberships = 0;
   let totalBookings = 0;
   let totalPayments = 0;

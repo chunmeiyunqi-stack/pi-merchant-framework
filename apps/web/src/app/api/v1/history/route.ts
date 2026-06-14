@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export const dynamic = 'force-dynamic';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPrisma = typeof prisma & { generationHistory: any };
 
-export async function GET(req: Request) {
+async function __GET(req: Request) {
   // Verify authentication - verifySessionToken returns piUid string or null
   const token = cookies().get('pi_auth_token')?.value;
   if (!token) {
@@ -94,3 +95,5 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+
+export const GET = withMetrics(__GET);

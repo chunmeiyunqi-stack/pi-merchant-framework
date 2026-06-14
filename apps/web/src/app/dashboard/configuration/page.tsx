@@ -6,9 +6,7 @@ export default function ConfigurationPage() {
       <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-black text-gray-800 mb-1">组件配置流溯源</h2>
-          <p className="text-sm text-gray-500">
-            追踪组件配置变更历史与版本溯源。
-          </p>
+          <p className="text-sm text-gray-500">追踪组件配置变更历史与版本溯源。</p>
         </div>
       </div>
 
@@ -20,10 +18,7 @@ export default function ConfigurationPage() {
       </div>
 
       <div className="text-center">
-        <Link
-          href="/dashboard"
-          className="text-sm text-[#7C3AED] font-bold hover:underline"
-        >
+        <Link href="/dashboard" className="text-sm text-[#7C3AED] font-bold hover:underline">
           ← 返回概览面板
         </Link>
       </div>

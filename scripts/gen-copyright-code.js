@@ -11,11 +11,7 @@ const path = require('path');
 
 // ---- 配置 ----
 
-const TARGET_DIRS = [
-  'packages/pi-sdk/src',
-  'apps/web/src/app',
-  'apps/admin/src/app',
-];
+const TARGET_DIRS = ['packages/pi-sdk/src', 'apps/web/src/app', 'apps/admin/src/app'];
 
 const IGNORE_DIRS = ['node_modules', '.next', 'dist', '__tests__', '.turbo'];
 
@@ -41,13 +37,23 @@ const REDACTION_RULES = [
   // Authorization: Bearer token
   { pattern: /Bearer\s+[a-zA-Z0-9._-]+/g, replacement: 'Bearer [REDACTED]' },
   // 数据库连接 URL
-  { pattern: /(postgresql|postgres|mysql):\/\/[^"';\s]+/gi, replacement: 'process.env.DATABASE_URL' },
+  {
+    pattern: /(postgresql|postgres|mysql):\/\/[^"';\s]+/gi,
+    replacement: 'process.env.DATABASE_URL',
+  },
   // 通用的敏感环境变量值（等号后可能是密码/key 的内容）
-  { pattern: /(DATABASE_URL|PI_API_KEY|NEXTAUTH_SECRET|OPENAI_API_KEY|ANTHROPIC_API_KEY|USAGE_WEBHOOK_URL|MONITORING_WEBHOOK_URL|LICENSE_PAYLOAD)\s*=\s*["']?[^\s"';\n]+/g, replacement: '$1=[REDACTED]' },
+  {
+    pattern:
+      /(DATABASE_URL|PI_API_KEY|NEXTAUTH_SECRET|OPENAI_API_KEY|ANTHROPIC_API_KEY|USAGE_WEBHOOK_URL|MONITORING_WEBHOOK_URL|LICENSE_PAYLOAD)\s*=\s*["']?[^\s"';\n]+/g,
+    replacement: '$1=[REDACTED]',
+  },
   // 64 位十六进制字符串（通常是密钥或签名）
   { pattern: /["'][0-9a-fA-F]{64}["']/g, replacement: '"[REDACTED]"' },
   // api_key 字段
-  { pattern: /(api[_-]?key|secret|password)\s*:\s*["'`][^"'`]+["'`]/gi, replacement: '$1: "[REDACTED]"' },
+  {
+    pattern: /(api[_-]?key|secret|password)\s*:\s*["'`][^"'`]+["'`]/gi,
+    replacement: '$1: "[REDACTED]"',
+  },
   // URL 中的敏感信息
   { pattern: /https?:\/\/[^\s"'`)\]]+/g, replacement: '[REDACTED_URL]' },
 ];
@@ -131,7 +137,9 @@ function sliceLines(lines) {
   }
 
   const half = Math.floor(TOTAL_LINES_NEEDED / 2);
-  console.log(`[INFO] 总行数 ${lines.length} > ${TOTAL_LINES_NEEDED}，取前 ${half} 行 + 后 ${half} 行`);
+  console.log(
+    `[INFO] 总行数 ${lines.length} > ${TOTAL_LINES_NEEDED}，取前 ${half} 行 + 后 ${half} 行`
+  );
   const head = lines.slice(0, half);
   const tail = lines.slice(-half);
   return [...head, '// ... [SKIPPED MIDDLE CONTENT] ...', ...tail];

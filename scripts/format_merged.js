@@ -27,7 +27,7 @@ function flushFence() {
       .replace(/\r?\n/g, '\n')
       .replace(/\t/g, '  ')
       .split('\n')
-      .map(l => l.trim())
+      .map((l) => l.trim())
       .join('\n')
       .replace(/\{\s*/g, '{\n')
       .replace(/\s*\}/g, '\n}')
@@ -38,11 +38,22 @@ function flushFence() {
         return `enum ${name} {\n  ${vals.join('\n  ')}\n}`;
       })
       .replace(/model\s+([A-Za-z0-9_]+)\s*\{\s*([^}]*)\}/g, (m, name, body) => {
-        const fields = body.trim().split(/;|\n/).map(s => s.trim()).filter(Boolean);
-        const fieldLines = fields.map(f => '  ' + f.replace(/\s+/g, ' '));
+        const fields = body
+          .trim()
+          .split(/;|\n/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const fieldLines = fields.map((f) => '  ' + f.replace(/\s+/g, ' '));
         return `model ${name} {\n${fieldLines.join('\n')}\n}`;
       });
-  } else if (fenceLang === 'typescript' || fenceLang === 'ts' || fenceLang === 'javascript' || fenceLang === 'tsv' || fenceLang === 'tsx' || fenceLang === 'js') {
+  } else if (
+    fenceLang === 'typescript' ||
+    fenceLang === 'ts' ||
+    fenceLang === 'javascript' ||
+    fenceLang === 'tsv' ||
+    fenceLang === 'tsx' ||
+    fenceLang === 'js'
+  ) {
     // Heuristic TypeScript formatter
     formatted = code
       .replace(/\t/g, '  ')
@@ -56,11 +67,14 @@ function flushFence() {
       .replace(/\)\s*\{/g, ') {\n')
       .replace(/\}\s*else/g, '}\nelse')
       // split before return, const, let, if, for, export, import, try, catch
-      .replace(/\s*(?=(return|const |let |if\s*\(|for\s*\(|export |import |try\s*\{|catch\s*\(|await\s))/g, '\n')
+      .replace(
+        /\s*(?=(return|const |let |if\s*\(|for\s*\(|export |import |try\s*\{|catch\s*\(|await\s))/g,
+        '\n'
+      )
       .split('\n')
-      .map(l => l.trim())
+      .map((l) => l.trim())
       .filter(Boolean)
-      .map(l => {
+      .map((l) => {
         // indent lines consistently: naive block indent by counting braces
         return l;
       })
@@ -121,13 +135,13 @@ if (inFence) flushFence();
 // Post-processing: ensure metadata header 4 lines at top each on its own line
 // Trim leading/trailing blank lines
 while (out.length && out[0].trim() === '') out.shift();
-while (out.length && out[out.length-1].trim() === '') out.pop();
+while (out.length && out[out.length - 1].trim() === '') out.pop();
 // Ensure single blank line after each file separator line
 let final = [];
 for (let i = 0; i < out.length; i++) {
   final.push(out[i]);
   if (/^\/\/ --- 文件:/.test(out[i])) {
-    if (!(i+1 < out.length && out[i+1].trim() === '')) final.push('');
+    if (!(i + 1 < out.length && out[i + 1].trim() === '')) final.push('');
   }
 }
 final = final.join('\n') + '\n';

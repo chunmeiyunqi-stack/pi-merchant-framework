@@ -111,7 +111,9 @@ export default function AdminSettingsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-gray-500 mb-1">备选容错序列 (Fallback Chain)</label>
+            <label className="block text-sm text-gray-500 mb-1">
+              备选容错序列 (Fallback Chain)
+            </label>
             <div className="flex gap-2">
               <span className="px-3 py-1 bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
                 Anthropic

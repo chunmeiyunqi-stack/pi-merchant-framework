@@ -13,7 +13,7 @@ export default function FooterLegal() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="text-sm text-gray-600">
             {/* \u5148\u950b AI \u5546\u6237\u670d\u52a1\u6846\u67b6 V2.0.0 */}
-            {"\u5148\u950b"} AI {"\u5546\u6237\u670d\u52a1\u6846\u67b6"} V2.0.0
+            {'\u5148\u950b'} AI {'\u5546\u6237\u670d\u52a1\u6846\u67b6'} V2.0.0
           </div>
           <div className="flex gap-3">
             <button
@@ -21,14 +21,14 @@ export default function FooterLegal() {
               className="text-sm text-blue-600 hover:underline"
             >
               {/* \u9690\u79c1\u653f\u7b56 */}
-              {"\u9690\u79c1\u653f\u7b56"}
+              {'\u9690\u79c1\u653f\u7b56'}
             </button>
             <button
               onClick={() => setShowDisclaimer((s) => !s)}
               className="text-sm text-blue-600 hover:underline"
             >
               {/* \u514d\u8d23\u58f0\u660e */}
-              {"\u514d\u8d23\u58f0\u660e"}
+              {'\u514d\u8d23\u58f0\u660e'}
             </button>
           </div>
         </div>

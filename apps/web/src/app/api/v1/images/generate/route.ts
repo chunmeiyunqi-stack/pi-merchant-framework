@@ -9,6 +9,7 @@ import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { logEvent, logError } from '@pi-merchant/pi-sdk';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,7 @@ interface DallEResponse {
   }>;
 }
 
-export async function POST(req: Request) {
+async function __POST(req: Request) {
   const startTime = Date.now();
 
   // Verify authentication - verifySessionToken returns the piUid string or null
@@ -254,3 +255,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export const POST = withMetrics(__POST);
