@@ -85,3 +85,10 @@ coverage/
 reports/
 
 # End of generated .gitignore
+
+# Local archive of copyright artifacts
+archive/
+ 
+# Local temp scripts
+.scripts/
+
