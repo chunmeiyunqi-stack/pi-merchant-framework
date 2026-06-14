@@ -76,14 +76,24 @@ export function buildRateLimitHeaders(result: RateLimitResult): Record<string, s
   };
 }
 
-export function getClientIp(request: Request | { headers?: any }): string {
+type HeadersLike = { get?: (k: string) => string | null } | Record<string, string | undefined>;
+
+export function getClientIp(request: Request | { headers?: HeadersLike }): string {
   try {
-    const headers = (request as any).headers;
-    const cf = headers?.get?.('cf-connecting-ip') || headers?.get?.('x-real-ip');
+    const headers = (request as unknown as { headers?: HeadersLike }).headers;
+    const getHeader = (name: string) => {
+      if (!headers) return undefined;
+      const headersAny = headers as HeadersLike;
+      if (typeof headersAny.get === 'function')
+        return headersAny.get(name) as string | null | undefined;
+      return (headers as Record<string, string | undefined>)[name.toLowerCase()];
+    };
+
+    const cf = getHeader('cf-connecting-ip') || getHeader('x-real-ip');
     if (cf) return String(cf).split(',')[0].trim();
-    const xff = headers?.get?.('x-forwarded-for') || headers?.get?.('X-Forwarded-For');
+    const xff = getHeader('x-forwarded-for') || getHeader('X-Forwarded-For');
     if (xff) return String(xff).split(',')[0].trim();
-  } catch (e) {
+  } catch (_e) {
     // ignore and fallback
   }
   return '127.0.0.1';

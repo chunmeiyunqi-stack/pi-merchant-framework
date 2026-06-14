@@ -7,7 +7,7 @@ const SECRET_KEY = process.env.PI_SESSION_SECRET || 'dev_fallback_secret_for_pi_
 try {
   const source = process.env.PI_SESSION_SECRET ? 'env' : 'fallback';
   console.error('[session] SECRET_KEY source:', source);
-} catch (e) {
+} catch (_e) {
   /* ignore */
 }
 
@@ -39,7 +39,9 @@ export function verifySessionToken(token: string): string | null {
   }
 
   if (!token.includes('.')) {
-    console.error('[session] verifySessionToken: token missing separator (expected payload.signature)');
+    console.error(
+      '[session] verifySessionToken: token missing separator (expected payload.signature)'
+    );
     return null;
   }
 
@@ -55,7 +57,10 @@ export function verifySessionToken(token: string): string | null {
   const expectedSignature = hmac.digest('base64url');
 
   if (signature !== expectedSignature) {
-    console.error('[session] verifySessionToken: signature mismatch', { provided: signature, expected: expectedSignature });
+    console.error('[session] verifySessionToken: signature mismatch', {
+      provided: signature,
+      expected: expectedSignature,
+    });
     return null;
   }
 
@@ -77,14 +82,16 @@ export function verifySessionToken(token: string): string | null {
         return null;
       }
       return uid;
-    } catch (jsonErr) {
+    } catch (_jsonErr) {
       // 不是 JSON -> 兼容旧格式：解码即为 uid
       if (decoded && decoded.length > 0) return decoded;
       console.error('[session] verifySessionToken: decoded payload empty or invalid');
       return null;
     }
   } catch (error) {
-    console.error('[session] verifySessionToken: payload base64url decode failed', { error: (error && error.message) || error });
+    console.error('[session] verifySessionToken: payload base64url decode failed', {
+      error: (error && error.message) || error,
+    });
     return null;
   }
 }
