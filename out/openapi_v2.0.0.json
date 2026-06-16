@@ -1,0 +1,254 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "先锋人工智能服务框架 API V2.0.0",
+    "version": "2.0.0",
+    "description": "基于 Pi Network 的 AI 商户白标框架标准化接口文档"
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/ai/query": {
+      "post": {
+        "summary": "POST /api/ai/query",
+        "description": "Auto-generated entry for /api/ai/query",
+        "tags": ["Ai"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stream": {
+      "post": {
+        "summary": "POST /api/ai/stream",
+        "description": "Auto-generated entry for /api/ai/stream",
+        "tags": ["Ai"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "POST /api/auth/logout",
+        "description": "Auto-generated entry for /api/auth/logout",
+        "tags": ["Auth"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "GET /api/auth/me",
+        "description": "Auto-generated entry for /api/auth/me",
+        "tags": ["Auth"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        }
+      }
+    },
+    "/api/auth/pi": {
+      "post": {
+        "summary": "POST /api/auth/pi",
+        "description": "Auto-generated entry for /api/auth/pi",
+        "tags": ["Auth"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/docs": {
+      "get": {
+        "summary": "GET /api/docs",
+        "description": "Auto-generated entry for /api/docs",
+        "tags": ["Docs"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        }
+      }
+    },
+    "/api/license/validate": {
+      "post": {
+        "summary": "POST /api/license/validate",
+        "description": "Auto-generated entry for /api/license/validate",
+        "tags": ["License"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "post": {
+        "summary": "POST /api/orders",
+        "description": "Auto-generated entry for /api/orders",
+        "tags": ["Orders"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/approve": {
+      "post": {
+        "summary": "POST /api/payments/approve",
+        "description": "Auto-generated entry for /api/payments/approve",
+        "tags": ["Payments"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/cancel": {
+      "post": {
+        "summary": "POST /api/payments/cancel",
+        "description": "Auto-generated entry for /api/payments/cancel",
+        "tags": ["Payments"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/complete": {
+      "post": {
+        "summary": "POST /api/payments/complete",
+        "description": "Auto-generated entry for /api/payments/complete",
+        "tags": ["Payments"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant/{tenantId}/usage": {
+      "get": {
+        "summary": "GET /api/tenant/{tenantId}/usage",
+        "description": "Auto-generated entry for /api/tenant/{tenantId}/usage",
+        "tags": ["Tenant"],
+        "responses": {
+          "200": {
+            "description": "成功"
+          }
+        }
+      }
+    }
+  },
+  "tags": []
+}

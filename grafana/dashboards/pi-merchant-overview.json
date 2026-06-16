@@ -1,0 +1,43 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "pi-merchant-overview",
+    "title": "Pi Merchant - Overview",
+    "schemaVersion": 36,
+    "version": 1,
+    "panels": [
+      {
+        "type": "stat",
+        "title": "API QPS",
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 6 },
+        "targets": [{ "expr": "sum(rate(http_requests_total[1m]))", "refId": "A" }]
+      },
+      {
+        "type": "graph",
+        "title": "P95 Response Time (s)",
+        "gridPos": { "x": 12, "y": 0, "w": 12, "h": 6 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "type": "graph",
+        "title": "AI Provider Calls",
+        "gridPos": { "x": 0, "y": 6, "w": 12, "h": 6 },
+        "targets": [{ "expr": "sum(ai_provider_requests_total) by (provider)", "refId": "A" }]
+      },
+      {
+        "type": "graph",
+        "title": "AI Fallback Activations",
+        "gridPos": { "x": 12, "y": 6, "w": 12, "h": 6 },
+        "targets": [{ "expr": "sum(ai_fallback_activations_total)", "refId": "A" }]
+      }
+    ],
+    "templating": { "list": [] },
+    "time": { "from": "now-1h", "to": "now" }
+  },
+  "overwrite": true
+}

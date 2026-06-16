@@ -1,0 +1,1457 @@
+﻿'use client';
+
+// ============================================================
+// 鍟嗘埛鍓嶅彴 鈥?鐧诲綍椤?// 閫氳繃 Pi Network 璁よ瘉鐧诲綍锛屾垚鍔熷悗璺宠浆鍟嗘埛棣栭〉
+// ============================================================
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { authenticateWithPi } from '@pi-merchant/pi-sdk';
+
+const DEFAULT_MERCHANT_ID =
+  process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ??
+  process.env.NEXT_PUBLIC_MERCHANT_ID ??
+  'merchant-demo-001';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handlePiLogin = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await authenticateWithPi(DEFAULT_MERCHANT_ID);
+      if (result.success && result.user) {
+        router.push('/');
+      } else {
+        setError(result.error ?? '鐧诲綍澶辫触锛岃閲嶈瘯');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '鐧诲綍寮傚父锛岃鍦?Pi Browser 涓墦寮€');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
+        {/* Logo */}
+        <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <span className="text-4xl">蟺</span>
+        </div>
+
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Sign In</h1>
+        <p className="text-gray-500 text-sm mb-8">鐧诲綍鎮ㄧ殑璐︽埛浠ョ户缁闂?/p>
+
+        {/* Pi 鐧诲綍鎸夐挳 */}
+        <button
+          onClick={handlePiLogin}
+          disabled={loading}
+          className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] disabled:bg-gray-300 
+                     text-white font-semibold py-3 px-6 rounded-xl transition-all 
+                     duration-200 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <span className="animate-spin text-lg">鉄?/span>
+              <span>Signing in...</span>
+            </>
+          ) : (
+            <>
+              <span className="text-xl">蟺</span>
+              <span>Sign In with Pi</span>
+            </>
+          )}
+        </button>
+
+        {/* 閿欒鎻愮ず */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400 mt-6">璇峰湪 Pi Browser 涓墦寮€浠ヤ娇鐢?Pi 鐧诲綍鍔熻兘</p>
+      </div>
+    </main>
+  );
+}
+'use client';
+
+import { useState } from 'react';
+
+export default function AiPage() {
+  const [prompt, setPrompt] = useState('鎴戞兂浼樺寲鍓嶇鍟嗘埛鏀粯浣撻獙锛屾湁浠€涔堝缓璁紵');
+  const [result, setResult] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async () => {
+    setError('');
+    setLoading(true);
+    setResult('');
+
+    try {
+      const response = await fetch('/api/ai/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setError(data.error || 'AI 璇锋眰澶辫触锛岃绋嶅悗閲嶈瘯銆?);
+        return;
+      }
+
+      setResult(data.result);
+    } catch (_err) {
+      setError('鏃犳硶杩炴帴 AI 鏈嶅姟锛岃妫€鏌ョ綉缁滄垨绋嶅悗鍐嶈瘯銆?);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-white px-4 py-10">
+      <div className="mx-auto max-w-4xl space-y-8">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-lg shadow-slate-950/20">
+          <h1 className="text-3xl font-bold text-white mb-3">AI 鏅鸿兘鍔╂墜</h1>
+          <p className="text-sm text-slate-400 mb-6">
+            鍙戦€佷笟鍔￠棶棰樼粰 Pioneer AI锛岃幏鍙栭潰鍚戝晢鎴疯繍缁淬€佽鍗曘€佷細鍛樺拰鏀粯娴佺▼鐨勫缓璁€?          </p>
+
+          <textarea
+            rows={5}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            className="w-full resize-none rounded-3xl border border-slate-800 bg-slate-950 px-5 py-4 text-sm text-slate-100 outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/30"
+          />
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="mt-4 inline-flex items-center justify-center rounded-full bg-[#7C3AED] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? 'AI 澶勭悊涓€? : '鐢熸垚寤鸿'}
+          </button>
+        </div>
+
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-lg shadow-slate-950/20 min-h-[220px]">
+          <h2 className="text-xl font-semibold text-white mb-4">杈撳嚭缁撴灉</h2>
+          {error ? (
+            <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-200">
+              {error}
+            </div>
+          ) : result ? (
+            <div className="whitespace-pre-wrap text-sm leading-7 text-slate-100">{result}</div>
+          ) : (
+            <p className="text-sm text-slate-400">璇锋彁浜ら棶棰橈紝Pioneer AI 灏嗕负浣犵敓鎴愬彲鎵ц寤鸿銆?/p>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { generateMerchantAiResponse, logEvent, logError } from '@pi-merchant/pi-sdk';
+import { verifySessionToken } from '@/lib/session';
+
+export async function POST(req: Request) {
+  const token = cookies().get('pi_auth_token')?.value;
+  if (!token || !verifySessionToken(token)) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+
+  if (!prompt) {
+    return NextResponse.json({ success: false, error: 'Missing prompt' }, { status: 400 });
+  }
+
+  const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
+  const result = await generateMerchantAiResponse({ merchantId, prompt });
+
+  if (!result.success) {
+    logError('AI query failed', result.error, { merchantId, promptPreview: prompt.slice(0, 80) });
+    return NextResponse.json(result, { status: 500 });
+  }
+
+  logEvent('AI query success', { merchantId, promptPreview: prompt.slice(0, 80) });
+  return NextResponse.json(result);
+}
+import { ReadableStream } from 'stream/web';
+
+if (typeof global.Request === 'undefined') {
+  global.Request = class Request {} as any;
+}
+if (typeof global.Response === 'undefined') {
+  global.Response = class Response {
+    body: unknown;
+    init: any;
+    constructor(body: unknown, init?: any) {
+      this.body = body;
+      this.init = init;
+    }
+    get status() {
+      return this.init?.status || 200;
+    }
+    get headers() {
+      const h = this.init?.headers || {};
+      return { get: (k: string) => h[k] || h[k.toLowerCase()] };
+    }
+    static json(data: unknown, init?: any) {
+      return new Response(JSON.stringify(data), {
+        ...init,
+        headers: { 'Content-Type': 'application/json', ...init?.headers },
+      });
+    }
+  } as any;
+} else if (!(global.Response as any).json) {
+  (global.Response as any).json = function (data: unknown, init?: any) {
+    return new global.Response(JSON.stringify(data), {
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...init?.headers },
+    });
+  };
+}
+
+if (typeof global.ReadableStream === 'undefined') {
+  global.ReadableStream = ReadableStream as any;
+}
+if (typeof global.TextEncoder === 'undefined') {
+  global.TextEncoder = require('util').TextEncoder;
+}
+if (typeof global.TextDecoder === 'undefined') {
+  global.TextDecoder = require('util').TextDecoder;
+}
+
+import { POST } from '../route';
+import { streamMerchantAiResponse } from '@pi-merchant/pi-sdk';
+import { verifySessionToken } from '@/lib/session';
+import { cookies } from 'next/headers';
+
+jest.mock('@pi-merchant/pi-sdk', () => ({
+  streamMerchantAiResponse: jest.fn(),
+  logError: jest.fn(),
+}));
+
+jest.mock('@/lib/session', () => ({
+  verifySessionToken: jest.fn(),
+}));
+
+jest.mock('next/headers', () => ({
+  cookies: jest.fn(),
+}));
+
+describe('POST /api/ai/stream', () => {
+  let mockRequest: { json: jest.Mock; signal: any };
+  let mockSignal: { aborted: boolean; addEventListener: jest.Mock; removeEventListener: jest.Mock };
+  let mockCookies: { get: jest.Mock };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockSignal = {
+      aborted: false,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    };
+
+    mockRequest = {
+      json: jest.fn().mockResolvedValue({ prompt: 'test prompt' }),
+      signal: mockSignal,
+    };
+
+    mockCookies = {
+      get: jest.fn().mockReturnValue({ value: 'valid-token' }),
+    };
+
+    (cookies as jest.Mock).mockReturnValue(mockCookies);
+    (verifySessionToken as jest.Mock).mockReturnValue(true);
+  });
+
+  const readStream = async (stream: ReadableStream) => {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let result = '';
+    let isDone = false;
+    while (!isDone) {
+      const { done, value } = await reader.read();
+      if (done) {
+        isDone = true;
+        break;
+      }
+      result += decoder.decode(value);
+    }
+    return result;
+  };
+
+  it('returns 401 if unauthorized', async () => {
+    mockCookies.get.mockReturnValue(undefined);
+    const response = await POST(mockRequest as any);
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 400 if JSON is invalid', async () => {
+    mockRequest.json.mockRejectedValue(new Error('Invalid JSON'));
+    const response = await POST(mockRequest as any);
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 400 if prompt is missing', async () => {
+    mockRequest.json.mockResolvedValue({});
+    const response = await POST(mockRequest as any);
+    expect(response.status).toBe(400);
+  });
+
+  it('streams response successfully', async () => {
+    async function* mockStream() {
+      yield { content: 'chunk1', done: false };
+      yield { content: 'chunk2', done: true };
+    }
+    (streamMerchantAiResponse as jest.Mock).mockReturnValue(mockStream());
+
+    const response = await POST(mockRequest as any);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('text/event-stream');
+
+    const result = await readStream(response.body as ReadableStream);
+    expect(result).toContain('data: {"content":"chunk1"}\n\n');
+    expect(result).toContain('data: {"content":"chunk2"}\n\n');
+    expect(result).toContain('data: [DONE]\n\n');
+  });
+
+  it('sends error event if stream fails', async () => {
+    async function* mockStream() {
+      yield { content: 'chunk1', done: false };
+      throw new Error('Stream failed');
+    }
+    (streamMerchantAiResponse as jest.Mock).mockReturnValue(mockStream());
+
+    const response = await POST(mockRequest as any);
+    expect(response.status).toBe(200);
+
+    const result = await readStream(response.body as ReadableStream);
+    expect(result).toContain('data: {"content":"chunk1"}\n\n');
+    expect(result).toContain('event: error\ndata: {"message":"Stream failed"}\n\n');
+  });
+
+  it('stops streaming when request is aborted', async () => {
+    async function* mockStream() {
+      yield { content: 'chunk1', done: false };
+      mockSignal.aborted = true; // Simulate abort
+      yield { content: 'chunk2', done: false };
+    }
+    (streamMerchantAiResponse as jest.Mock).mockReturnValue(mockStream());
+
+    const response = await POST(mockRequest as any);
+    const result = await readStream(response.body as ReadableStream);
+
+    expect(result).toContain('data: {"content":"chunk1"}\n\n');
+    expect(result).not.toContain('chunk2');
+  });
+});
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { streamMerchantAiResponse, logError } from '@pi-merchant/pi-sdk';
+import { verifySessionToken } from '@/lib/session';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: Request) {
+  const token = cookies().get('pi_auth_token')?.value;
+  if (!token || !verifySessionToken(token)) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+  const provider = typeof body.provider === 'string' ? body.provider : undefined;
+
+  if (!prompt) {
+    return NextResponse.json({ success: false, error: 'Missing prompt' }, { status: 400 });
+  }
+
+  const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
+
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      // 15s heartbeat to prevent Vercel/Nginx from closing idle connection
+      const heartbeat = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(': ping\n\n'));
+        } catch {
+          clearInterval(heartbeat);
+        }
+      }, 15000);
+
+      req.signal.addEventListener('abort', () => {
+        clearInterval(heartbeat);
+      });
+
+      try {
+        const streamIterable = streamMerchantAiResponse({ merchantId, prompt, provider });
+
+        for await (const chunk of streamIterable) {
+          if (req.signal.aborted) {
+            break;
+          }
+
+          if (chunk.content) {
+            // Encode SSE data payload
+            const data = JSON.stringify({ content: chunk.content });
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+          }
+
+          if (chunk.done) {
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            break;
+          }
+        }
+      } catch (error) {
+        logError('AI stream failed', error instanceof Error ? error : new Error(String(error)), {
+          merchantId,
+        });
+        const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+        // Send an error event instead of data
+        controller.enqueue(
+          encoder.encode(`event: error\ndata: ${JSON.stringify({ message: errorMessage })}\n\n`)
+        );
+      } finally {
+        clearInterval(heartbeat);
+        try {
+          controller.close();
+        } catch {
+          // ignore if already closed or errored
+        }
+      }
+    },
+    cancel() {
+      // Stream cancelled by consumer
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  });
+}
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+
+export async function POST() {
+  cookies().delete('pi_auth_token');
+  return NextResponse.json({ success: true });
+}
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
+
+const prisma = new PrismaClient();
+
+export async function GET(req: Request) {
+  const cookieStore = cookies();
+  let token = cookieStore.get('pi_auth_token')?.value;
+
+  if (!token) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+  }
+
+  if (!token) {
+    return NextResponse.json({ authenticated: false });
+  }
+
+  const piUid = verifySessionToken(token);
+  if (!piUid) {
+    return NextResponse.json({ authenticated: false });
+  }
+
+  const customer = await prisma.customer.findFirst({
+    where: { piUid },
+    select: { username: true },
+  });
+
+  if (!customer) {
+    return NextResponse.json({ authenticated: false });
+  }
+
+  return NextResponse.json({ authenticated: true, username: customer.username });
+}
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { signSessionToken } from '@/lib/session';
+import { logEvent } from '@pi-merchant/pi-sdk';
+
+const prisma = new PrismaClient();
+
+// Pi Platform API 鍩虹鍦板潃
+const PI_API_BASE = process.env.PI_PLATFORM_API_BASE ?? 'https://api.minepi.com';
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { accessToken, piUid, username, merchantId } = body;
+
+    if (!accessToken || !piUid || !username || !merchantId) {
+      return NextResponse.json(
+        { success: false, error: 'Missing parameters: accessToken, piUid, username, merchantId' },
+        { status: 400 }
+      );
+    }
+
+    // 鈹€鈹€ 姝ラ 1锛氱敤 accessToken 璋冪敤 Pi Platform API 楠岃瘉鐪熷疄韬唤 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    // GET /v2/me 浣跨敤 Authorization: Bearer <accessToken>
+    // 杩欐槸 Pi 瀹樻柟鎺ㄨ崘鐨?token 楠岃瘉鏂瑰紡锛屾棤闇€ PI_API_KEY
+    let verifiedUid: string;
+    let verifiedUsername: string;
+
+    try {
+      const piMeRes = await fetch(`${PI_API_BASE}/v2/me`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!piMeRes.ok) {
+        const errBody = await piMeRes.text();
+        console.error('[Auth/Pi] Pi Platform /v2/me 楠岃瘉澶辫触:', piMeRes.status, errBody);
+        return NextResponse.json(
+          { success: false, error: `Pi Platform 楠岃瘉澶辫触 (${piMeRes.status}): token 鏃犳晥鎴栧凡杩囨湡` },
+          { status: 401 }
+        );
+      }
+
+      const piUser = await piMeRes.json();
+      verifiedUid = piUser.uid;
+      verifiedUsername = piUser.username;
+
+      // 闃叉鍓嶇浼€?uid
+      if (verifiedUid !== piUid) {
+        console.error('[Auth/Pi] UID 涓嶅尮閰?鈥?鍓嶇:', piUid, '/ Pi Platform:', verifiedUid);
+        return NextResponse.json(
+          { success: false, error: '韬唤楠岃瘉澶辫触锛歶id 涓嶅尮閰? },
+          { status: 403 }
+        );
+      }
+    } catch (fetchErr) {
+      console.error('[Auth/Pi] 璋冪敤 Pi Platform API 缃戠粶寮傚父:', fetchErr);
+      return NextResponse.json(
+        { success: false, error: 'Pi Platform API 缃戠粶涓嶅彲杈撅紝璇锋鏌ユ湇鍔″櫒缃戠粶閰嶇疆' },
+        { status: 502 }
+      );
+    }
+
+    // 鈹€鈹€ 姝ラ 2锛歎psert Customer 璁板綍 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    const customer = await prisma.customer.upsert({
+      where: {
+        merchantId_piUid: {
+          merchantId: merchantId,
+          piUid: verifiedUid,
+        },
+      },
+      update: {
+        username: verifiedUsername,
+      },
+      create: {
+        merchantId: merchantId,
+        piUid: verifiedUid,
+        username: verifiedUsername,
+      },
+    });
+
+    // 鈹€鈹€ 姝ラ 3锛氱鍙?HMAC session token 鍐欏叆 HttpOnly Cookie 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    const secureToken = signSessionToken(verifiedUid);
+    const cookieStore = cookies();
+    cookieStore.set('pi_auth_token', secureToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 澶?
+    });
+
+    logEvent('user.authenticated', { user: verifiedUsername, merchantId, customerId: customer.id });
+
+    return NextResponse.json({
+      success: true,
+      user: { uid: verifiedUid, username: verifiedUsername },
+      token: secureToken, // 鍙戦€佺粰鍓嶇锛屼綔涓?localStorage 澶囩敤
+    });
+  } catch (error: unknown) {
+    console.error('[POST /api/auth/pi] 楠岃瘉寮傚父:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : '鏈嶅姟鍣ㄥ唴閮ㄩ敊璇? },
+      { status: 500 }
+    );
+  }
+}
+import { NextResponse } from 'next/server';
+import { getApiDocs } from '@/lib/swagger';
+
+export async function GET() {
+  try {
+    const spec = getApiDocs();
+    return NextResponse.json(spec);
+  } catch (e) {
+    return NextResponse.json({ error: 'Failed to build OpenAPI spec' }, { status: 500 });
+  }
+}
+// apps/web/src/app/api/license/validate/route.ts
+// License 楠岃瘉 API 绔偣
+
+import { NextResponse } from 'next/server';
+import {
+  deserializeLicense,
+  parseLicense,
+  validateLicense,
+  type SerializedLicense,
+} from '@pi-merchant/pi-sdk';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/license/validate
+ * 楠岃瘉鎻愪氦鐨?License 鏄惁鍚堟硶
+ *
+ * Body: SerializedLicense JSON 瀛楃涓?鎴?base64 缂栫爜
+ */
+export async function POST(request: Request): Promise<Response> {
+  try {
+    const body = await request.json();
+
+    let rawLicense: SerializedLicense | null = null;
+
+    // 鏀寔涓ょ鏍煎紡锛氱洿鎺?JSON 瀵硅薄 鎴?base64 瀛楃涓?    if (typeof body === 'string') {
+      rawLicense = parseLicense(body);
+    } else if (body && typeof body === 'object' && 'id' in body) {
+      rawLicense = body as SerializedLicense;
+    } else if (body?.payload && typeof body.payload === 'string') {
+      try {
+        const decoded = Buffer.from(body.payload, 'base64').toString('utf-8');
+        rawLicense = parseLicense(decoded);
+      } catch {
+        rawLicense = null;
+      }
+    }
+
+    if (!rawLicense) {
+      return NextResponse.json({ valid: false, error: 'Invalid license format' }, { status: 400 });
+    }
+
+    const license = deserializeLicense(rawLicense);
+
+    // 鐢熶骇鐜鍚敤绛惧悕楠岃瘉锛屽紑鍙?娴嬭瘯鐜璺宠繃
+    const skipSignatureCheck =
+      process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
+    const result = await validateLicense(license, rawLicense, { skipSignatureCheck });
+
+    return NextResponse.json(
+      {
+        valid: result.valid,
+        status: result.status,
+        daysRemaining: result.daysRemaining,
+        tier: result.license?.tier,
+        features: result.license?.features,
+        error: result.error,
+      },
+      { status: result.valid ? 200 : 422 }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return NextResponse.json({ valid: false, error: message }, { status: 500 });
+  }
+}
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
+
+const prisma = new PrismaClient();
+
+export async function POST(req: Request) {
+  try {
+    const cookieStore = cookies();
+    let token = cookieStore.get('pi_auth_token')?.value;
+
+    // 濡傛灉 Cookie 涓簡锛屽皾璇曚粠 Authorization 澶翠腑璇诲彇
+    if (!token) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+
+    console.log('[Orders API] Received token:', token ? 'YES (hidden)' : 'NO');
+
+    const piUid = token ? verifySessionToken(token) : null;
+
+    console.log('[Orders API] Verified piUid:', piUid ? piUid : 'FAILED');
+
+    if (!piUid) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized (No valid token)' },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+    const { amount, memo, planId } = body;
+    const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
+
+    // Verify customer exists
+    const customer = await prisma.customer.findUnique({
+      where: { merchantId_piUid: { merchantId, piUid } },
+    });
+
+    if (!customer) {
+      return NextResponse.json({ success: false, error: 'Customer not found' }, { status: 404 });
+    }
+
+    // 骞傜瓑绛栫暐: We could check if there's an existing DRAFT order for this same plan.
+    // For simplicity, we just generate a new orderNo. The real deduplication is in the Pi Payment creation.
+    const orderNo = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const order = await prisma.order.create({
+      data: {
+        merchantId,
+        customerId: customer.id,
+        orderNo,
+        amount,
+        status: 'DRAFT',
+        note: memo || planId || 'App Subscription',
+      },
+    });
+
+    return NextResponse.json({ success: true, order });
+  } catch (error: unknown) {
+    console.error('[POST /api/orders] 鍒涘缓璁㈠崟澶辫触:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : '鏈嶅姟鍣ㄥ唴閮ㄩ敊璇? },
+      { status: 500 }
+    );
+  }
+}
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { paymentId, orderId } = body;
+
+    if (!paymentId) {
+      return NextResponse.json({ success: false, error: 'Missing paymentId' }, { status: 400 });
+    }
+
+    // 1. 骞傜瓑绛栫暐: 妫€鏌ユ暟鎹簱鐘舵€?    const existingPayment = await prisma.payment.findUnique({
+      where: { piPaymentId: paymentId },
+    });
+
+    if (!existingPayment) {
+      const order = await prisma.order.findUnique({ where: { orderNo: orderId } });
+      if (order) {
+        await prisma.payment.create({
+          data: {
+            orderId: order.id,
+            piPaymentId: paymentId,
+            amount: order.amount,
+            status: 'PENDING',
+            developerApproved: true,
+            approvedAt: new Date(),
+            memo: `Paying for order ${order.orderNo}`,
+          },
+        });
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'PENDING_APPROVAL', paymentId: paymentId },
+        });
+      }
+    }
+
+    // 2. 鏋佸叾鍏抽敭锛氬繀椤诲悜 Pi 瀹樻柟鏈嶅姟鍣ㄥ彂閫?Approve 璇锋眰锛屽惁鍒?SDK 浼氭閿侊紒
+    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
+    const apiKey = process.env.PI_API_KEY;
+
+    if (!apiKey) {
+      console.error('[Pi API] Missing PI_API_KEY in environment variables');
+      return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
+    }
+
+    const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/approve`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Key ${apiKey}`,
+      },
+    });
+
+    if (!piRes.ok) {
+      const errText = await piRes.text();
+      console.error('[Pi API] Approve Failed:', piRes.status, errText);
+      // 濡傛灉 Pi 鎶ラ敊璇村凡缁?approve 杩囦簡锛屽彲浠ユ斁琛?      if (!errText.includes('already approved')) {
+        return NextResponse.json(
+          { success: false, error: `Pi API Error: ${errText}` },
+          { status: 502 }
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    console.error('[POST /api/payments/approve] 瀹℃壒寮傚父:', error);
+    return new NextResponse(error instanceof Error ? error.message : 'Server error', {
+      status: 500,
+    });
+  }
+}
+// ============================================================
+// POST /api/payments/cancel
+// 鍙栨秷鏀粯锛堢敤鎴峰彇娑堟垨绯荤粺瓒呮椂鍙栨秷锛?// ============================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = (await request.json()) as { paymentId?: string };
+    const { paymentId } = body;
+
+    if (!paymentId) {
+      return NextResponse.json({ success: false, error: 'paymentId 涓嶈兘涓虹┖' }, { status: 400 });
+    }
+
+    // 鏇存柊鏀粯璁板綍鐘舵€?    await prisma.payment.updateMany({
+      where: { piPaymentId: paymentId },
+      data: {
+        status: 'CANCELLED',
+        userCancelled: true,
+      },
+    });
+
+    // 鏇存柊鍏宠仈璁㈠崟
+    const payment = await prisma.payment.findUnique({
+      where: { piPaymentId: paymentId },
+      select: { orderId: true },
+    });
+
+    if (payment?.orderId) {
+      await prisma.order.update({
+        where: { id: payment.orderId },
+        data: { status: 'CANCELLED' },
+      });
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (err) {
+    console.error('[/api/payments/cancel] 鍐呴儴閿欒:', err);
+    return NextResponse.json({ success: false, error: '鏈嶅姟鍣ㄥ唴閮ㄩ敊璇? }, { status: 500 });
+  }
+}
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { paymentId, txid } = body;
+
+    if (!paymentId || !txid) {
+      return NextResponse.json({ success: false, error: 'Missing parameters' }, { status: 400 });
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { piPaymentId: paymentId },
+      include: { order: true },
+    });
+
+    // 1. 鏋佸叾鍏抽敭锛氬悜 Pi 瀹樻柟鏈嶅姟鍣ㄥ彂閫?Complete 璇锋眰锛岀湡姝ｅ畬缁撹繖绗旀敮浠?    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
+    const apiKey = process.env.PI_API_KEY;
+
+    if (!apiKey) {
+      console.error('[Pi API] Missing PI_API_KEY in environment variables');
+      return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
+    }
+
+    const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Key ${apiKey}`,
+      },
+      body: JSON.stringify({ txid }),
+    });
+
+    if (!piRes.ok) {
+      const errText = await piRes.text();
+      console.error('[Pi API] Complete Failed:', piRes.status, errText);
+      if (!errText.includes('already completed')) {
+        return NextResponse.json(
+          { success: false, error: `Pi API Error: ${errText}` },
+          { status: 502 }
+        );
+      }
+    }
+
+    if (!payment || payment.status === 'COMPLETED') {
+      // 骞傜瓑杈圭晫
+      return NextResponse.json({ success: true, message: 'Already completed locally' });
+    }
+
+    // 2. 鏇存柊鏈湴鏁版嵁搴?    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { piPaymentId: paymentId },
+        data: {
+          txid: txid,
+          status: 'COMPLETED',
+          transactionVerified: true,
+          developerCompleted: true,
+          completedAt: new Date(),
+        },
+      });
+
+      const updatedOrder = await tx.order.update({
+        where: { id: payment.orderId },
+        data: { status: 'COMPLETED' },
+      });
+
+      const durationDays = 30;
+      let dbMembership = await tx.membership.findFirst({
+        where: { merchantId: updatedOrder.merchantId },
+      });
+
+      if (!dbMembership) {
+        dbMembership = await tx.membership.create({
+          data: {
+            merchantId: updatedOrder.merchantId,
+            name: 'AI Framework Subscription',
+            mode: 'TIME_BASED',
+            price: 0,
+          },
+        });
+      }
+
+      const endAt = new Date();
+      endAt.setDate(endAt.getDate() + durationDays);
+
+      await tx.customerMembership.create({
+        data: {
+          customerId: updatedOrder.customerId,
+          membershipId: dbMembership.id,
+          startAt: new Date(),
+          endAt: endAt,
+          status: 'ACTIVE',
+        },
+      });
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    console.error('[POST /api/payments/complete] 瀹屾垚鏀粯寮傚父:', error);
+    return new NextResponse(error instanceof Error ? error.message : 'Server error', {
+      status: 500,
+    });
+  }
+}
+'use client';
+
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+
+export default function CheckoutClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const plan = searchParams.get('plan') || 'basic';
+
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState('鍑嗗鏀堕摱鍙?..');
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
+
+  const plans = {
+    basic: { name: '鍩虹寤虹珯鍏堥攱 (Basic Plan)', amount: 5.0 },
+    pro: { name: '涓撲笟 AI 鏋舵瀯 (Pro Plan)', amount: 25.0 },
+  };
+
+  const selectedPlan = plans[plan as keyof typeof plans] || plans.basic;
+
+  const handlePayment = async () => {
+    if (typeof window === 'undefined' || !window.Pi) {
+      setErrorStatus('鈿狅笍 渚︽祴鍒版偍骞舵湭鍦?Pi Browser 鍐呭彂璧锋敮浠樸€?);
+      return;
+    }
+
+    setLoading(true);
+    setStatusText('1. 姝ｅ湪鏈嶅姟鍣ㄧ敓鎴愮敓鎬佸晢鎴疯鍗?..');
+    setErrorStatus(null);
+
+    try {
+      // Step 1: Draft order creation (Idempotent keys generated server side for the user action)
+      const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
+
+      const orderRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(fallbackToken ? { Authorization: `Bearer ${fallbackToken}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          amount: selectedPlan.amount,
+          planId: plan,
+          memo: `Framework Subscription: ${selectedPlan.name}`,
+        }),
+      });
+
+      const orderData = await orderRes.json();
+
+      if (!orderData.success) {
+        if (orderRes.status === 401) {
+          setErrorStatus('韬唤鏈巿鏉冿紝璇峰洖棣栭〉閫氳繃 Pi Wallet 杩炴帴銆?);
+        } else {
+          setErrorStatus('鏈嶅姟鍣ㄥ垱寤鸿鍗曞け璐? ' + orderData.error);
+        }
+        setLoading(false);
+        return;
+      }
+
+      setStatusText('2. 姝ｅ湪鍞ら啋鍖哄潡閾惧簳灞傚畨鍏ㄩ獙璇?..');
+      const Pi = window.Pi;
+
+      // Step 2: Use Core Pi.createPayment API
+      Pi.createPayment(
+        {
+          amount: selectedPlan.amount,
+          memo: `Subscription: ${selectedPlan.name}`,
+          metadata: { orderId: orderData.order.orderNo, planId: plan },
+        },
+        {
+          onReadyForServerApproval: async (paymentId: string) => {
+            setStatusText(`3. 鏈嶅姟鍣ㄦ牳绠楀浠蜂腑 [${paymentId.slice(0, 6)}...]`);
+            const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
+            await fetch('/api/payments/approve', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(fallbackToken ? { Authorization: `Bearer ${fallbackToken}` } : {}),
+              },
+              credentials: 'include',
+              body: JSON.stringify({ paymentId, orderId: orderData.order.orderNo }),
+            });
+          },
+          onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+            setStatusText('4. 浜ゆ槗涓婇摼鎴愬姛锛佹鍦ㄤ负鎮ㄩ鍙戞暟瀛楁潈鐩?..');
+            const fallbackToken = localStorage.getItem('pi_auth_token_fallback') || '';
+            await fetch('/api/payments/complete', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(fallbackToken ? { Authorization: `Bearer ${fallbackToken}` } : {}),
+              },
+              credentials: 'include',
+              body: JSON.stringify({ paymentId, txid }),
+            });
+            // All good, flow returning to dashboard
+            router.push('/dashboard?success=true');
+          },
+          onCancel: (_paymentId: string) => {
+            setLoading(false);
+            setStatusText('');
+            setErrorStatus(`馃挕 鍔ㄤ綔宸蹭腑姝紝鎮ㄥ彇娑堜簡鏀粯锛屾湭鍙戠敓璧勪骇杞Щ銆俙);
+          },
+          onError: (error: Error, _payment: unknown) => {
+            setLoading(false);
+            setStatusText('');
+            console.error('Payment API error', error);
+            setErrorStatus(`鈿狅笍 鏀粯鍞よ捣閬亣寮傚父: ${error?.message || '鏈煡閿欒'}`);
+          },
+        }
+      );
+    } catch (e: unknown) {
+      console.error(e);
+      setLoading(false);
+      setErrorStatus(`鏈湴閫昏緫鍙戠敓寮傚父: ${e instanceof Error ? e.message : '鏈煡寮傚父'}`);
+    }
+  };
+
+  return (
+    <div className="max-w-md w-full bg-[#1E112A] border border-[#F3C136]/20 rounded-3xl p-8 shadow-2xl relative">
+      {/* Back navigation */}
+      <Link
+        href="/"
+        className="absolute top-6 left-6 text-gray-500 hover:text-gray-300 text-sm flex items-center font-bold"
+      >
+        鈫?杩斿洖澶у巺
+      </Link>
+
+      <h1 className="text-2xl font-black text-center mt-6 text-white mb-2">瀹夊叏鏀堕摱鍙?/h1>
+      <p className="text-sm text-center text-gray-400 mb-8 border-b border-gray-700 pb-6">
+        姝ｅ湪涓烘偍鎺ュ叆鐢熸€佸畨鍏ㄦ墸娆剧綉鍏?      </p>
+
+      <div className="bg-[#2A1642] rounded-2xl p-6 mb-8 border border-indigo-900/50">
+        <h2 className="text-sm font-bold text-gray-400 mb-2">璁㈤槄鍖呰９绫诲瀷</h2>
+        <p className="text-lg font-black text-[#F3C136] mb-6">{selectedPlan.name}</p>
+
+        <h2 className="text-sm font-bold text-gray-400 mb-2">绛変环缁撶畻閲戦</h2>
+        <div className="flex items-baseline space-x-2">
+          <span className="text-[#F3C136] text-4xl font-black">蟺</span>
+          <span className="text-4xl font-black text-white">{selectedPlan.amount.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {errorStatus && (
+        <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-200 text-sm font-medium">
+          {errorStatus}
+        </div>
+      )}
+
+      <button
+        onClick={handlePayment}
+        disabled={loading}
+        className="w-full bg-[#F3C136] hover:bg-[#EEA834] text-[#1E112A] font-black text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(243,193,54,0.3)] transition-all disabled:opacity-50 disabled:grayscale mb-4 flex justify-center items-center"
+      >
+        {loading ? (
+          <span className="animate-pulse">{statusText}</span>
+        ) : (
+          <span className="flex items-center">
+            瀹夊叏纭骞舵姇閫?<span className="text-xl ml-2 font-black leading-none">鈫?/span>
+          </span>
+        )}
+      </button>
+
+      <p className="text-xs text-center text-gray-500 font-medium">
+        鏈鎿嶄綔鍙楀簳灞傞槻閲嶆斁鏈哄埗涓庡瘑鏂囬獙璇佺爜淇濇姢锛屼繚闅滃畬鍏ㄧ殑鐢熸€佷氦浜掍綋楠屻€?      </p>
+    </div>
+  );
+}
+import { Suspense } from 'react';
+import CheckoutClient from './CheckoutClient';
+
+export const dynamic = 'force-dynamic';
+
+export default function CheckoutPage() {
+  return (
+    <main className="min-h-screen bg-[#110B19] text-gray-200 flex flex-col items-center justify-center p-4">
+      <Suspense fallback={<div className="text-[#F3C136] font-bold">杞藉叆鏀堕摱鍙颁腑...</div>}>
+        <CheckoutClient />
+      </Suspense>
+    </main>
+  );
+}
+import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { PrismaClient } from '@prisma/client';
+import LogoutButton from '@/components/LogoutButton';
+import { verifySessionToken } from '@/lib/session';
+
+// 寮哄埗鍔ㄦ€佹覆鏌撶瓥鐣ワ紝纭繚璇诲彇鏈€鏂扮殑 session cookie
+export const dynamic = 'force-dynamic';
+
+const prisma = new PrismaClient();
+
+export default async function DashboardPage() {
+  const cookieStore = cookies();
+  const token = cookieStore.get('pi_auth_token')?.value;
+  const piUid = token ? verifySessionToken(token) : null;
+  const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
+
+  let customer = null;
+  let activeMemberships = 0;
+  let totalBookings = 0;
+  let totalPayments = 0;
+
+  // P1-A: 鏈嶅姟绔函韬唤閴存潈鎷︽埅
+  if (piUid) {
+    customer = await prisma.customer.findUnique({
+      where: {
+        merchantId_piUid: { merchantId, piUid },
+      },
+      include: {
+        _count: {
+          select: {
+            bookings: { where: { status: { notIn: ['CANCELLED', 'NO_SHOW'] } } },
+            orders: { where: { status: 'COMPLETED' } },
+          },
+        },
+        customerMemberships: {
+          where: { status: 'ACTIVE' },
+        },
+      },
+    });
+
+    if (customer) {
+      activeMemberships = customer.customerMemberships.length;
+      totalBookings = customer._count.bookings;
+      totalPayments = customer._count.orders;
+    }
+  }
+
+  // 鏈嶅姟绔繑鍥炴棤鏉冩帶鍒堕潰鏉?  if (!customer) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-[#1E112A] to-[#110B19] flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-20 h-20 bg-[#2A1642] border border-[#F3C136]/30 rounded-full flex items-center justify-center text-3xl mb-6 shadow-lg shadow-[#F3C136]/10">
+          馃敀
+        </div>
+        <h1 className="text-2xl md:text-3xl font-bold text-white mb-3">鏃犳潈鎿嶄綔</h1>
+        <p className="text-gray-400 mb-8 max-w-md text-sm md:text-base leading-relaxed">
+          鐢熸€佹帶鍒堕潰鏉挎槸琚弗瀵嗕繚鎶ょ殑涓撳睘绉佸煙銆傛偍蹇呴』閫€鍥為椤碉紝骞堕€氳繃搴曞眰鍘熺敓鐨?          <strong className="text-[#F3C136] font-bold mx-1">閾句晶韬唤鎺堟潈</strong>
+          鏈哄埗鍚庢柟鍙В閿佹椤甸潰銆?        </p>
+        <Link
+          href="/"
+          className="bg-[#F3C136] hover:bg-[#EEA834] text-[#1E112A] px-8 py-3 rounded-xl font-bold transition-colors shadow-[0_0_15px_rgba(243,193,54,0.3)] hover:-translate-y-0.5 transform"
+        >
+          鈫?杩斿洖澶у巺
+        </Link>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col">
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+            <Link href="/">
+              <div className="w-8 h-8 rounded-lg bg-[#1E112A] flex items-center justify-center text-white font-bold cursor-pointer">
+                AI
+              </div>
+            </Link>
+            <h1 className="text-lg font-bold text-gray-800">鎺у埗鍙扮鐞嗕腑蹇?/h1>
+          </div>
+          <div className="flex items-center space-x-4">
+            <LogoutButton />
+            <Link href="/" className="text-sm font-medium text-gray-500 hover:text-gray-800">
+              杩斿洖涓婚〉
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-4 py-8 w-full flex-1 flex flex-col md:flex-row gap-6">
+        {/* 宸︿晶瀵艰埅 */}
+        <aside className="w-full md:w-64 shrink-0">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-1">
+            <div className="bg-purple-50 text-[#7C3AED] px-4 py-3 rounded-xl font-bold cursor-pointer">
+              姒傝闈㈡澘
+            </div>
+            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors">
+              鎴戠殑涓氬姟鍑瘉
+            </div>
+            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors">
+              鏋舵瀯涓庨棶绛旀敮鎸?            </div>
+            <div className="text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors mt-4">
+              缁勪欢閰嶇疆娴佹函婧?馃敀
+            </div>
+          </div>
+        </aside>
+
+        {/* 涓诲唴瀹瑰尯鏁版嵁缁戝畾 */}
+        <div className="flex-1 space-y-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-gray-800 mb-1">
+                娆㈣繋鍥炲綊锛寋customer.username} 馃憢
+              </h2>
+              <p className="text-sm text-gray-500">
+                浠ヤ笅鍙傛暟宸插疄鏃跺悓姝ユ偍鐨勭敓鎬佽妭鐐逛笌鍘嗗彶鍑瘉妗ｆ娴併€?              </p>
+            </div>
+            <div className="hidden sm:block w-16 h-16 bg-[#3B2D4F] rounded-full flex items-center justify-center text-2xl font-black text-[#F3C136] shadow-inner">
+              {customer.username.charAt(0).toUpperCase()}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm relative overflow-hidden group hover:border-[#7C3AED]/30 transition-colors">
+              <div className="absolute right-0 top-0 w-16 h-16 bg-indigo-50 rounded-bl-full flex items-start justify-end p-3 pointer-events-none">
+                <span className="text-indigo-400">鈿?/span>
+              </div>
+              <h3 className="text-sm font-bold text-gray-500 mb-4">褰撳墠閰嶇疆鍑瘉</h3>
+              <p className="text-2xl font-black text-gray-900 mb-1">
+                {activeMemberships > 0 ? `${activeMemberships} 椤圭敓鏁堜腑` : '鏆傛棤鍙傛暟'}
+              </p>
+              <Link href="/#pricing" className="text-sm text-[#7C3AED] font-bold hover:underline">
+                鍓嶅幓鐮旇鍔犻厤 鈫?              </Link>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm relative overflow-hidden">
+              <div className="absolute right-0 top-0 w-16 h-16 bg-blue-50 rounded-bl-full flex items-start justify-end p-3 pointer-events-none">
+                <span className="text-blue-400">馃帿</span>
+              </div>
+              <h3 className="text-sm font-bold text-gray-500 mb-4">鍛ㄦ湡鍐呭悜瀵兼帓鏈熼厤棰?/h3>
+              <p className="text-2xl font-black text-gray-900 mb-1">
+                {totalBookings} <span className="text-sm font-medium text-gray-400">娆?/span>
+              </p>
+              <button className="text-sm text-gray-400 font-medium cursor-not-allowed">
+                {totalBookings > 0 ? '鏌ョ湅灞ョ害蹇収' : '鍩虹鐗堝瓨鍦ㄩ檺鍒?}
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm relative overflow-hidden">
+              <div className="absolute right-0 top-0 w-16 h-16 bg-orange-50 rounded-bl-full flex items-start justify-end p-3 pointer-events-none">
+                <span className="text-orange-400">蟺</span>
+              </div>
+              <h3 className="text-sm font-bold text-gray-500 mb-4">绱缁撶畻绗旀暟</h3>
+              <p className="text-2xl font-black text-gray-900 mb-1">{totalPayments}</p>
+              <span className="text-sm text-gray-400 font-medium">Data On-Chain</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 opacity-80 pointer-events-none">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">
+              鐢熸€佸悜瀵间笌灞ョ害涓嬪彂娴?(Construction)
+            </h3>
+            <div className="bg-gray-50 rounded-xl p-8 border border-dashed border-gray-300 text-center text-sm font-medium text-gray-500">
+              鈿狅笍 鏈嶅姟绔巿鏉冮摼璺凡閫氳繃楠岃瘉銆?              <br /> 姝ゅ鍒楄〃璇︽儏鍦ㄨ繘琛屼笅涓€闃舵鐨勫啓鎿嶄綔杩唬鍚庯紝灏嗗彲浠ュ睍鐜颁笌涓嬭浇鍔犲瘑鏈嶅姟鍖呫€?            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+'use client';
+
+import { useState } from 'react';
+import { useChatStream } from '@/hooks/useChatStream';
+
+export default function StreamDemoPage() {
+  const [prompt, setPrompt] = useState('');
+  const [provider, setProvider] = useState<string>(''); // empty means fallback/primary
+  const { messages, isLoading, error, appendMessage, stopGeneration } = useChatStream({
+    provider: provider || undefined,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prompt.trim() || isLoading) return;
+    appendMessage(prompt);
+    setPrompt('');
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-6 space-y-8">
+      <header className="border-b pb-4">
+        <h1 className="text-3xl font-bold text-gray-900">AI Stream Routing Demo (Phase 2.2)</h1>
+        <p className="text-gray-500 mt-2">
+          Test real-time token streaming with automatic fallback and AbortController support.
+        </p>
+      </header>
+
+      <div className="bg-white rounded-xl shadow-sm border overflow-hidden h-[500px] flex flex-col">
+        {/* Chat History */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          {messages.length === 0 ? (
+            <div className="text-center text-gray-400 mt-20">
+              No messages yet. Send a prompt to start streaming.
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 whitespace-pre-wrap ${
+                    msg.role === 'user'
+                      ? 'bg-blue-600 text-white rounded-br-none'
+                      : 'bg-white border text-gray-800 shadow-sm rounded-bl-none'
+                  }`}
+                >
+                  {msg.content || (isLoading && msg.role === 'assistant' ? '...' : '')}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Controls */}
+        <div className="p-4 bg-white border-t space-y-4">
+          <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <label className="flex items-center space-x-2">
+              <span className="font-medium">Provider Override:</span>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                className="border rounded p-1"
+                disabled={isLoading}
+              >
+                <option value="">Auto (Use Primary/Fallback)</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="ollama">Ollama</option>
+                <option value="invalid_provider">Force Invalid (Test Error)</option>
+              </select>
+            </label>
+
+            {error && (
+              <span className="text-red-500 bg-red-50 px-2 py-1 rounded">Error occurred</span>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <input
+              type="text"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            {isLoading ? (
+              <button
+                type="button"
+                onClick={stopGeneration}
+                className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!prompt.trim()}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Send
+              </button>
+            )}
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+'use client';
+import dynamic from 'next/dynamic';
+import 'swagger-ui-react/swagger-ui.css';
+
+const SwaggerUI = dynamic(() => import('swagger-ui-react'), { ssr: false });
+
+export default function ApiDocsPage() {
+  return <div style={{ padding: 16 }}><SwaggerUI url="/api/docs" /></div>;
+}

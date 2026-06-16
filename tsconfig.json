@@ -18,21 +18,10 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./apps/web/src/*"],
+      "@/*": ["./apps/web/src/*", "./apps/admin/src/*", "./src/*"],
       "@pi-merchant/*": ["./packages/*/src"]
     }
   },
-  "include": [
-    "apps/**/*",
-    "packages/**/*",
-    "**/*.ts",
-    "**/*.tsx"
-  ],
-  "exclude": [
-    "node_modules",
-    "**/*.spec.ts",
-    "**/*.test.ts",
-    "**/*.spec.tsx",
-    "**/*.test.tsx"
-  ]
+  "include": ["apps/**/*", "packages/**/*", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts", "**/*.spec.tsx", "**/*.test.tsx"]
 }

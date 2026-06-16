@@ -5,6 +5,9 @@ import { verifySessionToken } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
+// Maximum duration for a single streaming AI response (60 seconds)
+const STREAM_TIMEOUT_MS = 60_000;
+
 export async function POST(req: Request) {
   const token = cookies().get('pi_auth_token')?.value;
   if (!token || !verifySessionToken(token)) {
@@ -40,15 +43,31 @@ export async function POST(req: Request) {
         }
       }, 15000);
 
+      // Overall 60s timeout — abort the stream if it takes too long
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        timeoutController.abort();
+      }, STREAM_TIMEOUT_MS);
+
       req.signal.addEventListener('abort', () => {
         clearInterval(heartbeat);
+        clearTimeout(timeoutId);
+        timeoutController.abort();
       });
 
       try {
         const streamIterable = streamMerchantAiResponse({ merchantId, prompt, provider });
 
         for await (const chunk of streamIterable) {
-          if (req.signal.aborted) {
+          // Check for client disconnect OR timeout
+          if (req.signal.aborted || timeoutController.signal.aborted) {
+            if (timeoutController.signal.aborted) {
+              controller.enqueue(
+                encoder.encode(
+                  `event: error\ndata: ${JSON.stringify({ message: 'Stream timed out after 60 seconds' })}\n\n`
+                )
+              );
+            }
             break;
           }
 
@@ -74,6 +93,7 @@ export async function POST(req: Request) {
         );
       } finally {
         clearInterval(heartbeat);
+        clearTimeout(timeoutId);
         try {
           controller.close();
         } catch {

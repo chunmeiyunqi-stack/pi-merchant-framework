@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 const prisma = new PrismaClient();
 
-export async function POST(req: Request) {
+async function __POST(req: Request) {
   try {
     const cookieStore = cookies();
     let token = cookieStore.get('pi_auth_token')?.value;
@@ -68,3 +69,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export const POST = withMetrics(__POST);

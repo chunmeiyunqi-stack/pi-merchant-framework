@@ -8,6 +8,7 @@ import {
   validateLicense,
   type SerializedLicense,
 } from '@pi-merchant/pi-sdk';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic';
  *
  * Body: SerializedLicense JSON 字符串 或 base64 编码
  */
-export async function POST(request: Request): Promise<Response> {
+async function __POST(request: Request): Promise<Response> {
   try {
     const body = await request.json();
 
@@ -65,3 +66,5 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ valid: false, error: message }, { status: 500 });
   }
 }
+
+export const POST = withMetrics(__POST);

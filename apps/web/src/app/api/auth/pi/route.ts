@@ -3,20 +3,21 @@ import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { signSessionToken } from '@/lib/session';
 import { logEvent } from '@pi-merchant/pi-sdk';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 const prisma = new PrismaClient();
 
 // Pi Platform API 基础地址
 const PI_API_BASE = process.env.PI_PLATFORM_API_BASE ?? 'https://api.minepi.com';
 
-export async function POST(req: Request) {
+async function __POST(req: Request) {
   try {
     const body = await req.json();
-    const { accessToken, piUid, username, merchantId } = body;
+    const { accessToken, piUid, username, merchantId: bodyMerchantId } = body;
 
-    if (!accessToken || !piUid || !username || !merchantId) {
+    if (!accessToken || !piUid || !username) {
       return NextResponse.json(
-        { success: false, error: 'Missing parameters: accessToken, piUid, username, merchantId' },
+        { success: false, error: 'Missing parameters: accessToken, piUid, username' },
         { status: 400 }
       );
     }
@@ -63,6 +64,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // ── 统一租户解析（优先级：x-tenant-id header → cookie merchant_id → body.merchantId → env 默认）
+    const headerTenant = req.headers.get('x-tenant-id');
+    const cookieTenant = cookies().get('merchant_id')?.value;
+    const merchantId =
+      headerTenant ??
+      cookieTenant ??
+      bodyMerchantId ??
+      process.env.NEXT_PUBLIC_MERCHANT_ID ??
+      'merchant-demo-001';
+
     // ── 步骤 2：Upsert Customer 记录 ────────────────────────────────────────
     const customer = await prisma.customer.upsert({
       where: {
@@ -92,12 +103,20 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 7, // 7 天
     });
 
+    // 写入 tenant cookie，供后续请求使用（HttpOnly）
+    cookieStore.set('merchant_id', merchantId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 天
+    });
+
     logEvent('user.authenticated', { user: verifiedUsername, merchantId, customerId: customer.id });
 
     return NextResponse.json({
       success: true,
       user: { uid: verifiedUid, username: verifiedUsername },
-      token: secureToken, // 发送给前端，作为 localStorage 备用
     });
   } catch (error: unknown) {
     console.error('[POST /api/auth/pi] 验证异常:', error);
@@ -107,3 +126,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export const POST = withMetrics(__POST);

@@ -31,6 +31,12 @@ export interface AIResponse {
   provider?: string;
   /** 实际使用的模型名称 */
   model?: string;
+  /** Optional routing metadata including fallback info */
+  routing?: {
+    requested?: string;
+    actual?: string;
+    fallback?: boolean;
+  };
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';

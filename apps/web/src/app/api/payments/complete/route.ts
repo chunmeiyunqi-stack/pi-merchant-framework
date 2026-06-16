@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { withMetrics } from '@/lib/metrics-middleware';
 
 const prisma = new PrismaClient();
 
-export async function POST(req: Request) {
+async function __POST(req: Request) {
   try {
     const body = await req.json();
     const { paymentId, txid } = body;
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
     }
 
     // 2. 更新本地数据库
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.payment.update({
         where: { piPaymentId: paymentId },
         data: {
@@ -107,3 +108,5 @@ export async function POST(req: Request) {
     });
   }
 }
+
+export const POST = withMetrics(__POST);

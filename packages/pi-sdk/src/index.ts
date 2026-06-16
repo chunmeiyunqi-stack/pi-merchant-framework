@@ -1,6 +1,11 @@
 // packages/pi-sdk/src/index.ts
 // Pi SDK 封装层统一导出入口
 
+import { validateEnv } from './env-validator';
+
+// 自动执行环境变量校验
+validateEnv();
+
 export * from './types';
 export * from './payment-service';
 export * from './auth-service';

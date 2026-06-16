@@ -61,7 +61,7 @@ export async function generateMerchantAiResponse({
       merchantId,
       provider: response.provider,
       model: response.model,
-      fallback: response.routing.fallback,
+      fallback: response.routing?.fallback,
       promptPreview: prompt.slice(0, 120),
     });
 
@@ -70,6 +70,11 @@ export async function generateMerchantAiResponse({
       result: response.content,
       provider: response.provider,
       model: response.model,
+      routing: {
+        requested: response.routing?.requested as string | undefined,
+        actual: response.routing?.actual as string | undefined,
+        fallback: response.routing?.fallback,
+      },
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

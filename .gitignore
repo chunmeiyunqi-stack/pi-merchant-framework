@@ -1,27 +1,50 @@
-# Dependency directories
+﻿# ----- PiMerchantFramework generated .gitignore (generated) -----
+# NOTE: This is a generated ignore file.
+
+# Ignore all env files (per request)
+.env*
+
+# Ignore generated documentation (common formats)
+*.pdf
+*.docx
+*.html
+*.md.pdf
+
+# Ignore Python scripts (.py) as requested
+*.py
+
+# Ignore source_code_* files
+source_code_*
+
+# Ignore output*.txt files
+output*.txt
+
+# Node / JS common
 node_modules/
+.pnpm-debug.log
 .pnpm-store/
+.npm/
+package-lock.json
+pnpm-lock.yaml
 
-# Next.js build outputs
+# Next.js build
 .next/
-out/
-dist/
+.next/*
+.out/
+/dist/
 
-# Environment files
-.env
-.env.local
-.env.*.local
+# Coverage
+coverage/
+lcov.info
 
-# Prisma
-prisma/migrations/dev/
-*.db
-*.sqlite
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.suo
@@ -29,17 +52,46 @@ Thumbs.db
 *.njsproj
 *.sln
 
-# Logs
-*.log
-npm-debug.log*
-pnpm-debug.log*
+# OS
+.DS_Store
+Thumbs.db
 
-# Turbo
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.swp
+
+# Build artifacts
+build/
+dist/
+
+# Ignore generated source_code printouts and large outputs
+source_code_print.*
+source_code_combined.*
+output_combined.txt
+fixed_output*.md
+fixed_output*.txt
+
+# Optional: ignore environment-specific local files
+.env.local
+.env.*.local
+
+# Git hooks
+.husky/_
+
+# Misc
+coverage/
+reports/
+
+# End of generated .gitignore
+
+# Local archive of copyright artifacts
+archive/
+ 
+# Local temp scripts
+.scripts/
+
+# Turbo build/cache artifacts
 .turbo/
 
-# Testing
-coverage/
-.nyc_output/
-
-# TypeScript
-*.tsbuildinfo

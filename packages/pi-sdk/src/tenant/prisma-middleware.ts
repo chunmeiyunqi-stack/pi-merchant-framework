@@ -18,45 +18,40 @@ import { getTenantId } from './context';
  *   applyTenantMiddleware(prisma);
  */
 export function applyTenantMiddleware(prisma: PrismaClient) {
-  prisma.$use(
-    async (
-      params: Prisma.MiddlewareParams,
-      next: (params: Prisma.MiddlewareParams) => Promise<unknown>
-    ) => {
-      const tenantId = getTenantId();
+  prisma.$use(async (params: any, next: (params: any) => Promise<unknown>) => {
+    const tenantId = getTenantId();
 
-      const modelsRequiringIsolation = [
-        'Customer',
-        'Order',
-        'Payment',
-        'Booking',
-        'Membership',
-        'Service',
-      ];
+    const modelsRequiringIsolation = [
+      'Customer',
+      'Order',
+      'Payment',
+      'Booking',
+      'Membership',
+      'Service',
+    ];
 
-      try {
-        if (tenantId && params.model && modelsRequiringIsolation.includes(params.model)) {
-          // Ensure args exists
-          params.args = params.args || {};
+    try {
+      if (tenantId && params.model && modelsRequiringIsolation.includes(params.model)) {
+        // Ensure args exists
+        params.args = params.args || {};
 
-          // For findUnique/findFirst, Prisma expects where to be present
-          if (params.action === 'findUnique' || params.action === 'findFirst') {
-            params.args.where = { ...params.args.where, merchantId: tenantId };
-          } else if (
-            params.action === 'findMany' ||
-            params.action === 'updateMany' ||
-            params.action === 'deleteMany'
-          ) {
-            params.args.where = { ...params.args.where, merchantId: tenantId };
-          } else if (params.action === 'update' || params.action === 'delete') {
-            params.args.where = { ...params.args.where, merchantId: tenantId };
-          }
+        // For findUnique/findFirst, Prisma expects where to be present
+        if (params.action === 'findUnique' || params.action === 'findFirst') {
+          params.args.where = { ...params.args.where, merchantId: tenantId };
+        } else if (
+          params.action === 'findMany' ||
+          params.action === 'updateMany' ||
+          params.action === 'deleteMany'
+        ) {
+          params.args.where = { ...params.args.where, merchantId: tenantId };
+        } else if (params.action === 'update' || params.action === 'delete') {
+          params.args.where = { ...params.args.where, merchantId: tenantId };
         }
-      } catch (_e) {
-        // In case of unexpected shapes, do not block the request; log upstream instead.
       }
-
-      return next(params);
+    } catch (_e) {
+      // In case of unexpected shapes, do not block the request; log upstream instead.
     }
-  );
+
+    return next(params);
+  });
 }

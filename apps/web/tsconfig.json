@@ -23,7 +23,8 @@
       "@/*": ["./src/*"],
       "@pi-merchant/ui": ["../../packages/ui/src"],
       "@pi-merchant/ui/*": ["../../packages/ui/src/*"]
-    }
+    },
+    "strictNullChecks": true
   },
   "include": ["next-env.d.ts", ".next/types/**/*.ts", "**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]

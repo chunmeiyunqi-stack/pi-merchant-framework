@@ -1,0 +1,1500 @@
+﻿  const [loading, setLoading] = useState(true);
+
+  const fetchBookings = () => {
+    setLoading(true);
+    fetch('/api/admin/bookings', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { bookings: Booking[] }) => {
+        setBookings(data.bookings ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(fetchBookings, []);
+
+  const handleVerify = async (bookingId: string) => {
+    if (!confirm('纭鏍搁攢姝ら绾︼紵')) return;
+    try {
+      const res = await fetch(`/api/admin/bookings/${bookingId}/complete`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) fetchBookings();
+    } catch {
+      alert('鏍搁攢澶辫触锛岃閲嶈瘯');
+    }
+  };
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">棰勭害绠＄悊</h1>
+      <div className="space-y-3">
+        {loading ? (
+          [1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-2xl p-5 animate-pulse h-24" />
+          ))
+        ) : bookings.length === 0 ? (
+          <div className="text-center py-20 text-gray-400">
+            <div className="text-5xl mb-4">馃搮</div>
+            <p>鏆傛棤棰勭害璁板綍</p>
+          </div>
+        ) : (
+          bookings.map((b) => (
+            <div key={b.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-gray-800">{b.service?.title ?? '鏈煡鏈嶅姟'}</p>
+                  <p className="text-gray-500 text-sm mt-1">椤惧锛歿b.customer?.username ?? '-'}</p>
+                  <p className="text-gray-400 text-xs mt-1">
+                    {new Date(b.slotStart).toLocaleString('zh-CN')} 鈫抺' '}
+                    {new Date(b.slotEnd).toLocaleTimeString('zh-CN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                  {b.note && <p className="text-gray-300 text-xs mt-1">澶囨敞锛歿b.note}</p>}
+                </div>
+                <div className="text-right flex-shrink-0 ml-4">
+                  <span
+                    className={`text-xs px-2 py-1 rounded-lg ${
+                      b.status === 'CONFIRMED'
+                        ? 'bg-blue-100 text-blue-700'
+                        : b.status === 'COMPLETED'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {b.status}
+                  </span>
+
+                  {b.status === 'CONFIRMED' && (
+                    <button
+                      onClick={() => handleVerify(b.id)}
+                      className="mt-2 block bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      鏍搁攢
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+'use client';
+
+// ============================================================
+// 鍟嗘埛鍚庡彴 鈥?鏁版嵁姒傝 Dashboard
+// ============================================================
+
+import { useEffect, useState } from 'react';
+
+interface DashboardStats {
+  todayOrders: number;
+  todayRevenue: number;
+  totalMembers: number;
+  pendingBookings: number;
+  activeServices: number;
+  pendingPayments: number;
+  activeMemberships: number;
+}
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/dashboard/stats', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: DashboardStats) => {
+        setStats(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const cards = [
+    {
+      label: '浠婃棩璁㈠崟',
+      value: stats?.todayOrders ?? 0,
+      icon: '馃搵',
+      color: 'bg-blue-50 border-blue-100',
+    },
+    {
+      label: '浠婃棩鏀舵 (蟺)',
+      value: stats?.todayRevenue?.toFixed(2) ?? '0.00',
+      icon: '馃挵',
+      color: 'bg-green-50 border-green-100',
+    },
+    {
+      label: '娲昏穬鏈嶅姟',
+      value: stats?.activeServices ?? 0,
+      icon: '馃洜锔?,
+      color: 'bg-cyan-50 border-cyan-100',
+    },
+    {
+      label: '寰呭鐞嗘敮浠?,
+      value: stats?.pendingPayments ?? 0,
+      icon: '鈿狅笍',
+      color: 'bg-amber-50 border-amber-100',
+    },
+    {
+      label: '娲昏穬浼氬憳鏁?,
+      value: stats?.activeMemberships ?? 0,
+      icon: '猸?,
+      color: 'bg-purple-50 border-purple-100',
+    },
+    {
+      label: '寰呮牳閿€棰勭害',
+      value: stats?.pendingBookings ?? 0,
+      icon: '馃搮',
+      color: 'bg-orange-50 border-orange-100',
+    },
+  ];
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">鏁版嵁姒傝</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {cards.map((card) => (
+          <div key={card.label} className={`${card.color} border rounded-2xl p-5`}>
+            <div className="text-3xl mb-3">{card.icon}</div>
+            <p className="text-2xl font-bold text-gray-800">
+              {loading ? <span className="animate-pulse text-gray-300">--</span> : card.value}
+            </p>
+            <p className="text-sm text-gray-500 mt-1">{card.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+'use client';
+
+// 鍚庡彴 鈥?浼氬憳鏂规绠＄悊
+
+import { useEffect, useState } from 'react';
+
+interface Membership {
+  id: string;
+  name: string;
+  mode: string;
+  price: number;
+  validDays: number | null;
+  totalUses: number | null;
+  status: string;
+}
+
+export default function AdminMembershipsPage() {
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Form states
+  const [formData, setFormData] = useState({
+    name: '',
+    mode: 'TIME_BASED',
+    price: '',
+    validDays: '',
+    totalUses: '',
+  });
+
+  const fetchMemberships = () => {
+    setLoading(true);
+    fetch('/api/admin/memberships', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { memberships: Membership[] }) => {
+        setMemberships(data.memberships ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchMemberships();
+  }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setCreating(true);
+
+    try {
+      const res = await fetch('/api/admin/memberships', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          mode: formData.mode,
+          price: parseFloat(formData.price),
+          validDays: formData.validDays ? parseInt(formData.validDays) : null,
+          totalUses: formData.totalUses ? parseInt(formData.totalUses) : null,
+        }),
+        credentials: 'include',
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || '鍒涘缓澶辫触');
+      }
+      // Optimistic or real refresh
+      fetchMemberships();
+      setIsModalOpen(false);
+      setFormData({ name: '', mode: 'TIME_BASED', price: '', validDays: '', totalUses: '' });
+    } catch (err: unknown) {
+      // err is unknown; use type guard to safely access message
+      if (err instanceof Error) setErrorMsg(err.message);
+      else setErrorMsg(typeof err === 'string' ? err : 'Unknown error');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">浼氬憳鏂规</h1>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+        >
+          + 鏂板鏂规
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {loading ? (
+          [1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-2xl p-5 animate-pulse h-32" />
+          ))
+        ) : memberships.length === 0 ? (
+          <div className="col-span-full text-center py-20 text-gray-400">
+            <div className="text-5xl mb-4">猸?/div>
+            <p>鏆傛棤浼氬憳鏂规</p>
+          </div>
+        ) : (
+          memberships.map((m) => (
+            <div
+              key={m.id}
+              className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col h-full"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-gray-800 text-lg">{m.name}</h3>
+                <span
+                  className={`text-xs px-2 py-1 rounded-lg ${
+                    m.status === 'ACTIVE'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {m.status === 'ACTIVE' ? '鐢熸晥涓? : '宸蹭笅鏋?}
+                </span>
+              </div>
+              <p className="text-[#7C3AED] font-bold text-2xl mb-4">
+                蟺 {Number(m.price).toFixed(2)}
+              </p>
+
+              <div className="text-sm text-gray-500 mt-auto mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <p>
+                  妯″紡锛?                  {m.mode === 'TIME_BASED'
+                    ? '鏈夋晥鏃堕暱鍗?
+                    : m.mode === 'USAGE_BASED'
+                      ? '浣跨敤娆℃暟鍗?
+                      : '璁㈤槄/鏃犻檺鍒?}
+                </p>
+                {m.validDays && <p>棰濆害锛氭湁鏁堟湡 {m.validDays} 澶?/p>}
+                {m.totalUses && <p>棰濆害锛氬叡 {m.totalUses} 娆?/p>}
+              </div>
+
+              {/* Not connected to backend yet, but UI required us to not remove buttons unless explicit. 
+                  User said "涓嶅厑璁告柊澧炩€滅湅璧锋潵鑳界偣浣嗗叾瀹炴病鎺ュ悗绔€濈殑鍋囨寜閽?, so we disable these until implemented */}
+              <div className="flex gap-2 border-t pt-3">
+                <button
+                  disabled
+                  title="缂栬緫鍔熻兘灏氬湪鎺掓湡涓?
+                  className="flex-1 text-center text-sm font-medium text-gray-400 bg-gray-50 py-1.5 rounded-lg cursor-not-allowed"
+                >
+                  缂栬緫
+                </button>
+                <button
+                  disabled
+                  title="涓嬫灦鍔熻兘灏氬湪鎺掓湡涓?
+                  className="flex-1 text-center text-sm font-medium text-red-300 bg-red-50 py-1.5 rounded-lg cursor-not-allowed"
+                >
+                  涓嬫灦
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">鏂板浼氬憳鏂规</h2>
+
+            {errorMsg && (
+              <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 p-2 rounded-lg">
+                {errorMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">鏂规鍚嶇О</label>
+                <input
+                  required
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">鏂规鍞环 (蟺)</label>
+                <input
+                  required
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">鏍搁攢妯″紡</label>
+                <select
+                  value={formData.mode}
+                  onChange={(e) => setFormData({ ...formData, mode: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]"
+                >
+                  <option value="TIME_BASED">鏈夋晥鏃堕暱鍗?(濡?鏈堝崱)</option>
+                  <option value="USAGE_BASED">浣跨敤娆℃暟鍗?(濡?10娆″崱)</option>
+                  <option value="UNLIMITED">涓嶉檺閲?姘镐箙璁㈤槄</option>
+                </select>
+              </div>
+
+              {(formData.mode === 'TIME_BASED' || formData.mode === 'USAGE_BASED') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {formData.mode === 'TIME_BASED' ? '鏈夋晥澶╂暟' : '鍖呭惈娆℃暟'}
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    value={formData.mode === 'TIME_BASED' ? formData.validDays : formData.totalUses}
+                    onChange={(e) =>
+                      formData.mode === 'TIME_BASED'
+                        ? setFormData({ ...formData, validDays: e.target.value })
+                        : setFormData({ ...formData, totalUses: e.target.value })
+                    }
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+                >
+                  鍙栨秷
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="px-4 py-2 text-white bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 rounded-lg transition-colors font-medium flex items-center justify-center min-w-[80px]"
+                >
+                  {creating ? '鎻愪氦...' : '纭鍒涘缓'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+'use client';
+
+import { useEffect, useState } from 'react';
+
+interface MonitoringMetrics {
+  todayOrders: number;
+  todayRevenue: number;
+  totalMembers: number;
+  pendingBookings: number;
+  activeServices: number;
+  pendingPayments: number;
+  activeMemberships: number;
+}
+
+export default function MonitoringPage() {
+  const [metrics, setMetrics] = useState<MonitoringMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/dashboard/stats', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data: MonitoringMetrics) => setMetrics(data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500 animate-pulse">姝ｅ湪鍔犺浇鐩戞帶鎸囨爣...</div>;
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-4">绯荤粺鐩戞帶涓績</h1>
+      <p className="text-sm text-gray-500 mb-8">
+        鍩虹鐩戞帶宸叉縺娲伙紝褰撳墠灞曠ず鐨勬槸瀹炴椂鍟嗘埛鏍稿績鎸囨爣涓庢敮浠樺仴搴风姸鎬併€?      </p>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {[
+          { label: '浠婃棩璁㈠崟', value: metrics?.todayOrders ?? 0 },
+          { label: '浠婃棩鏀跺叆 (蟺)', value: metrics?.todayRevenue.toFixed(2) ?? '0.00' },
+          { label: '娲昏穬浼氬憳', value: metrics?.activeMemberships ?? 0 },
+          { label: '寰呭鐞嗛绾?, value: metrics?.pendingBookings ?? 0 },
+          { label: '寰呭鐞嗘敮浠?, value: metrics?.pendingPayments ?? 0 },
+          { label: '娲昏穬鏈嶅姟', value: metrics?.activeServices ?? 0 },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
+          >
+            <p className="text-sm text-gray-500 mb-3">{item.label}</p>
+            <p className="text-3xl font-semibold text-gray-900">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+'use client';
+
+// 鍚庡彴 鈥?璁㈠崟绠＄悊
+
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+
+interface Order {
+  id: string;
+  orderNo: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+  customer?: { username: string };
+  service?: { title: string };
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+const STATUS_OPTIONS = ['ALL', 'PENDING_PAYMENT', 'APPROVED', 'COMPLETED', 'CANCELLED'];
+
+function OrdersContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const currentStatus = searchParams.get('status') || 'ALL';
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const qs = new URLSearchParams();
+    if (currentStatus !== 'ALL') qs.set('status', currentStatus);
+    qs.set('page', currentPage.toString());
+    qs.set('limit', '10');
+
+    fetch(`/api/admin/orders?${qs.toString()}`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { orders: Order[]; pagination: Pagination }) => {
+        setOrders(data.orders ?? []);
+        setPagination(data.pagination ?? null);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [currentStatus, currentPage]);
+
+  const handleStatusChange = (status: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (status === 'ALL') {
+      params.delete('status');
+    } else {
+      params.set('status', status);
+    }
+    // Changing status resets page to 1
+    params.set('page', '1');
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || (pagination && newPage > pagination.totalPages)) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', newPage.toString());
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">璁㈠崟绠＄悊</h1>
+
+      {/* 鐘舵€佺瓫閫?*/}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {STATUS_OPTIONS.map((s) => (
+          <button
+            key={s}
+            onClick={() => handleStatusChange(s)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              currentStatus === s
+                ? 'bg-[#7C3AED] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {s === 'ALL' ? '鍏ㄩ儴' : s}
+          </button>
+        ))}
+      </div>
+
+      {/* 璁㈠崟琛ㄦ牸 */}
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 mb-6">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              {['璁㈠崟鍙?, '椤惧', '鏈嶅姟', '閲戦', '鐘舵€?, '涓嬪崟鏃堕棿'].map((h) => (
+                <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="text-center py-10 text-gray-300">
+                  鍔犺浇涓?..
+                </td>
+              </tr>
+            ) : orders.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-center py-10 text-gray-400">
+                  鏆傛棤璁㈠崟鏁版嵁
+                </td>
+              </tr>
+            ) : (
+              orders.map((order) => (
+                <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-600">{order.orderNo}</td>
+                  <td className="px-4 py-3 text-gray-700">{order.customer?.username ?? '-'}</td>
+                  <td className="px-4 py-3 text-gray-700">{order.service?.title ?? '-'}</td>
+                  <td className="px-4 py-3 text-[#7C3AED] font-semibold">
+                    蟺 {Number(order.amount).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-lg">
+                      {order.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">
+                    {new Date(order.createdAt).toLocaleString('zh-CN')}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 鍒嗛〉鍣?*/}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <div>
+            鍏?{pagination.total} 鏉¤褰曪紝褰撳墠绗?{pagination.page} / {pagination.totalPages} 椤?          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page <= 1}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              涓婁竴椤?            </button>
+            <button
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              涓嬩竴椤?            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AdminOrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center text-gray-500">Loading Orders...</div>}>
+      <OrdersContent />
+    </Suspense>
+  );
+}
+'use client';
+
+// 鍚庡彴 鈥?鏀粯璁板綍
+
+import { useEffect, useState } from 'react';
+
+interface Payment {
+  id: string;
+  piPaymentId: string;
+  txid?: string;
+  amount: number;
+  status: string;
+  developerApproved: boolean;
+  developerCompleted: boolean;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export default function AdminPaymentsPage() {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/payments', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { payments: Payment[] }) => {
+        setPayments(data.payments ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">鏀粯璁板綍</h1>
+
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                {['Pi Payment ID', '閾句笂 TxID', '閲戦', '鐘舵€?, '宸插鎵?, '宸插畬鎴?, '鏃堕棿'].map(
+                  (h) => (
+                    <th
+                      key={h}
+                      className="text-left px-4 py-3 text-gray-500 font-medium whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  )
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-gray-300">
+                    鍔犺浇涓?..
+                  </td>
+                </tr>
+              ) : payments.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-gray-400">
+                    鏆傛棤鏀粯璁板綍
+                  </td>
+                </tr>
+              ) : (
+                payments.map((p) => (
+                  <tr key={p.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td
+                      className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[140px] truncate"
+                      title={p.piPaymentId}
+                    >
+                      {p.piPaymentId}
+                    </td>
+                    <td
+                      className="px-4 py-3 font-mono text-xs text-gray-400 max-w-[120px] truncate"
+                      title={p.txid ?? ''}
+                    >
+                      {p.txid ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 text-[#7C3AED] font-semibold">
+                      蟺 {Number(p.amount).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-lg ${
+                          p.status === 'COMPLETED'
+                            ? 'bg-green-100 text-green-700'
+                            : p.status === 'CANCELLED'
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {p.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">{p.developerApproved ? '鉁? : '鉂?}</td>
+                    <td className="px-4 py-3 text-center">{p.developerCompleted ? '鉁? : '鉂?}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                      {new Date(p.createdAt).toLocaleString('zh-CN')}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+'use client';
+
+// 鍚庡彴 鈥?鏈嶅姟绠＄悊
+
+import { useEffect, useState } from 'react';
+
+interface Service {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  price: number;
+  durationMinutes: number;
+  status: string;
+  createdAt: string;
+}
+
+export default function AdminServicesPage() {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/services', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { services: Service[] }) => {
+        setServices(data.services ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">鏈嶅姟绠＄悊</h1>
+        <button className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-not-allowed opacity-50">
+          + 鏂板鏈嶅姟
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              {['鏈嶅姟鍚嶇О', '绫诲瀷', '浠锋牸', '鏃堕暱', '鐘舵€?, '鎿嶄綔'].map((h) => (
+                <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="text-center py-10 text-gray-300">
+                  鍔犺浇涓?..
+                </td>
+              </tr>
+            ) : services.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-center py-10 text-gray-400">
+                  鏆傛棤鏈嶅姟鏁版嵁
+                </td>
+              </tr>
+            ) : (
+              services.map((s) => (
+                <tr key={s.id} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-800 font-medium">{s.title}</td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {s.type === 'APPOINTMENT' ? '棰勭害鍒? : '鍏朵粬'}
+                  </td>
+                  <td className="px-4 py-3 text-[#7C3AED] font-semibold">
+                    蟺 {Number(s.price).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {s.durationMinutes ? `${s.durationMinutes} 鍒嗛挓` : '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`text-xs px-2 py-1 rounded-lg ${
+                        s.status === 'ACTIVE'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {s.status === 'ACTIVE' ? '涓婃灦涓? : '宸蹭笅鏋?}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button className="text-[#7C3AED] hover:text-[#6D28D9] text-sm font-medium mr-3">
+                      缂栬緫
+                    </button>
+                    <button className="text-red-500 hover:text-red-600 text-sm font-medium">
+                      鍒犻櫎
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+'use client';
+
+// 鍚庡彴 鈥?搴楅摵璁剧疆
+
+import { useEffect, useState } from 'react';
+
+interface AppConfigForm {
+  name: string;
+  contactPhone: string;
+  industrySkin: string;
+  homepageLayout: string;
+  modulesBooking: boolean;
+  modulesMembership: boolean;
+  enableCoupon: boolean;
+}
+
+export default function AdminSettingsPage() {
+  const [form, setForm] = useState<AppConfigForm>({
+    name: '',
+    contactPhone: '',
+    industrySkin: 'generic',
+    homepageLayout: 'service-first',
+    modulesBooking: true,
+    modulesMembership: false,
+    enableCoupon: false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/settings', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: { config: AppConfigForm }) => {
+        if (data.config) setForm(data.config);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+        credentials: 'include',
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggle = (key: keyof AppConfigForm) => setForm((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">搴楅摵璁剧疆</h1>
+
+      <div className="max-w-lg space-y-6">
+        {/* 鍩虹淇℃伅 */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
+          <h2 className="font-semibold text-gray-700">鍩虹淇℃伅</h2>
+          {[
+            { label: '鍟嗘埛鍚嶇О', key: 'name' as keyof AppConfigForm, type: 'text' },
+            { label: '鑱旂郴鐢佃瘽', key: 'contactPhone' as keyof AppConfigForm, type: 'tel' },
+          ].map((f) => (
+            <div key={f.key}>
+              <label className="block text-sm text-gray-500 mb-1">{f.label}</label>
+              <input
+                type={f.type}
+                value={String(form[f.key])}
+                onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* 琛屼笟鐨偆 */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+          <h2 className="font-semibold text-gray-700 mb-4">琛屼笟鐨偆</h2>
+          <select
+            value={form.industrySkin}
+            onChange={(e) => setForm((prev) => ({ ...prev, industrySkin: e.target.value }))}
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]"
+          >
+            {['beauty', 'fitness', 'education', 'consulting', 'repair', 'generic'].map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 妯″潡寮€鍏?*/}
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
+          <h2 className="font-semibold text-gray-700">鍔熻兘寮€鍏?/h2>
+          {[
+            { key: 'modulesBooking', label: '棰勭害绠＄悊' },
+            { key: 'modulesMembership', label: '浼氬憳鏂规' },
+            { key: 'enableCoupon', label: '浼樻儬鍒革紙P2锛? },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">{label}</span>
+              <button
+                onClick={() => toggle(key as keyof AppConfigForm)}
+                className={`w-12 h-6 rounded-full transition-colors ${
+                  form[key as keyof AppConfigForm] ? 'bg-[#7C3AED]' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
+                    form[key as keyof AppConfigForm] ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition-colors"
+        >
+          {saved ? '鉁?宸蹭繚瀛? : saving ? '淇濆瓨涓?..' : '淇濆瓨璁剧疆'}
+        </button>
+      </div>
+    </div>
+  );
+}
+export const metadata = {
+  title: 'Next.js',
+  description: 'Generated by Next.js',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+'use client';
+import { useState } from 'react';
+
+const mockOrders = [
+  {
+    id: 'TXN001',
+    user: 'pi_user_88',
+    service: '基础美甲护理',
+    amount: 0.5,
+    status: 'completed',
+    time: '14:05:32',
+  },
+  {
+    id: 'TXN002',
+    user: 'pi_user_42',
+    service: '高级光疗美甲',
+    amount: 1.0,
+    status: 'completed',
+    time: '13:48:17',
+  },
+  {
+    id: 'TXN003',
+    user: 'pi_user_77',
+    service: '日式美睫嫁接',
+    amount: 1.5,
+    status: 'pending',
+    time: '13:21:09',
+  },
+  {
+    id: 'TXN004',
+    user: 'pi_user_13',
+    service: '全套手足尊享',
+    amount: 2.0,
+    status: 'completed',
+    time: '12:55:44',
+  },
+  {
+    id: 'TXN005',
+    user: 'pi_user_56',
+    service: '基础美甲护理',
+    amount: 0.5,
+    status: 'cancelled',
+    time: '12:30:00',
+  },
+];
+
+const tabs = ['概览', '订单管理', '服务设置', '用户管理'];
+
+export default function AdminPage() {
+  const [activeTab, setActiveTab] = useState('概览');
+  const [authed, setAuthed] = useState(false);
+  const [pwd, setPwd] = useState('');
+  const [err, setErr] = useState(false);
+
+  const totalPi = mockOrders
+    .filter((o) => o.status === 'completed')
+    .reduce((s, o) => s + o.amount, 0);
+  const completed = mockOrders.filter((o) => o.status === 'completed').length;
+  const pending = mockOrders.filter((o) => o.status === 'pending').length;
+
+  if (!authed)
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg,#1E112A,#2A1642,#110B19)',
+          fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(243,193,54,0.2)',
+            borderRadius: 20,
+            padding: '40px 48px',
+            width: 360,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              margin: '0 auto 16px',
+              background: 'linear-gradient(135deg,#F3C136,#9B59B6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 28,
+              fontWeight: 900,
+              color: '#1E112A',
+            }}
+          >
+            π
+          </div>
+          <h2 style={{ color: '#f0e6ff', fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+            商户管理后台
+          </h2>
+          <p style={{ color: 'rgba(240,230,255,0.45)', fontSize: 13, marginBottom: 28 }}>
+            美丽时光工作室 · Admin
+          </p>
+          <input
+            type="password"
+            placeholder="请输入管理员密码"
+            value={pwd}
+            onChange={(e) => {
+              setPwd(e.target.value);
+              setErr(false);
+            }}
+            onKeyDown={(e) =>
+              e.key === 'Enter' && (pwd === 'admin888' ? setAuthed(true) : setErr(true))
+            }
+            style={{
+              width: '100%',
+              padding: '11px 16px',
+              borderRadius: 12,
+              marginBottom: 12,
+              background: 'rgba(255,255,255,0.07)',
+              border: err ? '1px solid rgba(192,57,43,0.6)' : '1px solid rgba(243,193,54,0.2)',
+              color: '#f0e6ff',
+              fontSize: 14,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          {err && (
+            <p style={{ color: '#e74c3c', fontSize: 12, marginBottom: 10 }}>密码错误，请重试</p>
+          )}
+          <button
+            onClick={() => (pwd === 'admin888' ? setAuthed(true) : setErr(true))}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 12,
+              fontWeight: 700,
+              fontSize: 15,
+              background: 'linear-gradient(90deg,#F3C136,#E67E22)',
+              color: '#1E112A',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            登录
+          </button>
+          <p style={{ color: 'rgba(240,230,255,0.25)', fontSize: 11, marginTop: 16 }}>
+            提示：密码 admin888
+          </p>
+        </div>
+      </div>
+    );
+
+  const s = {
+    padding: '0 0 2px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 14,
+    fontWeight: 600,
+    transition: 'color 0.2s',
+  } as React.CSSProperties;
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg,#1E112A,#2A1642,#110B19)',
+        fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif",
+        color: '#f0e6ff',
+      }}
+    >
+      {/* TOP BAR */}
+      <nav
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '14px 32px',
+          background: 'rgba(30,17,42,0.8)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(243,193,54,0.15)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg,#F3C136,#9B59B6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 900,
+              fontSize: 18,
+              color: '#1E112A',
+            }}
+          >
+            π
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>美丽时光工作室</span>
+          <span
+            style={{
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 10,
+              background: 'rgba(155,89,182,0.2)',
+              color: '#c39bd3',
+              border: '1px solid rgba(155,89,182,0.3)',
+            }}
+          >
+            管理后台
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 24 }}>
+          {tabs.map((t) => (
+            <button
+              key={t}
+              style={{
+                ...s,
+                color: activeTab === t ? '#F3C136' : 'rgba(240,230,255,0.5)',
+                borderBottom: activeTab === t ? '2px solid #F3C136' : '2px solid transparent',
+              }}
+              onClick={() => setActiveTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setAuthed(false)}
+          style={{
+            padding: '7px 16px',
+            borderRadius: 20,
+            fontSize: 13,
+            fontWeight: 600,
+            background: 'rgba(192,57,43,0.15)',
+            color: '#e74c3c',
+            border: '1px solid rgba(192,57,43,0.3)',
+            cursor: 'pointer',
+          }}
+        >
+          退出登录
+        </button>
+      </nav>
+
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+        {/* 概览 */}
+        {activeTab === '概览' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24, color: '#f0e6ff' }}>
+              📊 今日概览
+            </h2>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))',
+                gap: 18,
+                marginBottom: 32,
+              }}
+            >
+              {[
+                {
+                  label: '今日总收入',
+                  value: `π ${totalPi.toFixed(1)}`,
+                  color: '#F3C136',
+                  icon: '💰',
+                },
+                { label: '完成订单', value: `${completed} 笔`, color: '#2ecc71', icon: '✓' },
+                { label: '待处理', value: `${pending} 笔`, color: '#F3C136', icon: '⏳' },
+                { label: '注册用户', value: '128 人', color: '#9B59B6', icon: '👤' },
+              ].map((k) => (
+                <div
+                  key={k.label}
+                  style={{
+                    padding: '22px 24px',
+                    borderRadius: 16,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>{k.icon}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: k.color, marginBottom: 4 }}>
+                    {k.value}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'rgba(240,230,255,0.45)' }}>{k.label}</div>
+                </div>
+              ))}
+            </div>
+            {/* Recent */}
+            <h3
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                marginBottom: 14,
+                color: 'rgba(240,230,255,0.7)',
+              }}
+            >
+              最近交易
+            </h3>
+            <OrderTable orders={mockOrders.slice(0, 3)} />
+          </div>
+        )}
+
+        {/* 订单管理 */}
+        {activeTab === '订单管理' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>📋 订单管理</h2>
+            <OrderTable orders={mockOrders} />
+          </div>
+        )}
+
+        {/* 服务设置 */}
+        {activeTab === '服务设置' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>⚙️ 服务设置</h2>
+            {[
+              { name: '基础美甲护理', price: 0.5, active: true },
+              { name: '高级光疗美甲', price: 1.0, active: true },
+              { name: '日式美睫嫁接', price: 1.5, active: true },
+              { name: '全套手足尊享', price: 2.0, active: true },
+            ].map((sv) => (
+              <div
+                key={sv.name}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px 20px',
+                  marginBottom: 12,
+                  borderRadius: 14,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                <span style={{ fontWeight: 600, fontSize: 15 }}>{sv.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <span style={{ color: '#F3C136', fontWeight: 700 }}>π {sv.price.toFixed(1)}</span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      padding: '3px 10px',
+                      borderRadius: 12,
+                      background: 'rgba(39,174,96,0.15)',
+                      color: '#2ecc71',
+                      border: '1px solid rgba(39,174,96,0.25)',
+                    }}
+                  >
+                    ● 上架中
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 用户管理 */}
+        {activeTab === '用户管理' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>👥 用户管理</h2>
+            {['pi_user_88', 'pi_user_42', 'pi_user_77', 'pi_user_13', 'pi_user_56'].map((u, i) => (
+              <div
+                key={u}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 20px',
+                  marginBottom: 10,
+                  borderRadius: 14,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg,#9B59B6,#F3C136)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#1E112A',
+                    }}
+                  >
+                    {u[8].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{u}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(240,230,255,0.4)' }}>
+                      Pi Network 用户
+                    </div>
+                  </div>
+                </div>
+                <span style={{ color: 'rgba(240,230,255,0.45)', fontSize: 13 }}>
+                  {i + 1} 笔订单
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrderTable({ orders }: { orders: typeof mockOrders }) {
+  const statusStyle = (s: string) => ({
+    fontSize: 12,
+    padding: '3px 10px',
+    borderRadius: 12,
+    fontWeight: 600,
+    background:
+      s === 'completed'
+        ? 'rgba(39,174,96,0.15)'
+        : s === 'pending'
+          ? 'rgba(243,193,54,0.12)'
+          : 'rgba(192,57,43,0.12)',
+    color: s === 'completed' ? '#2ecc71' : s === 'pending' ? '#F3C136' : '#e74c3c',
+    border: `1px solid ${s === 'completed' ? 'rgba(39,174,96,0.25)' : s === 'pending' ? 'rgba(243,193,54,0.2)' : 'rgba(192,57,43,0.2)'}`,
+  });
+  const label = (s: string) =>
+    s === 'completed' ? '已完成' : s === 'pending' ? '待处理' : '已取消';
+  return (
+    <div
+      style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1.2fr 1.5fr 0.8fr 0.9fr 0.7fr',
+          padding: '12px 20px',
+          background: 'rgba(255,255,255,0.04)',
+          fontSize: 12,
+          color: 'rgba(240,230,255,0.4)',
+          fontWeight: 600,
+          letterSpacing: 0.5,
+        }}
+      >
+        {['订单号', '用户', '服务', '金额', '状态', '时间'].map((h) => (
+          <span key={h}>{h}</span>
+        ))}
+      </div>
+      {orders.map((o, i) => (
+        <div
+          key={o.id}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1.2fr 1.5fr 0.8fr 0.9fr 0.7fr',
+            padding: '14px 20px',
+            fontSize: 13,
+            background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ color: 'rgba(240,230,255,0.5)', fontFamily: 'monospace' }}>{o.id}</span>
+          <span style={{ color: '#c39bd3' }}>{o.user}</span>
+          <span>{o.service}</span>
+          <span style={{ color: '#F3C136', fontWeight: 700 }}>π {o.amount.toFixed(1)}</span>
+          <span style={statusStyle(o.status)}>{label(o.status)}</span>
+          <span style={{ color: 'rgba(240,230,255,0.4)' }}>{o.time}</span>
+        </div>
+      ))}
+    </div>
+  );
+}

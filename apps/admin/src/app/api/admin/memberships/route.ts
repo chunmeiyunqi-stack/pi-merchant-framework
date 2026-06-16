@@ -3,8 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { getMerchantId } from '@/lib/utils';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
+import { withMetrics } from '@/lib/metrics-middleware';
 
-export async function GET() {
+async function __GET() {
   const merchantId = getMerchantId();
   try {
     const memberships = await prisma.membership.findMany({
@@ -17,7 +18,9 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export const GET = withMetrics(__GET);
+
+async function __POST(req: Request) {
   const token = cookies().get('pi_auth_token')?.value;
   if (!token || !verifySessionToken(token))
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -44,3 +47,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export const POST = withMetrics(__POST);

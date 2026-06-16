@@ -7,7 +7,7 @@ import Link from 'next/link';
 export default function CheckoutClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const plan = searchParams.get('plan') || 'basic';
+  const plan = searchParams?.get('plan') ?? 'basic';
 
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('准备收银台...');

@@ -76,6 +76,7 @@ Response: { order: { id, orderNo, status: "PENDING_PAYMENT" } }
 ```
 
 在触发 Pi SDK 之前先创建本地订单，目的：
+
 - 记录用户意图，即使支付失败也有追踪
 - 拿到 `orderId` 后塞入 Pi 支付的 `metadata`
 
@@ -86,8 +87,8 @@ Response: { order: { id, orderNo, status: "PENDING_PAYMENT" } }
 ```typescript
 window.Pi.createPayment(
   {
-    amount: 5.0,           // Pi 金额
-    memo: "购买：美甲服务",  // 用户在 Pi 钱包中看到的说明
+    amount: 5.0, // Pi 金额
+    memo: '购买：美甲服务', // 用户在 Pi 钱包中看到的说明
     metadata: { orderId }, // 开发者自定义字段
   },
   callbacks
@@ -105,6 +106,7 @@ onReadyForServerApproval(paymentId) → POST /api/payments/approve
 ```
 
 后端收到请求后：
+
 1. 用 `PI_API_KEY` 调用 `POST /v2/payments/{paymentId}/approve`
 2. 将 `payments` 记录落库（`developer_approved = true`）
 3. 更新 `orders.status = APPROVED`
@@ -126,6 +128,7 @@ onReadyForServerCompletion(paymentId, txid) → POST /api/payments/complete
 ```
 
 后端收到请求后：
+
 1. 用 `PI_API_KEY` 调用 `POST /v2/payments/{paymentId}/complete`（传入 `txid`）
 2. 更新 `payments`：`txid`、`status = COMPLETED`、`developer_completed = true`
 3. 更新 `orders.status = COMPLETED`
@@ -156,6 +159,7 @@ await window.Pi.authenticate(scopes, async (payment) => {
 ```
 
 处理逻辑：
+
 - 若 `developer_approved = false` → 重新 Approve
 - 若 `developer_approved = true` 且 `txid` 存在 → 重新 Complete
 - 若 `user_cancelled = true` → 更新本地状态为 CANCELLED
@@ -191,9 +195,9 @@ DRAFT
 
 ## 安全规范
 
-| 规则 | 原因 |
-|------|------|
-| `PI_API_KEY` 仅在服务端使用 | 防止前端暴露导致被盗用 |
-| `pi_payment_id` 数据库设 `@unique` | 防止重复支付到账 |
-| Approve 接口做幂等处理 | 网络重试不产生副作用 |
-| Complete 接口验证 `txid` | 防止伪造支付结果 |
+| 规则                               | 原因                   |
+| ---------------------------------- | ---------------------- |
+| `PI_API_KEY` 仅在服务端使用        | 防止前端暴露导致被盗用 |
+| `pi_payment_id` 数据库设 `@unique` | 防止重复支付到账       |
+| Approve 接口做幂等处理             | 网络重试不产生副作用   |
+| Complete 接口验证 `txid`           | 防止伪造支付结果       |
