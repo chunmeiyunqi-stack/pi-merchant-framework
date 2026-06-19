@@ -1,5 +1,0 @@
-{
-  "framework": "nextjs",
-  "buildCommand": "turbo run build --filter=@pi-merchant/web...",
-  "installCommand": "pnpm install"
-}

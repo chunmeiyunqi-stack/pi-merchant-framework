@@ -95,3 +95,5 @@ archive/
 # Turbo build/cache artifacts
 .turbo/
 
+
+.vercel

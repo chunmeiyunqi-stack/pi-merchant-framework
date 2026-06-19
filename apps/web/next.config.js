@@ -4,7 +4,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
-  output: 'standalone',
+    // output: 'standalone',  // Disabled for Vercel (only needed for Docker)
   eslint: {
     ignoreDuringBuilds: true,
   },
