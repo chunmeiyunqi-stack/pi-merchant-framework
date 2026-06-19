@@ -1,12 +1,80 @@
 import crypto from 'crypto';
 
-// 使用不可推导的密钥盐进行服务端签名。生产环境请确保配置了独立的环境变量
-const SECRET_KEY = process.env.PI_SESSION_SECRET || 'dev_fallback_secret_for_pi_hmac_2026';
+/**
+ * Session Token 签名密钥 —— 安全策略 (v2.1.0+)
+ *
+ * 🔒 安全原则：
+ *   1. 生产环境 (NODE_ENV=production) 强制要求 PI_SESSION_SECRET 环境变量
+ *      且长度 ≥ 32 字符，否则启动时直接 crash（fail-fast）。
+ *   2. 开发/测试环境允许使用 fallback 密钥，但会打警告。
+ *   3. 不再在源码中暴露任何"看似真实"的密钥字符串，fallback 改为明显的
+ *      "DEV_ONLY" 标记，让任何攻击者即使读到源码也无法在未知部署环境中复用。
+ *
+ * 🚨 历史：
+ *   v2.1.0 之前使用了 'dev_fallback_secret_for_pi_hmac_2026' 作为公开 fallback，
+ *   由于本仓库为 public，该字符串等同于公开密钥 —— 已废弃。
+ */
 
-// Debug: surface whether the process is using env-provided secret or the fallback
+const MIN_SECRET_LENGTH = 32;
+const DEV_FALLBACK_SECRET = 'DEV_ONLY_FALLBACK_DO_NOT_USE_IN_PRODUCTION_xxxxxx';
+
+function resolveSessionSecret(): string {
+  const envSecret = process.env.PI_SESSION_SECRET;
+  const nodeEnv = process.env.NODE_ENV || 'development';
+
+  // 生产环境：必须设置 PI_SESSION_SECRET 且长度足够
+  if (nodeEnv === 'production') {
+    if (!envSecret) {
+      // fail-fast：生产环境绝不允许 fallback
+      throw new Error(
+        'FATAL: PI_SESSION_SECRET environment variable is required in production. ' +
+          'Generate one with: openssl rand -hex 32'
+      );
+    }
+    if (envSecret.length < MIN_SECRET_LENGTH) {
+      throw new Error(
+        `FATAL: PI_SESSION_SECRET must be at least ${MIN_SECRET_LENGTH} characters long in production. ` +
+          `Current length: ${envSecret.length}. Generate one with: openssl rand -hex 32`
+      );
+    }
+    if (
+      envSecret === DEV_FALLBACK_SECRET ||
+      envSecret.includes('dev_fallback_secret_for_pi_hmac')
+    ) {
+      throw new Error(
+        'FATAL: PI_SESSION_SECRET appears to be a known public fallback. ' +
+          'Generate a unique secret with: openssl rand -hex 32'
+      );
+    }
+    return envSecret;
+  }
+
+  // 开发/测试环境：允许 fallback，但打警告
+  if (!envSecret) {
+    console.warn(
+      '[session] WARNING: PI_SESSION_SECRET not set — using dev-only fallback. ' +
+        'This MUST NOT be used in production. Set PI_SESSION_SECRET to a 32+ char random string.'
+    );
+    return DEV_FALLBACK_SECRET;
+  }
+
+  if (envSecret.length < MIN_SECRET_LENGTH) {
+    console.warn(
+      `[session] WARNING: PI_SESSION_SECRET is only ${envSecret.length} chars (recommended ≥ ${MIN_SECRET_LENGTH}).`
+    );
+  }
+
+  return envSecret;
+}
+
+const SECRET_KEY = resolveSessionSecret();
+
+// 启动时记录密钥来源（仅打印 source 类型，绝不打印密钥本身）
 try {
-  const source = process.env.PI_SESSION_SECRET ? 'env' : 'fallback';
-  console.error('[session] SECRET_KEY source:', source);
+  const source = process.env.PI_SESSION_SECRET ? 'env' : 'dev-fallback';
+  console.error(
+    `[session] SECRET_KEY source: ${source} (NODE_ENV=${process.env.NODE_ENV || 'development'})`
+  );
 } catch (_e) {
   /* ignore */
 }
@@ -88,9 +156,9 @@ export function verifySessionToken(token: string): string | null {
       console.error('[session] verifySessionToken: decoded payload empty or invalid');
       return null;
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[session] verifySessionToken: payload base64url decode failed', {
-      error: (error && error.message) || error,
+      error: error instanceof Error ? error.message : String(error),
     });
     return null;
   }
