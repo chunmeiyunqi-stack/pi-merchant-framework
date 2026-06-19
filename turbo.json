@@ -25,8 +25,8 @@
         ".next/**",
         "!.next/cache/**",
         "dist/**",
-        "apps/web/.next/**",
-        "!apps/web/.next/cache/**"
+        "apps/admin/.next/**",
+        "!apps/admin/.next/cache/**"
       ],
       "env": [
         "PI_API_KEY",
