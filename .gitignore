@@ -97,3 +97,4 @@ archive/
 
 
 .vercel
+.env*

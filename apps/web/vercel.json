@@ -1,1 +1,0 @@
-{ "buildCommand": "pnpm --filter @pi-merchant/web build", "installCommand": "pnpm install" }
