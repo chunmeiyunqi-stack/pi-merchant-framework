@@ -1,5 +1,1 @@
-{
-  "buildCommand": "pnpm --filter @pi-merchant/web build",
-  "installCommand": "pnpm install",
-  "outputDirectory": ".next"
-}
+{ "buildCommand": "pnpm --filter @pi-merchant/web build", "installCommand": "pnpm install" }
