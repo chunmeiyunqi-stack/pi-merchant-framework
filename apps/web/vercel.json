@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "pnpm --filter @pi-merchant/web build",
+  "buildCommand": "pnpm --filter @pi-merchant/web build && echo {} > apps/web/.next/export-detail.json",
   "installCommand": "pnpm install",
   "outputDirectory": ".next"
 }
