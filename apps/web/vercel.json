@@ -1,1 +1,5 @@
-{ "outputDirectory": ".next" }
+{
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@pi-merchant/web",
+  "installCommand": "cd ../.. && pnpm install",
+  "outputDirectory": ".next"
+}

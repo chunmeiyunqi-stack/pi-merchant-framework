@@ -4,6 +4,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
+  output: (process.env.DOCKER_BUILD || (process.env.CI && !process.env.VERCEL)) ? 'standalone' : undefined,
   eslint: {
     ignoreDuringBuilds: true,
   },
