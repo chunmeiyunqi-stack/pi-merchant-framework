@@ -21,11 +21,14 @@ async function applyRateLimit(request: NextRequest): Promise<NextResponse | null
   // Only apply rate limiting to AI-heavy endpoints
   if (!isAiRoute) return null;
 
-  // Allow bypass for load tests coming from k6 (header) to avoid tripping rate limits
-  try {
-    const bypassHeader = request.headers.get('x-k6-bypass-rate-limit');
-    if (String(bypassHeader) === '1') return null;
-  } catch (_) {}
+  // Allow bypass for load tests coming from k6 — only in non-production environments.
+  // Production bypasses must use a secret token to prevent clients from self-exempting.
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const bypassHeader = request.headers.get('x-k6-bypass-rate-limit');
+      if (String(bypassHeader) === '1') return null;
+    } catch (_) {}
+  }
 
   const ip = getClientIp(request as unknown as Request);
   // Use authenticated user ID as part of key if available (cookie-based)
@@ -97,11 +100,6 @@ export async function middleware(request: NextRequest) {
     loginUrl.searchParams.set('mode', 'signin');
     return NextResponse.redirect(loginUrl);
   }
-
-  // Tenant resolution: prefer header 'x-tenant-id', fall back to cookie 'merchant_id', else env default
-  const headerTenant = request.headers?.get?.('x-tenant-id');
-  const cookieTenant = request.cookies?.get?.('merchant_id')?.value;
-  const _tenantId = headerTenant ?? cookieTenant ?? process.env.NEXT_PUBLIC_MERCHANT_ID;
 
   return NextResponse.next();
 }

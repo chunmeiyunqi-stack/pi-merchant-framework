@@ -7,6 +7,13 @@ global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 describe('AI Service (Backward Compatibility)', () => {
   const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
 
+  function getFetchRequestBody(): any {
+    const call = mockFetch.mock.calls.find((c) => c[1] && (c[1] as any).body !== undefined);
+    if (!call) throw new Error('No fetch call with a request body was recorded');
+    const body = (call[1] as any).body;
+    return typeof body === 'string' ? JSON.parse(body) : JSON.parse(String(body));
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     resetProviderFactory();
@@ -79,7 +86,7 @@ describe('AI Service (Backward Compatibility)', () => {
         prompt: 'Test prompt',
       });
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+      const body = getFetchRequestBody();
       expect(body.model).toBe('gpt-4o-mini');
     });
 
@@ -101,7 +108,7 @@ describe('AI Service (Backward Compatibility)', () => {
         model: 'gpt-4o',
       });
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+      const body = getFetchRequestBody();
       expect(body.model).toBe('gpt-4o');
     });
 
@@ -122,7 +129,7 @@ describe('AI Service (Backward Compatibility)', () => {
         prompt: 'Test prompt',
       });
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+      const body = getFetchRequestBody();
       expect(body.temperature).toBe(0.6);
     });
 
@@ -144,7 +151,7 @@ describe('AI Service (Backward Compatibility)', () => {
         temperature: 0.8,
       });
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+      const body = getFetchRequestBody();
       expect(body.temperature).toBe(0.8);
     });
 
@@ -165,7 +172,7 @@ describe('AI Service (Backward Compatibility)', () => {
         prompt: 'How to optimize inventory?',
       });
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+      const body = getFetchRequestBody();
       expect(body.messages[0].content).toContain('merchant acme-corp');
     });
   });

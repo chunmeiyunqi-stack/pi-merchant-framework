@@ -12,7 +12,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
-import { logEvent, logError } from '@pi-merchant/pi-sdk';
+import { logEvent, logError, runWithTenant, checkQuota, trackUsage } from '@pi-merchant/pi-sdk';
 import { withMetrics } from '@/lib/metrics-middleware';
 
 export const dynamic = 'force-dynamic';
@@ -61,11 +61,26 @@ async function __POST(req: Request) {
     );
   }
 
-  const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
-  const db = prisma as AnyPrisma;
+  const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID ?? 'merchant-demo-001';
 
+  // ── 多租户配额检查 ──
+  const maxRequestsPerMonth = parseInt(process.env.AI_MAX_REQUESTS_PER_MONTH || '1000', 10);
+  const quota = checkQuota(merchantId, merchantId, maxRequestsPerMonth);
+  if (quota.isExceeded) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Monthly AI request quota exceeded.',
+        quota: { used: quota.usedRequestsThisMonth, limit: quota.maxRequestsPerMonth, resetAt: quota.resetAt },
+      },
+      { status: 429 }
+    );
+  }
+
+  const db = prisma as AnyPrisma;
   let historyId: string | null = null;
 
+  return runWithTenant(merchantId, async () => {
   try {
     // Pre-create a 'pending' history record
     const historyRecord = await db.generationHistory.create({
@@ -126,6 +141,8 @@ async function __POST(req: Request) {
 
     logEvent('Video generation queued (no provider)', { merchantId, provider });
 
+    trackUsage({ tenantId: merchantId, merchantId, type: 'ai_request', provider, model: 'placeholder', latencyMs: durationMs, success: true });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -159,6 +176,8 @@ async function __POST(req: Request) {
         });
     }
 
+    trackUsage({ tenantId: merchantId, merchantId, type: 'ai_request', provider, latencyMs: Date.now() - startTime, success: false, error: errorMessage });
+
     logError('Video generation failed', error, {
       merchantId,
       provider,
@@ -167,6 +186,7 @@ async function __POST(req: Request) {
 
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
+  }); // end runWithTenant
 }
 
 export const POST = withMetrics(__POST);

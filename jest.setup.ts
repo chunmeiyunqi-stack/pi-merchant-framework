@@ -1,10 +1,10 @@
 import '@testing-library/jest-dom';
+import * as nodeCrypto from 'crypto';
 
 // 全局测试配置
 beforeAll(() => {
   // 设置环境变量
-  // @ts-ignore - test env assignment
-  process.env.NODE_ENV = 'test';
+  (process.env as { NODE_ENV?: string }).NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-secret-key-for-testing-only';
   process.env.REDIS_URL = 'redis://localhost:6379';
   process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
@@ -13,7 +13,10 @@ beforeAll(() => {
   process.env.OLLAMA_BASE_URL = 'http://localhost:11434';
 
   // 配置全局 fetch mock
-  setupFetchMock();
+  // Only set up a global fetch mock if tests haven't provided one.
+  if (typeof (global as any).fetch === 'undefined') {
+    setupFetchMock();
+  }
 
   // 配置 crypto mock
   setupCryptoMock();
@@ -156,15 +159,14 @@ function setupFetchMock() {
  */
 function setupCryptoMock() {
   if (typeof global.crypto === 'undefined') {
-    const crypto = require('crypto');
     (global as any).crypto = {
-      getRandomValues: (arr: any) => crypto.randomFillSync(arr),
+      getRandomValues: (arr: any) => nodeCrypto.randomFillSync(arr),
       subtle: {
         sign: async (algorithm: string, key: any, data: any) => {
-          return crypto.sign(algorithm, data, key) as any;
+          return nodeCrypto.sign(algorithm as any, data, key) as any;
         },
         verify: async (algorithm: string, key: any, signature: any, data: any) => {
-          return crypto.verify(algorithm, data, key, signature) as any;
+          return nodeCrypto.verify(algorithm as any, data, key, signature) as any;
         },
       },
     };

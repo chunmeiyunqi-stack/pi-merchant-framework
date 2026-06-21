@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 
 // ──────────────────────────────────────────
@@ -17,10 +17,16 @@ interface ModelOption {
   description: string;
 }
 
-const SIZE_OPTIONS = [
+// DALL-E 3: 全部三种尺寸；DALL-E 2: 仅 1024x1024（实用范围内）
+const DALLE3_SIZES = [
   { value: '1024x1024', label: '1:1  正方形', desc: '1024×1024' },
   { value: '1792x1024', label: '16:9  横向', desc: '1792×1024' },
   { value: '1024x1792', label: '9:16  竖向', desc: '1024×1792' },
+];
+const DALLE2_SIZES = [
+  { value: '256x256',   label: '小图', desc: '256×256' },
+  { value: '512x512',   label: '中图', desc: '512×512' },
+  { value: '1024x1024', label: '大图', desc: '1024×1024' },
 ];
 
 const QUALITY_OPTIONS = [
@@ -55,13 +61,29 @@ export default function ImageGenPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [charCount, setCharCount] = useState(0);
+  // AbortController ref — 取消上一次仍在进行中的请求，防止竞态
+  const abortRef = useRef<AbortController | null>(null);
+
+  // 按当前模型选择可用的尺寸列表，切换模型时自动将 size 重置为合法值
+  const sizeOptions = model === 'dall-e-3' ? DALLE3_SIZES : DALLE2_SIZES;
+  const validSizes = sizeOptions.map((s) => s.value);
 
   useEffect(() => {
-    setCharCount(prompt.length);
-  }, [prompt]);
+    if (!validSizes.includes(size)) setSize(sizeOptions[0].value);
+  }, [model]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleGenerate = async () => {
+  useEffect(() => { setCharCount(prompt.length); }, [prompt]);
+
+  // 组件卸载时取消进行中的请求
+  useEffect(() => { return () => { abortRef.current?.abort(); }; }, []);
+
+  const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
+    // 取消上一次未完成的请求
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError(null);
     setImages([]);
@@ -73,6 +95,7 @@ export default function ImageGenPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt.trim(), size, quality, model }),
+        signal: controller.signal,
       });
 
       const data = await res.json();
@@ -81,7 +104,14 @@ export default function ImageGenPage() {
         if (res.status === 401) throw new Error('请先登录后使用图像生成功能');
         if (res.status === 503)
           throw new Error('图像生成服务暂未配置，请联系管理员设置 OpenAI API Key');
-        if (res.status === 429) throw new Error('请求过于频繁，请稍后再试（每分钟限 20 次）');
+        if (res.status === 429) {
+          const isQuota = data.quota != null;
+          throw new Error(
+            isQuota
+              ? `月度 AI 配额已用尽（${data.quota?.used ?? '--'}/${data.quota?.limit ?? '--'} 次），下次重置时间：${data.quota?.resetAt ? new Date(data.quota.resetAt).toLocaleDateString('zh-CN') : '--'}`
+              : '请求过于频繁，请稍后再试（速率限制：每分钟 20 次）'
+          );
+        }
         throw new Error(data.error || '图像生成失败，请重试');
       }
 
@@ -91,24 +121,36 @@ export default function ImageGenPage() {
         setSelectedImage(data.data.images[0].url);
       }
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return;
       setError(e instanceof Error ? e.message : '未知错误');
     } finally {
       setLoading(false);
     }
-  };
+  }, [prompt, size, quality, model]);
 
   const handleExampleClick = (example: string) => {
     setPrompt(example);
   };
 
-  const handleDownload = async (url: string) => {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `generated-image-${Date.now()}.png`;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.click();
-  };
+  // 跨域下载：先 fetch 成 blob，再创建临时 URL
+  const handleDownload = useCallback(async (url: string) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `generated-image-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // 释放 blob URL，防止内存泄漏
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+    } catch {
+      // 跨域 fetch 失败时降级为新窗口打开
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#0A0510] text-gray-100 font-sans">
@@ -132,7 +174,9 @@ export default function ImageGenPage() {
             </Link>
             <div>
               <h1 className="text-base font-bold text-white leading-none">图像生成</h1>
-              <p className="text-[10px] text-gray-500 mt-0.5">Powered by DALL-E 3</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                Powered by {model === 'dall-e-3' ? 'DALL-E 3' : 'DALL-E 2'}
+              </p>
             </div>
           </div>
           <nav className="flex items-center space-x-3">
@@ -236,7 +280,7 @@ export default function ImageGenPage() {
             <div className="bg-[#150B20] border border-white/10 rounded-2xl p-5">
               <p className="text-sm font-semibold text-white mb-3">📐 图像尺寸</p>
               <div className="space-y-2">
-                {SIZE_OPTIONS.map((opt) => (
+                {sizeOptions.map((opt) => (
                   <label
                     key={opt.value}
                     htmlFor={`size-${opt.value}`}

@@ -28,7 +28,7 @@ const store = new Map<string, StoreEntry>();
 // Periodic cleanup to avoid unbounded memory growth
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
+  const _cleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of store.entries()) {
       if (now - entry.windowStart > 10 * 60 * 1000) {
@@ -36,6 +36,17 @@ if (typeof setInterval !== 'undefined') {
       }
     }
   }, CLEANUP_INTERVAL_MS);
+
+  // In Node.js timers have an `unref()` method which prevents the timer
+  // from keeping the event loop alive (useful for Jest/CLI). Guard in case
+  // the runtime uses a different timer API (browsers return number).
+  try {
+    if (typeof (_cleanupTimer as any)?.unref === 'function') {
+      (_cleanupTimer as any).unref();
+    }
+  } catch (_err) {
+    // ignore any errors when calling unref in non-Node environments
+  }
 }
 
 export function checkRateLimit(options: RateLimitOptions): RateLimitResult {

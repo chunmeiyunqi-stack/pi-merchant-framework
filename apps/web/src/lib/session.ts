@@ -57,10 +57,7 @@ export function verifySessionToken(token: string): string | null {
   const expectedSignature = hmac.digest('base64url');
 
   if (signature !== expectedSignature) {
-    console.error('[session] verifySessionToken: signature mismatch', {
-      provided: signature,
-      expected: expectedSignature,
-    });
+    console.error('[session] verifySessionToken: signature mismatch');
     return null;
   }
 

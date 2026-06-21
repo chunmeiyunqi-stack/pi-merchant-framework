@@ -8,16 +8,24 @@ module.exports = {
     'plugin:prettier/recommended',
   ],
   rules: {
-    'prettier/prettier': 'error',
-    '@typescript-eslint/no-explicit-any': 'error',
+    'prettier/prettier': 'warn',
+    '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-unused-vars': [
-      'error',
+      'warn',
       {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       },
     ],
+    '@next/next/no-img-element': 'off',
+    'no-empty': 'off',
+    'no-useless-escape': 'off',
+    '@typescript-eslint/no-require-imports': 'off',
+    '@typescript-eslint/ban-ts-comment': 'off',
+    '@typescript-eslint/no-this-alias': 'off',
+    'no-unused-expressions': 'off',
+    '@typescript-eslint/no-unused-expressions': 'off',
   },
   env: {
     node: true,

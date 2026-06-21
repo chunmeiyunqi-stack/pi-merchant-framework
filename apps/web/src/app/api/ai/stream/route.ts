@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { streamMerchantAiResponse, logError } from '@pi-merchant/pi-sdk';
+import { streamMerchantAiResponse, logError, runWithTenant, trackUsage, checkQuota } from '@pi-merchant/pi-sdk';
 import { verifySessionToken } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -30,10 +30,24 @@ export async function POST(req: Request) {
 
   const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
 
+  // ── 多租户配额检查 ──
+  const maxRequestsPerMonth = parseInt(process.env.AI_MAX_REQUESTS_PER_MONTH || '1000', 10);
+  const quota = checkQuota(merchantId, merchantId, maxRequestsPerMonth);
+  if (quota.isExceeded) {
+    return NextResponse.json(
+      { success: false, error: 'Monthly AI request quota exceeded.' },
+      { status: 429 }
+    );
+  }
+
+  const startTime = Date.now();
   const encoder = new TextEncoder();
 
+  // ReadableStream 不可以被 runWithTenant 直接包裹（它是同步构建的），
+  // 改为在流内部的 start() 回调中调用 runWithTenant，确保 AsyncLocalStorage 上下文传播。
   const stream = new ReadableStream({
     async start(controller) {
+      await runWithTenant(merchantId, async () => {
       // 15s heartbeat to prevent Vercel/Nginx from closing idle connection
       const heartbeat = setInterval(() => {
         try {
@@ -72,13 +86,13 @@ export async function POST(req: Request) {
           }
 
           if (chunk.content) {
-            // Encode SSE data payload
             const data = JSON.stringify({ content: chunk.content });
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
           }
 
           if (chunk.done) {
             controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            trackUsage({ tenantId: merchantId, merchantId, type: 'stream_request', latencyMs: Date.now() - startTime, success: true });
             break;
           }
         }
@@ -87,10 +101,10 @@ export async function POST(req: Request) {
           merchantId,
         });
         const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
-        // Send an error event instead of data
         controller.enqueue(
           encoder.encode(`event: error\ndata: ${JSON.stringify({ message: errorMessage })}\n\n`)
         );
+        trackUsage({ tenantId: merchantId, merchantId, type: 'stream_request', latencyMs: Date.now() - startTime, success: false, error: errorMessage });
       } finally {
         clearInterval(heartbeat);
         clearTimeout(timeoutId);
@@ -100,6 +114,7 @@ export async function POST(req: Request) {
           // ignore if already closed or errored
         }
       }
+      }); // end runWithTenant
     },
     cancel() {
       // Stream cancelled by consumer
