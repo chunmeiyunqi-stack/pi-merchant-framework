@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build && node -e \"const fs=require('fs'),p=require('path');const expDir=p.resolve('.next/export');const det=p.resolve('.next/export-detail.json');if(!fs.existsSync(det)){fs.mkdirSync(expDir,{recursive:true});fs.writeFileSync(p.join(expDir,'404.html'),'<!DOCTYPE html><html lang=zh-CN><head><meta charset=utf-8><title>404</title><meta http-equiv=refresh content=0;url=/></head><body></body></html>');fs.writeFileSync(det,JSON.stringify({version:0,success:true,outDirectory:expDir}))}\"",
+    "build": "next build && node -e \"const fs=require('fs'),p=require('path');const expDir=p.resolve('.next/export');const det=p.resolve('.next/export-detail.json');fs.mkdirSync(expDir,{recursive:true});fs.writeFileSync(p.join(expDir,'404.html'),'<!DOCTYPE html><html lang=zh-CN><head><meta charset=utf-8><title>404</title><meta http-equiv=refresh content=0;url=/></head><body></body></html>');fs.writeFileSync(p.join(expDir,'500.html'),'500');fs.writeFileSync(det,JSON.stringify({version:0,success:true,outDirectory:expDir}))\"",
     "start": "next start -p 3000",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
