@@ -1,1 +1,0 @@
-﻿{"buildCommand":"npm run build","installCommand":"cd ../.. && pnpm install","outputDirectory":".next"}
