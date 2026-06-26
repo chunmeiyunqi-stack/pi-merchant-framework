@@ -3,18 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-declare global {
-  interface Window {
-    Pi?: {
-      authenticate: (
-        scopes: string[],
-        onIncompletePaymentFound: (payment: PiPayment) => void
-      ) => Promise<PiAuthResult>;
-      createPayment: (paymentData: PiPaymentData, callbacks: PiPaymentCallbacks) => void;
-    };
-  }
-}
-
 interface PiAuthResult {
   accessToken: string;
   user: { uid: string; username: string };
@@ -48,8 +36,16 @@ export default function CheckoutPage() {
   const [isPiBrowser, setIsPiBrowser] = useState(false);
 
   useEffect(() => {
-    setIsPiBrowser(typeof window !== 'undefined' && !!window.Pi);
+    setIsPiBrowser(typeof window !== 'undefined' && !!(window as any).Pi);
   }, []);
+
+  const getPi = () =>
+    (window as any).Pi as
+      | {
+          authenticate: (scopes: string[], cb: (p: PiPayment) => void) => Promise<PiAuthResult>;
+          createPayment: (data: PiPaymentData, callbacks: PiPaymentCallbacks) => void;
+        }
+      | undefined;
 
   // 处理未完成的支付
   const handleIncompletePayment = async (payment: PiPayment) => {
@@ -66,14 +62,14 @@ export default function CheckoutPage() {
   };
 
   const handleAuth = async () => {
-    if (!window.Pi) {
+    const Pi = getPi();
+    if (!Pi) {
       setErrorMsg('请在 Pi Browser 中打开此页面');
       return;
     }
     setStatus('auth');
     try {
-      const auth = await window.Pi.authenticate(['username', 'payments'], handleIncompletePayment);
-      // 同步身份到后端
+      const auth = await Pi.authenticate(['username', 'payments'], handleIncompletePayment);
       await fetch('/api/auth/pi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,7 +88,8 @@ export default function CheckoutPage() {
   };
 
   const handlePay = async () => {
-    if (!window.Pi) {
+    const Pi = getPi();
+    if (!Pi) {
       setErrorMsg('请在 Pi Browser 中打开此页面');
       return;
     }
@@ -103,7 +100,7 @@ export default function CheckoutPage() {
     setStatus('processing');
     setErrorMsg('');
 
-    window.Pi.createPayment(
+    Pi.createPayment(
       {
         amount: 25,
         memo: '先锋 AI 框架 - 专业架构版 年度授权',
@@ -149,7 +146,6 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-[#05020A] text-white flex items-center justify-center p-6">
       <div className="max-w-xl w-full">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-10 justify-center">
           <div className="w-8 h-8 rounded-lg bg-[#F3C136] flex items-center justify-center text-black font-black text-xs">
             PI
@@ -158,7 +154,6 @@ export default function CheckoutPage() {
         </div>
 
         <div className="bg-[#150B20] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
-          {/* 支付成功遮罩 */}
           {status === 'success' && (
             <div className="absolute inset-0 bg-[#05020A]/90 backdrop-blur-md z-10 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-500">
               <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-4xl mb-6 shadow-[0_0_50px_rgba(34,197,94,0.3)]">
@@ -178,7 +173,6 @@ export default function CheckoutPage() {
           )}
 
           <div className="p-8 md:p-12 space-y-8">
-            {/* 订单信息 */}
             <div className="space-y-4">
               <div className="flex justify-between items-end">
                 <div>
@@ -203,7 +197,6 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* 账户信息 */}
             <div className="space-y-4">
               <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">
                 认证身份
@@ -228,14 +221,12 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* 错误提示 */}
             {errorMsg && (
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
                 {errorMsg}
               </div>
             )}
 
-            {/* 支付按钮 */}
             {!isPiBrowser ? (
               <div className="w-full py-5 bg-neutral-800 text-neutral-400 font-bold rounded-2xl text-center">
                 请在 Pi Browser 中打开以使用支付功能
