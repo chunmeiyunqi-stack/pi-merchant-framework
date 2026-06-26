@@ -1,4 +1,4 @@
-import './globals.css';
+﻿import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import EnvBanner from '@/components/EnvBanner';
 import FooterLegal from '@/components/FooterLegal';
@@ -54,3 +54,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+

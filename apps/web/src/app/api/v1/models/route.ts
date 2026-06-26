@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // Pioneer AI Framework — GET /api/v1/models
 // 返回所有可用的 AI 模型列表
 // ============================================================
@@ -107,7 +107,7 @@ async function __GET() {
   try {
     // Get factory to check which providers are actually available
     const factory = await getFactory();
-    const availableProviders = factory.getAvailableProviders().map((p) => p.name);
+    const availableProviders = factory.getAvailableProviders().map((p: any) => p.name);
     const primaryProvider = factory.getPrimaryProviderName();
 
     // Mark models as available based on provider availability
@@ -148,3 +148,5 @@ async function __GET() {
 }
 
 export const GET = withMetrics(__GET);
+
+
