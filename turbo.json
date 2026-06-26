@@ -1,47 +1,22 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": [
-    "DATABASE_URL",
-    "PGHOST",
-    "POSTGRES_URL_NON_POOLING",
-    "POSTGRES_PASSWORD",
-    "PGUSER",
-    "NEON_PROJECT_ID",
-    "POSTGRES_URL_NO_SSL",
-    "PGPASSWORD",
-    "POSTGRES_DATABASE",
-    "POSTGRES_PRISMA_URL",
-    "POSTGRES_URL",
-    "PGHOST_UNPOOLED",
-    "POSTGRES_USER",
-    "POSTGRES_HOST",
-    "DATABASE_URL_UNPOOLED",
-    "PGDATABASE"
-  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [
-        ".next/**",
-        "!.next/cache/**",
-        "dist/**",
-        "apps/admin/.next/**",
-        "!apps/admin/.next/cache/**"
-      ],
+      "outputs": [".next/**", "dist/**"],
       "env": [
+        "DATABASE_URL",
         "PI_API_KEY",
-        "NEXT_PUBLIC_PI_SANDBOX",
-        "PI_PLATFORM_API_BASE",
+        "LICENSE_PAYLOAD_SECRET",
+        "OLLAMA_BASE_URL",
+        "JWT_SECRET",
         "PI_SESSION_SECRET",
         "NEXT_PUBLIC_MERCHANT_ID",
-        "NEXT_PUBLIC_APP_URL"
+        "NEXTAUTH_SECRET",
+        "NEXTAUTH_URL",
+        "PI_PLATFORM_API_BASE",
+        "NODE_ENV"
       ]
-    },
-    "lint": {
-      "dependsOn": ["^build"]
-    },
-    "type-check": {
-      "dependsOn": ["^build"]
     },
     "dev": {
       "cache": false,
