@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticateWithPi } from '@pi-merchant/pi-sdk';
+import { storePiAuthToken } from '@/lib/apiClient';
 
 export default function PiLoginButton() {
   const [username, setUsername] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export default function PiLoginButton() {
       );
       if (authResult.success && authResult.user) {
         if (authResult.token) {
-          localStorage.setItem('pi_auth_token_fallback', authResult.token);
+          storePiAuthToken(authResult.token);
         }
         setUsername(authResult.user.username);
         router.push('/dashboard');

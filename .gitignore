@@ -33,6 +33,9 @@ pnpm-lock.yaml
 .out/
 /dist/
 
+# TypeScript incremental build cache
+*.tsbuildinfo
+
 # Coverage
 coverage/
 lcov.info

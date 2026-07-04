@@ -9,7 +9,14 @@ export type SessionToken = {
 
 export function signSessionToken(
   piUid: string,
-  secret = process.env.JWT_SECRET || 'dev-secret'
+  secret = (() => {
+    const value = process.env.JWT_SECRET;
+    if (value) return value;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Missing required environment variable: JWT_SECRET');
+    }
+    return 'dev-secret';
+  })()
 ): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const iat = Math.floor(Date.now() / 1000);
@@ -27,7 +34,14 @@ export function signSessionToken(
 
 export function verifySessionToken(
   token: string | null | undefined,
-  secret = process.env.JWT_SECRET || 'dev-secret'
+  secret = (() => {
+    const value = process.env.JWT_SECRET;
+    if (value) return value;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Missing required environment variable: JWT_SECRET');
+    }
+    return 'dev-secret';
+  })()
 ) {
   if (!token || typeof token !== 'string') return { valid: false, error: 'invalid' } as any;
   const parts = token.split('.');

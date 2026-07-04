@@ -75,8 +75,9 @@ Write-Host "`n--- REQUIRED ---" -ForegroundColor Red
     @{N="DATABASE_URL";D="PostgreSQL URL";A=$false}
     @{N="PI_API_KEY";D="Pi API Key";A=$false}
     @{N="PI_SESSION_SECRET";D="Session key";A=$true}
+    @{N="JWT_SECRET";D="JWT signing secret";A=$true}
     @{N="LICENSE_PAYLOAD_SECRET";D="License key";A=$true}
-    @{N="LICENSE_PUBLIC_KEY";D="License pubkey";A=$false}
+    @{N="LICENSE_PAYLOAD";D="Base64 license payload";A=$false}
 )
 foreach ($v in $req) {
     Write-Host "`n  $($v.N)" -ForegroundColor White
@@ -104,6 +105,7 @@ foreach ($v in $req) {
 Write-Host "`n--- RECOMMENDED ---" -ForegroundColor Yellow
  $rec = @(
     @{N="OPENAI_API_KEY";D="OpenAI key";Def=$null}
+    @{N="OLLAMA_API_BASE";D="Ollama API URL";Def="http://localhost:11434"}
     @{N="OLLAMA_BASE_URL";D="Ollama URL";Def="http://localhost:11434"}
 )
 foreach ($v in $rec) {
@@ -119,6 +121,7 @@ foreach ($v in $rec) {
 Write-Host "`n--- OPTIONAL ---" -ForegroundColor Green
  $opt = @(
     @{N="NEXT_PUBLIC_MERCHANT_ID";D="Merchant ID";Def="merchant-demo-001"}
+    @{N="REDIS_URL";D="Redis URL";Def="redis://localhost:6379"}
 )
 foreach ($v in $opt) {
     Write-Host "`n  $($v.N)" -ForegroundColor White

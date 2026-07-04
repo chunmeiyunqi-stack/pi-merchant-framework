@@ -16,9 +16,10 @@ import { logEvent, logError, runWithTenant, checkQuota, trackUsage } from '@pi-m
 import { withMetrics } from '@/lib/metrics-middleware';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
-// 120 second timeout for video generation (video takes longer)
-const VIDEO_GENERATION_TIMEOUT_MS = 120_000;
+// Keep the route within Vercel's duration budget.
+const VIDEO_GENERATION_TIMEOUT_MS = 60_000;
 
 // Type alias for the GenerationHistory model - Prisma Client may not have generated yet
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,7 +72,11 @@ async function __POST(req: Request) {
       {
         success: false,
         error: 'Monthly AI request quota exceeded.',
-        quota: { used: quota.usedRequestsThisMonth, limit: quota.maxRequestsPerMonth, resetAt: quota.resetAt },
+        quota: {
+          used: quota.usedRequestsThisMonth,
+          limit: quota.maxRequestsPerMonth,
+          resetAt: quota.resetAt,
+        },
       },
       { status: 429 }
     );
@@ -81,111 +86,127 @@ async function __POST(req: Request) {
   let historyId: string | null = null;
 
   return runWithTenant(merchantId, async () => {
-  try {
-    // Pre-create a 'pending' history record
-    const historyRecord = await db.generationHistory.create({
-      data: {
+    try {
+      // Pre-create a 'pending' history record
+      const historyRecord = await db.generationHistory.create({
+        data: {
+          merchantId,
+          piUid,
+          type: 'VIDEO',
+          provider,
+          model: provider === 'runway' ? 'gen-3-alpha' : 'placeholder',
+          prompt,
+          status: 'pending',
+          metadata: { duration, resolution },
+        },
+      });
+      historyId = historyRecord.id as string;
+
+      logEvent('Video generation started', {
         merchantId,
         piUid,
-        type: 'VIDEO',
         provider,
-        model: provider === 'runway' ? 'gen-3-alpha' : 'placeholder',
-        prompt,
-        status: 'pending',
-        metadata: { duration, resolution },
-      },
-    });
-    historyId = historyRecord.id as string;
-
-    logEvent('Video generation started', {
-      merchantId,
-      piUid,
-      provider,
-      duration,
-      resolution,
-      promptPreview: prompt.slice(0, 100),
-    });
-
-    // ──────────────────────────────────────────────────────
-    // Provider routing — extend this switch to add new providers
-    // ──────────────────────────────────────────────────────
-    if (provider === 'runway' && process.env.RUNWAY_API_KEY) {
-      return await handleRunwayGeneration({
-        prompt,
         duration,
         resolution,
-        merchantId,
-        piUid,
-        historyId,
-        startTime,
-        db,
+        promptPreview: prompt.slice(0, 100),
       });
-    }
 
-    // Default: Placeholder response (service coming soon)
-    const durationMs = Date.now() - startTime;
-
-    await db.generationHistory.update({
-      where: { id: historyId },
-      data: {
-        status: 'pending',
-        metadata: {
+      // ──────────────────────────────────────────────────────
+      // Provider routing — extend this switch to add new providers
+      // ──────────────────────────────────────────────────────
+      if (provider === 'runway' && process.env.RUNWAY_API_KEY) {
+        return await handleRunwayGeneration({
+          prompt,
           duration,
           resolution,
-          provider,
-          note: 'Video generation provider not yet configured. Request queued.',
-        },
-        durationMs,
-      },
-    });
-
-    logEvent('Video generation queued (no provider)', { merchantId, provider });
-
-    trackUsage({ tenantId: merchantId, merchantId, type: 'ai_request', provider, model: 'placeholder', latencyMs: durationMs, success: true });
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        status: 'queued',
-        message:
-          'Video generation has been queued. This feature requires a video generation provider to be configured. ' +
-          'Supported providers: Runway ML (set RUNWAY_API_KEY), Pika Labs, Kling AI. ' +
-          'Contact support to enable video generation for your account.',
-        historyId,
-        provider,
-        prompt,
-        estimatedDurationSeconds: duration,
-        resolution,
-      },
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Video generation failed';
-
-    if (historyId) {
-      await db.generationHistory
-        .update({
-          where: { id: historyId },
-          data: {
-            status: 'failed',
-            errorMessage,
-            durationMs: Date.now() - startTime,
-          },
-        })
-        .catch(() => {
-          /* ignore */
+          merchantId,
+          piUid,
+          historyId,
+          startTime,
+          db,
         });
+      }
+
+      // Default: Placeholder response (service coming soon)
+      const durationMs = Date.now() - startTime;
+
+      await db.generationHistory.update({
+        where: { id: historyId },
+        data: {
+          status: 'pending',
+          metadata: {
+            duration,
+            resolution,
+            provider,
+            note: 'Video generation provider not yet configured. Request queued.',
+          },
+          durationMs,
+        },
+      });
+
+      logEvent('Video generation queued (no provider)', { merchantId, provider });
+
+      trackUsage({
+        tenantId: merchantId,
+        merchantId,
+        type: 'ai_request',
+        provider,
+        model: 'placeholder',
+        latencyMs: durationMs,
+        success: true,
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          status: 'queued',
+          message:
+            'Video generation has been queued. This feature requires a video generation provider to be configured. ' +
+            'Supported providers: Runway ML (set RUNWAY_API_KEY), Pika Labs, Kling AI. ' +
+            'Contact support to enable video generation for your account.',
+          historyId,
+          provider,
+          prompt,
+          estimatedDurationSeconds: duration,
+          resolution,
+        },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Video generation failed';
+
+      if (historyId) {
+        await db.generationHistory
+          .update({
+            where: { id: historyId },
+            data: {
+              status: 'failed',
+              errorMessage,
+              durationMs: Date.now() - startTime,
+            },
+          })
+          .catch(() => {
+            /* ignore */
+          });
+      }
+
+      trackUsage({
+        tenantId: merchantId,
+        merchantId,
+        type: 'ai_request',
+        provider,
+        latencyMs: Date.now() - startTime,
+        success: false,
+        error: errorMessage,
+      });
+
+      logError('Video generation failed', error, {
+        merchantId,
+        provider,
+        promptPreview: prompt.slice(0, 100),
+      });
+
+      return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
     }
-
-    trackUsage({ tenantId: merchantId, merchantId, type: 'ai_request', provider, latencyMs: Date.now() - startTime, success: false, error: errorMessage });
-
-    logError('Video generation failed', error, {
-      merchantId,
-      provider,
-      promptPreview: prompt.slice(0, 100),
-    });
-
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
-  }
   }); // end runWithTenant
 }
 

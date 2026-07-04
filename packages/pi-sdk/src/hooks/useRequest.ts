@@ -4,14 +4,14 @@
 // ================================================================
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ApiResponse, ApiError as ApiErrorType } from '../types/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ApiResponse } from '../types/api';
 import { ApiError } from '../types/api';
 
 export interface UseRequestState<T> {
-  data:    T | null;
+  data: T | null;
   loading: boolean;
-  error:   ApiError | null;
+  error: ApiError | null;
 }
 
 export interface UseRequestOptions<T> {
@@ -23,8 +23,7 @@ export interface UseRequestOptions<T> {
   immediate?: boolean;
 }
 
-export interface UseRequestReturn<T, A extends unknown[]>
-  extends UseRequestState<T> {
+export interface UseRequestReturn<T, A extends unknown[]> extends UseRequestState<T> {
   /** Fire the request with given args */
   execute: (...args: A) => Promise<T | null>;
   /** Abort in-flight request (sets loading = false) */
@@ -54,7 +53,7 @@ export interface UseRequestReturn<T, A extends unknown[]>
  */
 export function useRequest<T, A extends unknown[] = []>(
   requestFn: (...args: A) => Promise<ApiResponse<T>>,
-  options: UseRequestOptions<T> = {},
+  options: UseRequestOptions<T> = {}
 ): UseRequestReturn<T, A> {
   const [state, setState] = useState<UseRequestState<T>>({
     data: null,
@@ -63,13 +62,17 @@ export function useRequest<T, A extends unknown[] = []>(
   });
 
   // Refs keep latest values without re-creating `execute`
-  const fnRef      = useRef(requestFn);
-  const optsRef    = useRef(options);
-  const abortRef   = useRef<AbortController | null>(null);
+  const fnRef = useRef(requestFn);
+  const optsRef = useRef(options);
+  const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
-  useEffect(() => { fnRef.current   = requestFn; }, [requestFn]);
-  useEffect(() => { optsRef.current = options;    }, [options]);
+  useEffect(() => {
+    fnRef.current = requestFn;
+  }, [requestFn]);
+  useEffect(() => {
+    optsRef.current = options;
+  }, [options]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -84,7 +87,7 @@ export function useRequest<T, A extends unknown[] = []>(
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setState((prev: UseRequestState<T>) => ({ ...prev, loading: true, error: null }));
 
     try {
       const response = await fnRef.current(...args);
@@ -93,32 +96,28 @@ export function useRequest<T, A extends unknown[] = []>(
       setState({ data: response.data, loading: false, error: null });
       optsRef.current.onSuccess?.(response.data);
       return response.data;
-
     } catch (err) {
       if (!mountedRef.current) return null;
 
       // Silent cancel — do not surface as error
       if ((err as Error).name === 'AbortError') {
-        setState((prev) => ({ ...prev, loading: false }));
+        setState((prev: UseRequestState<T>) => ({ ...prev, loading: false }));
         return null;
       }
 
       // Ensure it's an ApiError (wrap raw errors)
       const apiError: ApiError =
-        err instanceof ApiError
-          ? err
-          : new ApiError((err as Error).message ?? 'Unknown error', 0);
+        err instanceof ApiError ? err : new ApiError((err as Error).message ?? 'Unknown error', 0);
 
       setState({ data: null, loading: false, error: apiError });
       optsRef.current.onError?.(apiError);
       return null;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // stable – refs handle stale closure
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();
-    setState((prev) => ({ ...prev, loading: false }));
+    setState((prev: UseRequestState<T>) => ({ ...prev, loading: false }));
   }, []);
 
   const reset = useCallback(() => {
@@ -132,7 +131,6 @@ export function useRequest<T, A extends unknown[] = []>(
     if (immediateRef.current) {
       void execute(...([] as unknown as A));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execute]);
 
   return { ...state, execute, cancel, reset };

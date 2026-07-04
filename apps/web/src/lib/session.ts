@@ -1,7 +1,14 @@
 import crypto from 'crypto';
 
 // 使用不可推导的密钥盐进行服务端签名。生产环境请确保配置了独立的环境变量
-const SECRET_KEY = process.env.PI_SESSION_SECRET || 'dev_fallback_secret_for_pi_hmac_2026';
+const SECRET_KEY = (() => {
+  const secret = process.env.PI_SESSION_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Missing required environment variable: PI_SESSION_SECRET');
+  }
+  return 'dev_fallback_secret_for_pi_hmac_2026';
+})();
 
 // Debug: surface whether the process is using env-provided secret or the fallback
 try {

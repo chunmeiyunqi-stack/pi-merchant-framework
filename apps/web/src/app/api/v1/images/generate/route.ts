@@ -12,6 +12,7 @@ import { logEvent, logError, runWithTenant, checkQuota, trackUsage } from '@pi-m
 import { withMetrics } from '@/lib/metrics-middleware';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 // 30 second timeout for image generation
 const IMAGE_GENERATION_TIMEOUT_MS = 30_000;
@@ -57,7 +58,7 @@ async function __POST(req: Request) {
 
   // DALL-E 3 only supports n=1; DALL-E 2 supports up to 10 (cap at 4 for cost control)
   const isDallE3 = model === 'dall-e-3';
-  const n = isDallE3 ? 1 : (typeof body.n === 'number' ? Math.min(body.n, 4) : 1);
+  const n = isDallE3 ? 1 : typeof body.n === 'number' ? Math.min(body.n, 4) : 1;
 
   if (!prompt) {
     return NextResponse.json({ success: false, error: 'Missing prompt' }, { status: 400 });
@@ -87,7 +88,10 @@ async function __POST(req: Request) {
   const validSizes = isDallE3 ? dallE3Sizes : dallE2Sizes;
   if (!validSizes.includes(size)) {
     return NextResponse.json(
-      { success: false, error: `Invalid size for ${model}. Must be one of: ${validSizes.join(', ')}` },
+      {
+        success: false,
+        error: `Invalid size for ${model}. Must be one of: ${validSizes.join(', ')}`,
+      },
       { status: 400 }
     );
   }
@@ -111,7 +115,8 @@ async function __POST(req: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Monthly AI request quota exceeded. Please upgrade your plan or wait for the next billing cycle.',
+        error:
+          'Monthly AI request quota exceeded. Please upgrade your plan or wait for the next billing cycle.',
         quota: {
           used: quota.usedRequestsThisMonth,
           limit: quota.maxRequestsPerMonth,
@@ -196,7 +201,16 @@ async function __POST(req: Request) {
           },
         });
 
-        trackUsage({ tenantId: merchantId, merchantId, type: 'ai_request', provider: 'openai', model, latencyMs: Date.now() - startTime, success: false, error: errorMessage });
+        trackUsage({
+          tenantId: merchantId,
+          merchantId,
+          type: 'ai_request',
+          provider: 'openai',
+          model,
+          latencyMs: Date.now() - startTime,
+          success: false,
+          error: errorMessage,
+        });
 
         logError('Image generation API error', new Error(errorMessage), {
           merchantId,
@@ -232,7 +246,15 @@ async function __POST(req: Request) {
         },
       });
 
-      trackUsage({ tenantId: merchantId, merchantId, type: 'ai_request', provider: 'openai', model, latencyMs: durationMs, success: true });
+      trackUsage({
+        tenantId: merchantId,
+        merchantId,
+        type: 'ai_request',
+        provider: 'openai',
+        model,
+        latencyMs: durationMs,
+        success: true,
+      });
 
       logEvent('Image generation completed', {
         merchantId,
@@ -275,10 +297,21 @@ async function __POST(req: Request) {
               durationMs: Date.now() - startTime,
             },
           })
-          .catch(() => { /* ignore DB update error */ });
+          .catch(() => {
+            /* ignore DB update error */
+          });
       }
 
-      trackUsage({ tenantId: merchantId, merchantId, type: 'ai_request', provider: 'openai', model, latencyMs: Date.now() - startTime, success: false, error: errorMessage });
+      trackUsage({
+        tenantId: merchantId,
+        merchantId,
+        type: 'ai_request',
+        provider: 'openai',
+        model,
+        latencyMs: Date.now() - startTime,
+        success: false,
+        error: errorMessage,
+      });
 
       logError('Image generation failed', error, {
         merchantId,

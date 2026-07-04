@@ -13,8 +13,12 @@ beforeAll(() => {
   process.env.OLLAMA_BASE_URL = 'http://localhost:11434';
 
   // 配置全局 fetch mock
-  // Only set up a global fetch mock if tests haven't provided one.
-  if (typeof (global as any).fetch === 'undefined') {
+  // Node 20+ ships a native `fetch` global, so checking `typeof fetch === 'undefined'`
+  // never triggers our mock and leaves the real (non-jest-mock) fetch in place, which
+  // then throws in afterEach's `.mockReset()`. Only skip installing our mock when a
+  // test file has already installed its own jest mock (e.g. `global.fetch = jest.fn()`
+  // at module scope, which runs before this beforeAll).
+  if (!jest.isMockFunction(global.fetch)) {
     setupFetchMock();
   }
 
@@ -25,8 +29,11 @@ beforeAll(() => {
 afterEach(() => {
   // 清理所有 mock
   jest.clearAllMocks();
-  // 重置 fetch mock
-  (global.fetch as jest.Mock).mockReset();
+  // 重置 fetch mock (only if it's actually a jest mock — defensive against a test
+  // file swapping in a non-mock fetch mid-suite)
+  if (jest.isMockFunction(global.fetch)) {
+    (global.fetch as jest.Mock).mockReset();
+  }
 });
 
 /**

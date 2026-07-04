@@ -130,6 +130,7 @@ describe('Logger', () => {
   describe('Webhook forwarding and degradation', () => {
     beforeEach(() => {
       process.env.MONITORING_WEBHOOK_URL = 'https://webhook.example.com/log';
+      mockFetch.mockResolvedValue({ ok: true } as Response);
     });
 
     it('forwards logs to webhook when URL is configured', () => {

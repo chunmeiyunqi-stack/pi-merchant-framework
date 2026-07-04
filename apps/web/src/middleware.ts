@@ -14,24 +14,22 @@ import type { NextRequest } from 'next/server';
 // ── Configuration ─────────────────────────────────────────────────────────────
 
 /** Routes requiring a valid session token */
-const PROTECTED_PREFIXES = [
-  '/history',
-  '/image-gen',
-  '/settings',
-  '/profile',
-  '/dashboard',
-];
+const PROTECTED_PREFIXES = ['/history', '/image-gen', '/settings', '/profile', '/dashboard'];
 
 /** Routes that always bypass auth (login, register, public API) */
 const PUBLIC_PREFIXES = [
   '/login',
   '/register',
+  '/services',
+  '/payment-result',
   '/api/auth',
   '/api/public',
+  '/api/services',
+  '/api/health',
 ];
 
-/** Cookie / localStorage key for the access token */
-const TOKEN_COOKIE = 'pi_access_token';
+/** Cookie set by /api/auth/pi on successful Pi login */
+const TOKEN_COOKIE = 'pi_auth_token';
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 
@@ -84,7 +82,5 @@ function isStaticAsset(pathname: string): boolean {
 
 // ── Matcher: skip known-static paths at the edge layer ────────────────────────
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt).*)'],
 };

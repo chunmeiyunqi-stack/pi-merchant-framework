@@ -28,9 +28,7 @@ interface PiPaymentCallbacks {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const [status, setStatus] = useState<'idle' | 'auth' | 'processing' | 'success' | 'failed'>(
-    'idle'
-  );
+  const [status, setStatus] = useState<'idle' | 'auth' | 'processing' | 'failed'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [piUser, setPiUser] = useState<{ uid: string; username: string } | null>(null);
   const [isPiBrowser, setIsPiBrowser] = useState(false);
@@ -125,14 +123,13 @@ export default function CheckoutPage() {
             body: JSON.stringify({ paymentId, txid }),
           });
           if (res.ok) {
-            setStatus('success');
+            router.push('/payment-result?status=success');
           } else {
-            setErrorMsg('支付完成确认失败，请联系客服');
-            setStatus('failed');
+            router.push('/payment-result?status=failed');
           }
         },
         onCancel: (_paymentId: string) => {
-          setStatus('idle');
+          router.push('/payment-result?status=cancelled');
         },
         onError: (error: Error) => {
           console.error('Pi payment error:', error);
@@ -154,24 +151,6 @@ export default function CheckoutPage() {
         </div>
 
         <div className="bg-[#150B20] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
-          {status === 'success' && (
-            <div className="absolute inset-0 bg-[#05020A]/90 backdrop-blur-md z-10 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-500">
-              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-4xl mb-6 shadow-[0_0_50px_rgba(34,197,94,0.3)]">
-                ✓
-              </div>
-              <h2 className="text-2xl font-bold mb-2">订单支付成功</h2>
-              <p className="text-neutral-500 text-center mb-10">
-                您的授权许可已即时生效，欢迎 {piUser?.username}！
-              </p>
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="px-10 py-4 bg-[#F3C136] text-black font-bold rounded-2xl hover:bg-[#EEA834] transition-all active:scale-95"
-              >
-                进入管理后台
-              </button>
-            </div>
-          )}
-
           <div className="p-8 md:p-12 space-y-8">
             <div className="space-y-4">
               <div className="flex justify-between items-end">

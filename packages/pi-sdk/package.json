@@ -12,8 +12,12 @@
     "docs": "typedoc"
   },
   "private": true,
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
     "jest-mock-fetch": "^2.0.5",
     "tsup": "^8.5.1",
     "typedoc": "^0.28.19",

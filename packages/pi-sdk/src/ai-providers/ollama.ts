@@ -50,7 +50,11 @@ export class OllamaProvider extends BaseAIProvider {
   constructor(config?: Partial<{ baseUrl: string; defaultModel: string; timeout: number }>) {
     super({
       apiKey: '', // Ollama 无需 API Key
-      baseUrl: config?.baseUrl ?? process.env.OLLAMA_API_BASE ?? DEFAULT_BASE_URL,
+      baseUrl:
+        config?.baseUrl ??
+        process.env.OLLAMA_API_BASE ??
+        process.env.OLLAMA_BASE_URL ??
+        DEFAULT_BASE_URL,
       defaultModel: config?.defaultModel ?? process.env.OLLAMA_MODEL ?? DEFAULT_MODEL,
       timeout: config?.timeout ?? DEFAULT_TIMEOUT,
     });
