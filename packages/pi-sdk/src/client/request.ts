@@ -12,9 +12,10 @@ import type {
   ErrorInterceptor,
 } from '../types/api';
 import { ApiError } from '../types/api';
+import { logError } from '../logger';
 
-const DEFAULT_TIMEOUT    = 30_000;
-const DEFAULT_RETRIES    = 3;
+const DEFAULT_TIMEOUT = 30_000;
+const DEFAULT_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 500;
 
 export class PiRequestClient {
@@ -26,6 +27,25 @@ export class PiRequestClient {
     response: [],
     error: [],
   };
+
+  private tokenProvider?: () => string | null | Promise<string | null>;
+  private licenseIdProvider?: () => string | null | Promise<string | null>;
+  private tokenRefreshHandler?: () => Promise<string | null>;
+
+  setTokenProvider(provider: () => string | null | Promise<string | null>): this {
+    this.tokenProvider = provider;
+    return this;
+  }
+
+  setLicenseIdProvider(provider: () => string | null | Promise<string | null>): this {
+    this.licenseIdProvider = provider;
+    return this;
+  }
+
+  setTokenRefreshHandler(handler: () => Promise<string | null>): this {
+    this.tokenRefreshHandler = handler;
+    return this;
+  }
 
   // ── Interceptor Registration ───────────────────────────────────────────────
 
@@ -59,9 +79,22 @@ export class PiRequestClient {
   // ── Core Request ──────────────────────────────────────────────────────────
 
   async request<T = unknown>(config: RequestConfig): Promise<ApiResponse<T>> {
+    // 1. Run automatic injection of token and licenseId if providers are configured
+    const requestHeaders = { ...config.headers };
 
-    // 1. Run request interceptors
-    let resolved = { ...config };
+    if (this.tokenProvider && !requestHeaders['Authorization']) {
+      const token = await this.tokenProvider();
+      if (token) requestHeaders['Authorization'] = `Bearer ${token}`;
+    }
+    if (this.licenseIdProvider && !requestHeaders['X-License-Id']) {
+      const licenseId = await this.licenseIdProvider();
+      if (licenseId) requestHeaders['X-License-Id'] = licenseId;
+    }
+
+    const resolvedConfig = { ...config, headers: requestHeaders };
+
+    // 2. Run request interceptors
+    let resolved: RequestConfig = resolvedConfig;
     for (const fn of this.interceptors.request) {
       resolved = await fn(resolved);
     }
@@ -80,15 +113,16 @@ export class PiRequestClient {
 
     const {
       url,
-      method      = 'GET',
-      headers     = {},
+      method = 'GET',
+      headers = {},
       body,
-      timeout     = DEFAULT_TIMEOUT,
-      retries     = DEFAULT_RETRIES,
-      retryDelay  = DEFAULT_RETRY_DELAY,
+      timeout = DEFAULT_TIMEOUT,
+      retries = DEFAULT_RETRIES,
+      retryDelay = DEFAULT_RETRY_DELAY,
     } = resolved;
 
     let lastError: ApiError | null = null;
+    let tokenRefreshed = false;
 
     // 3. Retry loop
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -101,7 +135,7 @@ export class PiRequestClient {
       try {
         const raw = await fetch(url, {
           method,
-          headers: { 'Content-Type': 'application/json', ...headers },
+          headers: { 'Content-Type': 'application/json', ...(resolved.headers ?? {}) },
           signal: controller.signal,
           ...(body !== undefined && { body: JSON.stringify(body) }),
         });
@@ -110,14 +144,32 @@ export class PiRequestClient {
 
         // 4. Error handling
         if (!raw.ok) {
-          const errBody = await raw.json().catch(() => ({})) as Record<string, unknown>;
+          const errBody = (await raw.json().catch(() => ({}))) as Record<string, unknown>;
+
+          // Check if token refresh is supported and retry on 401
+          if (raw.status === 401 && this.tokenRefreshHandler && !tokenRefreshed) {
+            try {
+              tokenRefreshed = true;
+              const freshToken = await this.tokenRefreshHandler();
+              if (freshToken) {
+                resolved.headers = {
+                  ...(resolved.headers ?? {}),
+                  Authorization: `Bearer ${freshToken}`,
+                };
+                attempt--; // Don't count refresh retry as a network retry
+                continue; // Retry request immediately with the fresh token
+              }
+            } catch (refreshErr) {
+              logError('Token refresh failed inside client request retry', refreshErr);
+            }
+          }
 
           // ── 429: distinguish rate-limit vs monthly quota ──────────────────
           if (raw.status === 429) {
             const retryAfterSecs = Number(raw.headers.get('Retry-After') ?? 60);
-            const quotaBlock     = errBody?.quota as Record<string, unknown> | undefined;
-            const errorCode      = (errBody?.error as Record<string, unknown>)?.code;
-            const isMonthly      = quotaBlock?.type === 'monthly' || errorCode === 'insufficient_quota';
+            const quotaBlock = errBody?.quota as Record<string, unknown> | undefined;
+            const errorCode = (errBody?.error as Record<string, unknown>)?.code;
+            const isMonthly = quotaBlock?.type === 'monthly' || errorCode === 'insufficient_quota';
 
             const err429 = new ApiError(
               isMonthly
@@ -126,10 +178,10 @@ export class PiRequestClient {
               429,
               {
                 type: isMonthly ? 'monthly_quota' : 'rate_limit',
-                resetAt:    quotaBlock?.reset_date as string | undefined,
+                resetAt: quotaBlock?.reset_date as string | undefined,
                 retryAfter: retryAfterSecs,
               },
-              errBody,
+              errBody
             );
 
             throw await this.runErrorInterceptors(err429);
@@ -139,7 +191,9 @@ export class PiRequestClient {
           if (raw.status >= 500 && attempt < retries) {
             lastError = new ApiError(
               (errBody?.message as string) ?? `Server error ${raw.status}`,
-              raw.status, undefined, errBody,
+              raw.status,
+              undefined,
+              errBody
             );
             await this.sleep(retryDelay * 2 ** attempt);
             continue;
@@ -149,22 +203,23 @@ export class PiRequestClient {
           throw await this.runErrorInterceptors(
             new ApiError(
               (errBody?.message as string) ?? raw.statusText,
-              raw.status, undefined, errBody,
-            ),
+              raw.status,
+              undefined,
+              errBody
+            )
           );
         }
 
         // 5. Success
-        const data = await raw.json() as T;
+        const data = (await raw.json()) as T;
         let response: ApiResponse<T> = { data, status: raw.status, headers: raw.headers };
 
         for (const fn of this.interceptors.response) {
-          response = await (fn as ResponseInterceptor<T>)(response) ?? response;
+          response = (await (fn as ResponseInterceptor<T>)(response)) ?? response;
         }
 
         if (key) this.controllers.delete(key);
         return response;
-
       } catch (err) {
         clearTimeout(timeoutId);
 
@@ -198,15 +253,27 @@ export class PiRequestClient {
     return this.request<T>({ ...cfg, url, method: 'GET' });
   }
 
-  post<T>(url: string, body?: unknown, cfg?: Omit<RequestConfig, 'url' | 'method' | 'body'>): Promise<ApiResponse<T>> {
+  post<T>(
+    url: string,
+    body?: unknown,
+    cfg?: Omit<RequestConfig, 'url' | 'method' | 'body'>
+  ): Promise<ApiResponse<T>> {
     return this.request<T>({ ...cfg, url, method: 'POST', body });
   }
 
-  put<T>(url: string, body?: unknown, cfg?: Omit<RequestConfig, 'url' | 'method' | 'body'>): Promise<ApiResponse<T>> {
+  put<T>(
+    url: string,
+    body?: unknown,
+    cfg?: Omit<RequestConfig, 'url' | 'method' | 'body'>
+  ): Promise<ApiResponse<T>> {
     return this.request<T>({ ...cfg, url, method: 'PUT', body });
   }
 
-  patch<T>(url: string, body?: unknown, cfg?: Omit<RequestConfig, 'url' | 'method' | 'body'>): Promise<ApiResponse<T>> {
+  patch<T>(
+    url: string,
+    body?: unknown,
+    cfg?: Omit<RequestConfig, 'url' | 'method' | 'body'>
+  ): Promise<ApiResponse<T>> {
     return this.request<T>({ ...cfg, url, method: 'PATCH', body });
   }
 

@@ -280,7 +280,9 @@ async function __POST(req: Request) {
       });
     } catch (error) {
       clearTimeout(timeoutId);
-      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      const isTimeout =
+        (error instanceof Error || error instanceof DOMException) &&
+        (error as { name?: string }).name === 'AbortError';
       const errorMessage = isTimeout
         ? 'Image generation timed out (30s limit)'
         : error instanceof Error

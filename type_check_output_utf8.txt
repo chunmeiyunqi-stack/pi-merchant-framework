@@ -1,0 +1,5 @@
+﻿
+> pi-merchant-framework@2.1.0 type-check
+> tsc --noEmit
+
+packages/pi-sdk/src/license/manager.ts(148,9): error TS2739: Type '{ id: string; issuedTo: string; merchantId: string; issuedAt: Date; expiresAt: Date; tier: "enterprise"; features: ("ai_routing" | "streaming" | "multi_tenant" | "usage_tracking" | "webhook_monitoring" | "advanced_analytics")[]; signature: string; }' is missing the following properties from type 'License': timestamp, nonce

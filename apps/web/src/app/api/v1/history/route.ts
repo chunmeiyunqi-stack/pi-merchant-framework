@@ -51,7 +51,7 @@ async function __GET(req: Request) {
     const db = prisma as AnyPrisma;
 
     // 在租户上下文中执行查询，Prisma 中间件将自动强制 merchantId 过滤
-    return runWithTenant(merchantId, async () => {
+    return await runWithTenant(merchantId, async () => {
       const [items, total] = await Promise.all([
         db.generationHistory.findMany({
           where,

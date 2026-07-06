@@ -1,0 +1,99 @@
+import os
+from docx import Document
+from docx.shared import Pt, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+
+# ================= 配置区 =================
+# 自动识别当前目录下的 packages 和 apps 文件夹
+SOURCE_CODE_DIRS = ["./packages", "./apps/web/src"] 
+SOFTWARE_NAME = "先锋人工智能服务框架软件"
+VERSION = "V1.0.0"
+OUTPUT_FILE = f"{SOFTWARE_NAME}_{VERSION}_源程序鉴别材料_60页.docx"
+LINES_PER_PAGE = 52 
+
+HEADER_TEXT = f"{SOFTWARE_NAME} {VERSION}"
+EXCLUDE_DIRS = {'node_modules', '.next', 'dist', '.git', 'coverage', '.turbo', 'migrations'}
+INCLUDE_EXTENSIONS = {'.ts', '.tsx', '.js', '.jsx'}
+
+def get_all_code_lines(root_dirs):
+    all_lines = []
+    for root_dir in root_dirs:
+        if not os.path.exists(root_dir):
+            print(f"⚠️ 警告：找不到目录 {root_dir}，已跳过。")
+            continue
+        for dirpath, dirnames, filenames in os.walk(root_dir):
+            dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
+            for filename in filenames:
+                ext = os.path.splitext(filename)[1]
+                if ext in INCLUDE_EXTENSIONS:
+                    filepath = os.path.join(dirpath, filename)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            lines = f.readlines()
+                            valid_lines = [line.rstrip('\n\r') for line in lines if line.strip()]
+                            all_lines.extend(valid_lines)
+                    except Exception as e:
+                        pass
+    return all_lines
+
+def set_header(doc, text):
+    section = doc.sections[0]
+    header = section.header
+    p = header.paragraphs[0]
+    p.text = text
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_format = p.paragraph_format
+    p_format.space_after = Pt(0)
+    run = p.runs[0]
+    run.font.name = '宋体'
+    run._element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+    run.font.size = Pt(9)
+
+def create_copyright_doc(lines, output_path):
+    doc = Document()
+    section = doc.sections[0]
+    section.top_margin = Cm(2.0)
+    section.bottom_margin = Cm(1.5)
+    section.left_margin = Cm(2.0)
+    section.right_margin = Cm(2.0)
+    set_header(doc, HEADER_TEXT)
+    
+    style = doc.styles['Normal']
+    font = style.font
+    font.name = 'Courier New'
+    font.size = Pt(9)
+    style.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+    
+    total_lines = len(lines)
+    total_pages = (total_lines + LINES_PER_PAGE - 1) // LINES_PER_PAGE
+    print(f"✅ 读取到总有效代码行数: {total_lines}")
+    print(f"✅ 预计总页数: {total_pages}")
+    
+    if total_pages <= 60:
+        start_idx = 0
+        end_idx = total_lines
+    else:
+        start_idx = 0
+        end_idx = 30 * LINES_PER_PAGE
+        back_start_idx = (total_pages - 30) * LINES_PER_PAGE
+        back_end_idx = total_lines
+        
+    for i in range(start_idx, end_idx):
+        doc.add_paragraph(lines[i])
+        
+    if total_pages > 60:
+        doc.add_page_break()
+        for i in range(back_start_idx, back_end_idx):
+            doc.add_paragraph(lines[i])
+
+    doc.save(output_path)
+    print(f"🎉 成功生成标准源程序鉴别材料: {output_path}")
+    print("⚠️ 请用 Word 打开该文件，检查页眉和代码格式，然后另存为 PDF 提交。")
+
+if __name__ == "__main__":
+    code_lines = get_all_code_lines(SOURCE_CODE_DIRS)
+    if not code_lines:
+        print("❌ 错误：未读取到任何有效代码行，请检查路径配置。")
+    else:
+        create_copyright_doc(code_lines, OUTPUT_FILE)

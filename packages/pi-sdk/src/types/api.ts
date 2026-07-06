@@ -37,7 +37,7 @@ export interface ApiResponse<T = unknown> {
 /** Quota details attached to 429 ApiError */
 export interface QuotaInfo {
   type: 'rate_limit' | 'monthly_quota';
-  resetAt?: string;    // ISO-8601 for monthly quota reset
+  resetAt?: string; // ISO-8601 for monthly quota reset
   retryAfter?: number; // seconds until safe to retry (rate limit)
 }
 
@@ -46,38 +46,84 @@ export class ApiError extends Error {
   public readonly status: number;
   public readonly quota?: QuotaInfo;
   public readonly details?: unknown;
+  public readonly code: string;
+  public readonly retryable: boolean;
 
-  constructor(
-    message: string,
-    status: number,
-    quota?: QuotaInfo,
-    details?: unknown,
-  ) {
+  constructor(message: string, status: number, quota?: QuotaInfo, details?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.quota = quota;
     this.details = details;
+
+    // Derive standard error fields
+    this.code = ApiError.deriveErrorCode(status, details);
+    this.retryable = ApiError.deriveRetryable(status);
   }
 
-  isRateLimit(): boolean    { return this.status === 429; }
-  isUnauthorized(): boolean { return this.status === 401; }
-  isForbidden(): boolean    { return this.status === 403; }
-  isNotFound(): boolean     { return this.status === 404; }
-  isServerError(): boolean  { return this.status >= 500; }
-  isNetworkError(): boolean { return this.status === 0; }
+  private static deriveErrorCode(status: number, details: unknown): string {
+    if (details && typeof details === 'object') {
+      const detailObj = details as Record<string, unknown>;
+      if (typeof detailObj.code === 'string') return detailObj.code;
+      if (detailObj.error && typeof detailObj.error === 'object') {
+        const errObj = detailObj.error as Record<string, unknown>;
+        if (typeof errObj.code === 'string') return errObj.code;
+      }
+    }
+    switch (status) {
+      case 0:
+        return 'NETWORK_ERROR';
+      case 400:
+        return 'BAD_REQUEST';
+      case 401:
+        return 'UNAUTHORIZED';
+      case 403:
+        return 'FORBIDDEN';
+      case 404:
+        return 'NOT_FOUND';
+      case 409:
+        return 'CONFLICT';
+      case 422:
+        return 'UNPROCESSABLE_ENTITY';
+      case 429:
+        return 'RATE_LIMIT';
+      default:
+        return status >= 500 ? 'SERVER_ERROR' : 'UNKNOWN_ERROR';
+    }
+  }
+
+  private static deriveRetryable(status: number): boolean {
+    return status >= 500 || status === 429 || status === 0;
+  }
+
+  isRateLimit(): boolean {
+    return this.status === 429;
+  }
+  isUnauthorized(): boolean {
+    return this.status === 401;
+  }
+  isForbidden(): boolean {
+    return this.status === 403;
+  }
+  isNotFound(): boolean {
+    return this.status === 404;
+  }
+  isServerError(): boolean {
+    return this.status >= 500;
+  }
+  isNetworkError(): boolean {
+    return this.status === 0;
+  }
 }
 
 // ─── Interceptor Types ────────────────────────────────────────────────────────
 
 /** Mutate / enrich outgoing config */
-export type RequestInterceptor = (
-  config: RequestConfig,
-) => RequestConfig | Promise<RequestConfig>;
+export type RequestInterceptor = (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
 
 /** Inspect / transform successful response */
 export type ResponseInterceptor<T = unknown> = (
-  response: ApiResponse<T>,
+  response: ApiResponse<T>
 ) => ApiResponse<T> | Promise<ApiResponse<T>>;
 
 /**
@@ -85,12 +131,10 @@ export type ResponseInterceptor<T = unknown> = (
  * - `throw error` / modified error → propagate
  * - `return error`                 → pass to next error interceptor
  */
-export type ErrorInterceptor = (
-  error: ApiError,
-) => ApiError | Promise<ApiError> | never;
+export type ErrorInterceptor = (error: ApiError) => ApiError | Promise<ApiError> | never;
 
 export interface InterceptorChain {
-  request:  RequestInterceptor[];
+  request: RequestInterceptor[];
   response: ResponseInterceptor[];
-  error:    ErrorInterceptor[];
+  error: ErrorInterceptor[];
 }

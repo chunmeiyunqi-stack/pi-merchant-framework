@@ -1,0 +1,89 @@
+// gen-source-pdf.js
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
+
+// 确保输出目录存在
+const outputDir = path.join(__dirname, 'softcopyright_output');
+if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+// 1. 读取源代码文本
+const sourceFile = path.join(__dirname, 'copyright-source-code-v2.txt');
+if (!fs.existsSync(sourceFile)) {
+    console.error('❌ 找不到 copyright-source-code-v2.txt，请确认文件在根目录！');
+    process.exit(1);
+}
+const codeText = fs.readFileSync(sourceFile, 'utf-8');
+
+// 2. 按 50 行切分
+const lines = codeText.split('\n');
+const pages = [];
+for (let i = 0; i < lines.length; i += 50) {
+    pages.push(lines.slice(i, i + 50).join('\n'));
+}
+
+// 如果超过 60 页，截取前 30 和后 30
+let finalPages = pages;
+if (pages.length > 60) {
+    finalPages = [...pages.slice(0, 30), '... (中间省略) ...', ...pages.slice(-30)];
+}
+
+// 3. 生成 HTML
+const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 0; }
+  body { margin: 0; padding: 0; font-family: 'Courier New', monospace; }
+  .page { 
+    width: 100%; 
+    height: 24.7cm; 
+    page-break-after: always; 
+    overflow: hidden; 
+    box-sizing: border-box;
+  }
+  pre.code-block { 
+    font-family: 'Courier New', Courier, monospace; 
+    font-size: 10.5pt; 
+    line-height: 14pt; 
+    margin: 0; padding: 0; white-space: pre; word-wrap: normal; 
+  }
+</style>
+</head>
+<body>
+${finalPages.map(page => `<div class="page"><pre class="code-block">${page.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre></div>`).join('')}
+</body>
+</html>
+`;
+
+const htmlPath = path.join(__dirname, 'source-code-temp.html');
+fs.writeFileSync(htmlPath, htmlContent);
+console.log('✅ HTML 生成完毕，正在调用 Chrome 生成 PDF...');
+
+// 4. 使用 Puppeteer 生成 PDF
+(async () => {
+  const browser = await puppeteer.launch({
+    executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    args: ['--no-sandbox']
+  });
+  const page = await browser.newPage();
+  await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle0' });
+
+  const pdfPath = path.join(outputDir, '01-源程序鉴别材料(补正版).pdf');
+
+  await page.pdf({
+    path: pdfPath,
+    format: 'A4',
+    displayHeaderFooter: true,
+    headerTemplate: '<div style="font-family: SimSun, 宋体, serif; font-size: 9pt; text-align: center; width: 100%; margin-top: 0.5cm;">先锋人工智能服务框架软件</div>',
+    footerTemplate: '<div style="font-family: SimSun, 宋体, serif; font-size: 9pt; text-align: center; width: 100%; margin-bottom: 0.5cm;">— 第 <span class="pageNumber"></span> 页 —</div>',
+    margin: { top: '2.5cm', bottom: '2.5cm', left: '2.5cm', right: '2.5cm' }
+  });
+
+  await browser.close();
+  // 清理临时 HTML
+  fs.unlinkSync(htmlPath);
+  console.log('🎉 源代码 PDF 生成成功！路径：', pdfPath);
+})();

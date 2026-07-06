@@ -161,6 +161,8 @@ export async function getActiveLicense(): Promise<LicenseValidationResult> {
             'advanced_analytics',
           ],
           signature: 'dev-signature',
+          timestamp: Date.now(),
+          nonce: 'dev-nonce',
         },
       };
     }
