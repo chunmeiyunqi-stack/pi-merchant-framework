@@ -29,8 +29,8 @@ function OrdersContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentStatus = searchParams.get('status') || 'ALL';
-  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const currentStatus = searchParams?.get('status') ?? 'ALL';
+  const currentPage = parseInt(searchParams?.get('page') ?? '1', 10);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -54,7 +54,7 @@ function OrdersContent() {
   }, [currentStatus, currentPage]);
 
   const handleStatusChange = (status: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
     if (status === 'ALL') {
       params.delete('status');
     } else {
@@ -67,7 +67,7 @@ function OrdersContent() {
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || (pagination && newPage > pagination.totalPages)) return;
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
     params.set('page', newPage.toString());
     router.push(`${pathname}?${params.toString()}`);
   };

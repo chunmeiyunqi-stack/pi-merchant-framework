@@ -5,6 +5,44 @@
 
 ---
 
+
+<!-- ============================================================ -->
+<!-- AI 数据工程扩展 (Monorepo)                                    -->
+<!-- ============================================================ -->
+
+## 🚀 AI 数据工程扩展 (Monorepo)
+
+> 本项目已演进为 **Monorepo 架构**，内置 Python AI 微服务，支持基于 LongCat-2.0 的代码质量自动评测与训练数据导出。详情见 [python-service/](python-service/README.md)。
+
+### 核心亮点
+
+| Icon | 特性 | 说明 |
+|------|------|------|
+| 🤖 | **全栈 AI 闭环** | Next.js 14 前端 + FastAPI 微服务 + LongCat-2.0 大模型 + PostgreSQL 15 |
+| 🕷️ | **自动化数据构建** | GitHub 异步爬取引擎，自动构建 TypeScript 代码评测数据集 |
+| 🧠 | **多维度 AI 评分** | 基于大模型自动评估代码的 **可读性 / 性能 / 规范性**，0-10 分量化输出 |
+| 📊 | **多格式训练数据导出** | 支持 JSON / CSV / JSONL（模型微调）格式一键导出 |
+| 🛡️ | **生产级质量保障** | 内置 **56 个自动化测试** (Pytest)，覆盖数据库、API、导出全链路 |
+
+### 快速启动 AI 微服务
+
+```bash
+# 进入 AI 微服务目录
+cd python-service
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env，填入 LONGCAT_API_KEY 和 DATABASE_URL
+
+# 安装依赖并启动
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+# 服务启动在 http://localhost:8000
+# API 文档在 http://localhost:8000/docs
+```
+
+> 详细文档请参见 [python-service/README.md](python-service/README.md)，包含完整的 API 参考、架构说明、测试运行指南和 56 项测试结果。
+
 ## 🎯 项目定位
 
 这不是一个单一商户 App，而是一个**可复用、可配置、可快速交付的商户应用框架**。
@@ -36,6 +74,37 @@
 | 构建工具 | Turborepo                                    |
 | 部署     | Vercel / Docker 兼容                         |
 | 支付     | Pi Network U2A Payment                       |
+
+---
+
+
+## 🏛️ 系统架构
+
+```mermaid
+graph TD
+    subgraph Monorepo
+        A[Next.js 14 Frontend] -->|API Routes| F[Next.js API Layer]
+        F -->|Prisma ORM| G[(PostgreSQL)]
+        A -->|/api/quality| B[FastAPI 微服务]
+        subgraph python-service
+            B --> H[CodeAnalyzer]
+            B --> I[DataExporter]
+            B -->|LLM Review| C[LongCat-2.0]
+            B -->|读写| D[(PostgreSQL)]
+            B -->|爬取| E[GitHub API]
+        end
+    end
+```
+
+**图例：**
+
+| 颜色 | 组件 | 说明 |
+|------|------|------|
+| 蓝色 | `python-service/` | Python AI 微服务（FastAPI + LLM 评测） |
+| 橙色 | LongCat-2.0 | AI 代码审查引擎 |
+| 绿色 | PostgreSQL | 主项目 Prisma + 微服务直连 |
+| 紫色 | GitHub API | 异步代码爬取 |
+| 灰色 | Next.js | 前端 + API 代理层 |
 
 ---
 

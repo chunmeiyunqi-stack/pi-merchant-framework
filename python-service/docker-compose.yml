@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  quality-analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - LONGCAT_API_KEY=${LONGCAT_API_KEY}
+      - LONGCAT_BASE_URL=${LONGCAT_BASE_URL}
+      - LONGCAT_MODEL=${LONGCAT_MODEL}
+      - DATABASE_URL=${DATABASE_URL:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # PostgreSQL (可选，仅当需要持久化分析结果时启用)
+  # db:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: pioneer_quality
+  #     POSTGRES_USER: pioneer
+  #     POSTGRES_PASSWORD: changeme
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U pioneer -d pioneer_quality"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # volumes:
+  #   pgdata:

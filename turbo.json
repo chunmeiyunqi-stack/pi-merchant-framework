@@ -16,11 +16,15 @@
     "POSTGRES_USER",
     "POSTGRES_HOST",
     "DATABASE_URL_UNPOOLED",
-    "PGDATABASE"
+    "PGDATABASE",
+    "PYTHON_SERVICE_URL",
+    "NEXT_PUBLIC_PYTHON_SERVICE_URL"
   ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "outputs": [
         ".next/**",
         "!.next/cache/**",
@@ -29,19 +33,25 @@
         "!apps/admin/.next/cache/**"
       ],
       "env": [
-        "PI_API_KEY",
-        "NEXT_PUBLIC_PI_SANDBOX",
-        "PI_PLATFORM_API_BASE",
+        "PYTHON_SERVICE_URL",
         "PI_SESSION_SECRET",
+        "PI_PLATFORM_API_BASE",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_PI_SANDBOX",
         "NEXT_PUBLIC_MERCHANT_ID",
-        "NEXT_PUBLIC_APP_URL"
+        "NEXT_PUBLIC_PYTHON_SERVICE_URL",
+        "PI_API_KEY"
       ]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "type-check": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "dev": {
       "cache": false,
