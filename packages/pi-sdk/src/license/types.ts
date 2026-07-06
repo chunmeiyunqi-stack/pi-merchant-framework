@@ -41,6 +41,10 @@ export interface License {
   maxTenants?: number;
   /** RSA-SHA256 数字签名（base64 编码） */
   signature: string;
+  /** 防重放与签名验证时间戳（毫秒数） */
+  timestamp: number;
+  /** 防重放随机值 */
+  nonce: string;
   /** License 元数据（扩展字段） */
   metadata?: Record<string, unknown>;
 }
@@ -78,5 +82,7 @@ export interface SerializedLicense {
   maxRequestsPerMonth?: number;
   maxTenants?: number;
   signature: string;
+  timestamp: number;
+  nonce: string;
   metadata?: Record<string, unknown>;
 }

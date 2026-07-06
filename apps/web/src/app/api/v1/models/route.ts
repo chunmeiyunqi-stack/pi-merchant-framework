@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // Pioneer AI Framework — GET /api/v1/models
 // 返回所有可用的 AI 模型列表
 // ============================================================
@@ -84,7 +84,7 @@ const MODEL_CATALOG: ModelInfo[] = [
     description: '本地部署的开源模型，数据完全不出境，适合隐私敏感场景',
     capabilities: ['text', 'stream'],
     maxTokens: 8192,
-    available: !!process.env.OLLAMA_BASE_URL,
+    available: !!(process.env.OLLAMA_API_BASE || process.env.OLLAMA_BASE_URL),
   },
   {
     id: 'mistral',
@@ -93,7 +93,7 @@ const MODEL_CATALOG: ModelInfo[] = [
     description: '本地轻量级开源模型，推理速度快',
     capabilities: ['text', 'stream'],
     maxTokens: 8192,
-    available: !!process.env.OLLAMA_BASE_URL,
+    available: !!(process.env.OLLAMA_API_BASE || process.env.OLLAMA_BASE_URL),
   },
 ];
 
@@ -107,7 +107,7 @@ async function __GET() {
   try {
     // Get factory to check which providers are actually available
     const factory = await getFactory();
-    const availableProviders = factory.getAvailableProviders().map((p) => p.name);
+    const availableProviders = factory.getAvailableProviders().map((p: any) => p.name);
     const primaryProvider = factory.getPrimaryProviderName();
 
     // Mark models as available based on provider availability

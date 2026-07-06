@@ -28,6 +28,7 @@ export function applyTenantMiddleware(prisma: PrismaClient) {
       'Booking',
       'Membership',
       'Service',
+      'GenerationHistory', // AI 生成记录必须按租户隔离，防止跨商户数据泄露
     ];
 
     try {

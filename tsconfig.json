@@ -17,11 +17,19 @@
     "jsx": "preserve",
     "incremental": true,
     "baseUrl": ".",
+    "typeRoots": ["./node_modules/@types", "./apps/web/node_modules/@types"],
     "paths": {
       "@/*": ["./apps/web/src/*", "./apps/admin/src/*", "./src/*"],
       "@pi-merchant/*": ["./packages/*/src"]
     }
   },
   "include": ["apps/**/*", "packages/**/*", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts", "**/*.spec.tsx", "**/*.test.tsx"]
+  "exclude": [
+    "node_modules",
+    "pi-merchant-framework",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.spec.tsx",
+    "**/*.test.tsx"
+  ]
 }

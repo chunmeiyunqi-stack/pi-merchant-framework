@@ -22,6 +22,18 @@ const REQUIRED_ENV_VARS: EnvSchema = {
     required: true,
     description: 'Pi Network API Key for backend verification',
   },
+  PI_SESSION_SECRET: {
+    required: true,
+    description: 'Session token HMAC secret',
+  },
+  JWT_SECRET: {
+    required: true,
+    description: 'JWT signing secret',
+  },
+  LICENSE_PAYLOAD_SECRET: {
+    required: true,
+    description: 'Secret key for signing/verifying license payloads',
+  },
   OPENAI_API_KEY: {
     required: false,
     description: 'OpenAI API Key (Required if using OpenAI provider)',
@@ -30,9 +42,17 @@ const REQUIRED_ENV_VARS: EnvSchema = {
     required: false,
     description: 'Anthropic API Key (Required if using Anthropic provider)',
   },
-  LICENSE_PAYLOAD_SECRET: {
-    required: true,
-    description: 'Secret key for signing/verifying license payloads',
+  LICENSE_PAYLOAD: {
+    required: false,
+    description: 'Base64-encoded serialized license payload',
+  },
+  NEXT_PUBLIC_MERCHANT_ID: {
+    required: false,
+    description: 'Default merchant / tenant identifier',
+  },
+  REDIS_URL: {
+    required: false,
+    description: 'Redis connection string for optional caching/queue features',
   },
 };
 
@@ -65,5 +85,11 @@ export function validateEnv(): void {
     } else {
       console.warn(errorMsg);
     }
+  }
+
+  if (process.env.NODE_ENV === 'production' && !process.env.LICENSE_PAYLOAD) {
+    console.error(
+      '[CRITICAL] Missing required environment variable: LICENSE_PAYLOAD (production license payload)'
+    );
   }
 }

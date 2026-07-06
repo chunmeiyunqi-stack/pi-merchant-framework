@@ -8,6 +8,7 @@ import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { withMetrics } from '@/lib/metrics-middleware';
+import { runWithTenant } from '@pi-merchant/pi-sdk';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,11 +35,9 @@ async function __GET(req: Request) {
     const type = searchParams.get('type'); // 'TEXT' | 'IMAGE' | 'VIDEO'
     const skip = (page - 1) * limit;
 
-    // 统一租户解析（优先级：x-tenant-id header → cookie merchant_id → env 默认）
-    const headerTenant = req.headers.get('x-tenant-id');
-    const cookieTenant = cookies().get('merchant_id')?.value;
-    const merchantId =
-      headerTenant ?? cookieTenant ?? process.env.NEXT_PUBLIC_MERCHANT_ID ?? 'merchant-demo-001';
+    // merchantId 只从服务端配置读取，不接受任何客户端传入的 tenant 声明，
+    // 防止通过 x-tenant-id 头部或 merchant_id Cookie 进行跨租户数据越权访问（IDOR）。
+    const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID ?? 'merchant-demo-001';
 
     // Build filter - piUid is the actual Pi User ID decoded from the session token
     const where = {
@@ -51,44 +50,47 @@ async function __GET(req: Request) {
 
     const db = prisma as AnyPrisma;
 
-    const [items, total] = await Promise.all([
-      db.generationHistory.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          type: true,
-          provider: true,
-          model: true,
-          prompt: true,
-          response: true,
-          imageUrl: true,
-          videoUrl: true,
-          promptTokens: true,
-          completionTokens: true,
-          totalTokens: true,
-          durationMs: true,
-          status: true,
-          createdAt: true,
-        },
-      }),
-      db.generationHistory.count({ where }),
-    ]);
+    // 在租户上下文中执行查询，Prisma 中间件将自动强制 merchantId 过滤
+    return await runWithTenant(merchantId, async () => {
+      const [items, total] = await Promise.all([
+        db.generationHistory.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            type: true,
+            provider: true,
+            model: true,
+            prompt: true,
+            response: true,
+            imageUrl: true,
+            videoUrl: true,
+            promptTokens: true,
+            completionTokens: true,
+            totalTokens: true,
+            durationMs: true,
+            status: true,
+            createdAt: true,
+          },
+        }),
+        db.generationHistory.count({ where }),
+      ]);
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        items,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-          hasMore: page * limit < total,
+      return NextResponse.json({
+        success: true,
+        data: {
+          items,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+            hasMore: page * limit < total,
+          },
         },
-      },
+      });
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch history';

@@ -7,6 +7,7 @@ import {
   hasFeature,
   isExpiringsoon,
   validateLicense,
+  verifySignature,
   type SerializedLicense,
 } from '../../license';
 
@@ -25,6 +26,8 @@ function makeRawLicense(overrides: Partial<SerializedLicense> = {}): SerializedL
     features: ['ai_routing', 'streaming', 'usage_tracking', 'webhook_monitoring'],
     maxRequestsPerMonth: 10000,
     signature: 'test-signature',
+    timestamp: Date.now(),
+    nonce: 'test-nonce-12345',
     ...overrides,
   };
 }
@@ -223,5 +226,84 @@ describe('getLicenseStatus', () => {
       })
     );
     expect(getLicenseStatus(license)).toBe('expired');
+  });
+
+  it('fails validation when nonce is missing or invalid', async () => {
+    const rawNoNonce = makeRawLicense({ nonce: '' });
+    const licenseNoNonce = deserializeLicense(rawNoNonce);
+    const result = await validateLicense(licenseNoNonce, rawNoNonce, { skipSignatureCheck: true });
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('missing or invalid nonce');
+  });
+
+  it('fails validation when timestamp is missing or negative', async () => {
+    const rawNoTS = makeRawLicense({ timestamp: 0 });
+    const licenseNoTS = deserializeLicense(rawNoTS);
+    const result = await validateLicense(licenseNoTS, rawNoTS, { skipSignatureCheck: true });
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('missing or invalid timestamp');
+  });
+
+  it('fails validation when timestamp is in the far future', async () => {
+    const rawFutureTS = makeRawLicense({ timestamp: Date.now() + 10 * 60 * 1000 }); // +10 minutes
+    const licenseFutureTS = deserializeLicense(rawFutureTS);
+    const result = await validateLicense(licenseFutureTS, rawFutureTS, {
+      skipSignatureCheck: true,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('timestamp is in the future');
+  });
+});
+
+// ──────────────────────────────────────────────
+// Signature Verification (HMAC and RSA)
+// ──────────────────────────────────────────────
+
+describe('verifySignature (HMAC and RSA)', () => {
+  it('correctly verifies valid HMAC signatures', async () => {
+    const crypto = await import('crypto');
+    const secret = 'my-test-hmac-secret-key-string-longer';
+    const secretBase64 = Buffer.from(secret).toString('base64');
+    const payload = 'canonical-data-pipe-separated';
+
+    const sigBase64 = crypto
+      .createHmac('sha256', Buffer.from(secretBase64, 'base64'))
+      .update(payload)
+      .digest('base64');
+
+    const isValid = await verifySignature(payload, sigBase64, secretBase64);
+    expect(isValid).toBe(true);
+
+    const isInvalid = await verifySignature(payload + '-altered', sigBase64, secretBase64);
+    expect(isInvalid).toBe(false);
+  });
+
+  it('correctly verifies valid RSA signatures', async () => {
+    const crypto = await import('crypto');
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+
+    const payload = 'canonical-data-for-rsa-signature';
+
+    const signer = crypto.createSign('SHA256');
+    signer.update(payload);
+    signer.end();
+    const sigBase64 = signer.sign(privateKey, 'base64');
+
+    const isValid = await verifySignature(payload, sigBase64, publicKey);
+    expect(isValid).toBe(true);
+
+    const isInvalidPayload = await verifySignature(payload + '-altered', sigBase64, publicKey);
+    expect(isInvalidPayload).toBe(false);
+
+    const isInvalidSignature = await verifySignature(
+      payload,
+      Buffer.from('fake-signature-string').toString('base64'),
+      publicKey
+    );
+    expect(isInvalidSignature).toBe(false);
   });
 });

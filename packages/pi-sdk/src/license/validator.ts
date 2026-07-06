@@ -50,6 +50,8 @@ export function buildSignablePayload(license: SerializedLicense): string {
     license.features.sort().join(','),
     license.maxRequestsPerMonth?.toString() ?? '',
     license.maxTenants?.toString() ?? '',
+    license.timestamp.toString(),
+    license.nonce,
   ].join('|');
 }
 
@@ -63,21 +65,45 @@ export async function verifySignature(
   publicKey: string
 ): Promise<boolean> {
   try {
-    // 将 base64 公钥（HMAC secret）转换为 CryptoKey
-    const keyData = Uint8Array.from(atob(publicKey), (c) => c.charCodeAt(0));
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw',
-      keyData,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    );
-
     const encoder = new TextEncoder();
     const sigBuffer = Uint8Array.from(atob(signature), (c) => c.charCodeAt(0));
-    return await crypto.subtle.verify('HMAC', cryptoKey, sigBuffer, encoder.encode(payload));
+    const payloadBuffer = encoder.encode(payload);
+
+    // If it's an RSA public key in PEM format
+    if (publicKey.includes('-----BEGIN PUBLIC KEY-----')) {
+      const pemBody = publicKey
+        .replace(/-----BEGIN PUBLIC KEY-----/, '')
+        .replace(/-----END PUBLIC KEY-----/, '')
+        .replace(/[\s\r\n]+/g, '');
+      const keyData = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+
+      const cryptoKey = await crypto.subtle.importKey(
+        'spki',
+        keyData,
+        {
+          name: 'RSASSA-PKCS1-v1_5',
+          hash: 'SHA-256',
+        },
+        false,
+        ['verify']
+      );
+
+      return await crypto.subtle.verify('RSASSA-PKCS1-v1_5', cryptoKey, sigBuffer, payloadBuffer);
+    } else {
+      // Fallback to default HMAC-SHA256 verification
+      const keyData = Uint8Array.from(atob(publicKey), (c) => c.charCodeAt(0));
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['verify']
+      );
+
+      return await crypto.subtle.verify('HMAC', cryptoKey, sigBuffer, payloadBuffer);
+    }
   } catch {
-    // 签名格式错误视为无效
+    // Invalid signature formatting or key structure
     return false;
   }
 }
@@ -130,7 +156,38 @@ export async function validateLicense(
     }
   }
 
-  // 2. 签名验证
+  // 2. 防重放与合法时间验证
+  if (!license.nonce || typeof license.nonce !== 'string' || license.nonce.trim() === '') {
+    return {
+      valid: false,
+      status: 'invalid',
+      license,
+      error: 'License rejection: missing or invalid nonce',
+    };
+  }
+
+  if (!license.timestamp || typeof license.timestamp !== 'number' || license.timestamp <= 0) {
+    return {
+      valid: false,
+      status: 'invalid',
+      license,
+      error: 'License rejection: missing or invalid timestamp',
+    };
+  }
+
+  // 允许 5 分钟的时钟偏差，但不能宣称为遥远未来的证书
+  const maxAllowedSkew = 5 * 60 * 1000;
+  if (license.timestamp > Date.now() + maxAllowedSkew) {
+    return {
+      valid: false,
+      status: 'invalid',
+      license,
+      error:
+        'License rejection: timestamp is in the future (invalid system clock or forged license)',
+    };
+  }
+
+  // 3. 签名验证
   if (!options.skipSignatureCheck) {
     const publicKey = process.env.LICENSE_PUBLIC_KEY;
     if (!publicKey) {
@@ -154,7 +211,7 @@ export async function validateLicense(
     }
   }
 
-  // 3. Feature Gate 检查
+  // 4. Feature Gate 检查
   if (options.requiredFeatures && options.requiredFeatures.length > 0) {
     const missingFeatures = options.requiredFeatures.filter((f) => !license.features.includes(f));
     if (missingFeatures.length > 0) {
@@ -167,7 +224,7 @@ export async function validateLicense(
     }
   }
 
-  // 4. 计算剩余天数
+  // 5. 计算剩余天数
   const daysRemaining = Math.ceil((license.expiresAt.getTime() - now.getTime()) / 86400000);
 
   return {

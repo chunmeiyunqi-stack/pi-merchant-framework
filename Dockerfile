@@ -14,9 +14,8 @@ RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 
 WORKDIR /app
 
-# Copy package manifests first to leverage cache
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY turbo.json ./
+# Copy package manifests first to leverage cache (include turbo.json)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
 COPY tsconfig.json ./
 COPY packages ./packages
 COPY apps ./apps
@@ -37,6 +36,8 @@ ENV DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/pi_merchant?sche
 # Provide safe placeholder env vars for build; these are NOT secrets for runtime
 ENV PI_API_KEY="dev"
 ENV LICENSE_PAYLOAD_SECRET="dev"
+# 启用 standalone 输出（CI/Docker 环境），规避 Windows symlink EPERM 问题
+ENV DOCKER_BUILD=1
 # Use a local pnpm store inside the builder and hoist packages to avoid symlinks to external stores
 # Temporarily set NODE_ENV=development so devDependencies (e.g. prisma) are installed for postinstall
 RUN NODE_ENV=development pnpm install --frozen-lockfile --reporter=default --store-dir=.pnpm-store --shamefully-hoist

@@ -1,6 +1,13 @@
 import crypto from 'crypto';
 
-const SECRET_KEY = process.env.PI_SESSION_SECRET || 'dev_fallback_secret_for_pi_hmac_2026';
+const SECRET_KEY = (() => {
+  const secret = process.env.PI_SESSION_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Missing required environment variable: PI_SESSION_SECRET');
+  }
+  return 'dev_fallback_secret_for_pi_hmac_2026';
+})();
 
 export function verifySessionToken(token: string): string | null {
   if (!token || !token.includes('.')) return null;

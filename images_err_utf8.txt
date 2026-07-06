@@ -1,0 +1,145 @@
+﻿node.exe : FAIL web-app ap
+ps/web/src/__tests__/api/v
+1/images-generate.test.ts
+所在位置 C:\Users\aizn\AppData
+\Local\hermes\node\pnpm.ps
+1:16 字符: 5
++     & "$basedir/node$exe
+"  "$basedir/node_modules/
+pnpm/bin/pnpm.mjs"  ...
++     ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (F  
+  AIL web-app ap...ener   
+ ate.test.ts:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+  POST /api/v1/images/gene
+rate
+    Authentication
+      鈭?returns 401 when n
+o auth cookie is present (
+3 ms)
+      鈭?returns 401 when t
+he token is invalid (1 ms)
+    Input validation
+      鈭?returns 400 when p
+rompt is missing
+      鈭?returns 400 when p
+rompt is empty string (1 m
+s)
+      鈭?returns 400 when p
+rompt exceeds 4000 charact
+ers
+      鈭?returns 400 for an
+ invalid model (1 ms)
+      鈭?returns 400 for an
+ invalid size for dall-e-3
+      鈭?returns 400 for an
+ invalid size for dall-e-2
+ (1 ms)
+      鈭?returns 400 when J
+SON body is malformed
+    Service availability
+      鈭?returns 503 when O
+PENAI_API_KEY is not confi
+gured
+    Quota enforcement
+      鈭?returns 429 when t
+he monthly quota is exceed
+ed (3 ms)
+    Successful generation
+      鈭?returns success=tr
+ue with images array (1 ms
+)
+      鈭?returns historyId 
+in the response
+      鈭?returns model and 
+provider metadata (1 ms)
+      鈭?creates a pending 
+history record before call
+ing OpenAI (1 ms)
+      鈭?updates history re
+cord to completed after su
+ccess (1 ms)
+      鈭?calls trackUsage w
+ith success=true
+      鈭?uses dall-e-2 when
+ explicitly requested (1 m
+s)
+    OpenAI API error propa
+gation
+      鈭?returns 400 when O
+penAI returns a 4xx error 
+(1 ms)
+      鈭?returns 502 when O
+penAI returns a 5xx error
+      鈭?updates history to
+ failed when OpenAI return
+s an error
+    Timeout handling
+      脳 returns 504 when t
+he fetch aborts due to tim
+eout (2 ms)
+      鈭?returns 500 for ge
+neric network errors (1 ms
+)
+      鈭?updates history to
+ failed on timeout (1 ms)
+
+  鈼?POST /api/v1/images/ge
+nerate 鈥?Timeout handling 
+鈥?returns 504 when the fet
+ch aborts due to timeout
+
+    expect(received).toBe(
+expected) // Object.is equ
+ality
+
+    Expected: 504
+    Received: 500
+
+    [0m [90m 344 |[39m
+     [90m 345 |[39m     
+  [36mconst[39m res [33
+m=[39m [36mawait[39m [
+33mPOST[39m(makeRequest({
+ prompt[33m:[39m [32m'A
+ cat'[39m }))[33m;[39m
+    [31m[1m>[22m[39m[
+90m 346 |[39m       expec
+t(res[33m.[39mstatus)[3
+3m.[39mtoBe([35m504[39m
+)[33m;[39m
+     [90m     |[39m     
+                     [31m
+[1m^[22m[39m
+     [90m 347 |[39m     
+  expect(res[33m.[39mbod
+y[33m.[39merror)[33m.[
+39mtoMatch([35m/timed out
+/i[39m)[33m;[39m
+     [90m 348 |[39m     
+})[33m;[39m
+     [90m 349 |[39m[0m
+
+      at Object.<anonymous
+> (apps/web/src/__tests__/
+api/v1/images-generate.tes
+t.ts:346:26)
+
+Test Suites: 1 failed, 1 t
+otal
+Tests:       1 failed, 23 
+passed, 24 total
+Snapshots:   0 total
+Time:        0.634 s, esti
+mated 1 s
+Ran all test suites matchi
+ng /images-generate.test.t
+s/i.

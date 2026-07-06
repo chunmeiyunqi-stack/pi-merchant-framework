@@ -1,10 +1,10 @@
 import '@testing-library/jest-dom';
+import * as nodeCrypto from 'crypto';
 
 // 全局测试配置
 beforeAll(() => {
   // 设置环境变量
-  // @ts-ignore - test env assignment
-  process.env.NODE_ENV = 'test';
+  (process.env as { NODE_ENV?: string }).NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-secret-key-for-testing-only';
   process.env.REDIS_URL = 'redis://localhost:6379';
   process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
@@ -13,7 +13,14 @@ beforeAll(() => {
   process.env.OLLAMA_BASE_URL = 'http://localhost:11434';
 
   // 配置全局 fetch mock
-  setupFetchMock();
+  // Node 20+ ships a native `fetch` global, so checking `typeof fetch === 'undefined'`
+  // never triggers our mock and leaves the real (non-jest-mock) fetch in place, which
+  // then throws in afterEach's `.mockReset()`. Only skip installing our mock when a
+  // test file has already installed its own jest mock (e.g. `global.fetch = jest.fn()`
+  // at module scope, which runs before this beforeAll).
+  if (!jest.isMockFunction(global.fetch)) {
+    setupFetchMock();
+  }
 
   // 配置 crypto mock
   setupCryptoMock();
@@ -22,8 +29,11 @@ beforeAll(() => {
 afterEach(() => {
   // 清理所有 mock
   jest.clearAllMocks();
-  // 重置 fetch mock
-  (global.fetch as jest.Mock).mockReset();
+  // 重置 fetch mock (only if it's actually a jest mock — defensive against a test
+  // file swapping in a non-mock fetch mid-suite)
+  if (jest.isMockFunction(global.fetch)) {
+    (global.fetch as jest.Mock).mockReset();
+  }
 });
 
 /**
@@ -156,15 +166,14 @@ function setupFetchMock() {
  */
 function setupCryptoMock() {
   if (typeof global.crypto === 'undefined') {
-    const crypto = require('crypto');
     (global as any).crypto = {
-      getRandomValues: (arr: any) => crypto.randomFillSync(arr),
+      getRandomValues: (arr: any) => nodeCrypto.randomFillSync(arr),
       subtle: {
         sign: async (algorithm: string, key: any, data: any) => {
-          return crypto.sign(algorithm, data, key) as any;
+          return nodeCrypto.sign(algorithm as any, data, key) as any;
         },
         verify: async (algorithm: string, key: any, signature: any, data: any) => {
-          return crypto.verify(algorithm, data, key, signature) as any;
+          return nodeCrypto.verify(algorithm as any, data, key, signature) as any;
         },
       },
     };

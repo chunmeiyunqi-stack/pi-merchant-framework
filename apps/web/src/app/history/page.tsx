@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 // ──────────────────────────────────────────
@@ -62,14 +62,23 @@ export default function HistoryPage() {
   const [activeType, setActiveType] = useState<GenerationType | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // 用于取消竞态条件：每次新请求开始时 abort 上一个
+  const abortRef = useRef<AbortController | null>(null);
 
   const fetchHistory = useCallback(async (page: number, type: GenerationType | 'ALL') => {
+    // 取消上一个仍在进行中的请求，防止旧结果覆盖新数据
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ page: String(page), limit: '15' });
       if (type !== 'ALL') params.set('type', type);
-      const res = await fetch(`/api/v1/history?${params.toString()}`);
+      const res = await fetch(`/api/v1/history?${params.toString()}`, {
+        signal: controller.signal,
+      });
       if (!res.ok) {
         if (res.status === 401) throw new Error('请先登录后查看历史记录');
         throw new Error('加载历史记录失败，请稍后重试');
@@ -78,10 +87,17 @@ export default function HistoryPage() {
       setItems(data.data?.items || []);
       setPagination(data.data?.pagination || null);
     } catch (e) {
+      // AbortError 是正常的竞态取消，不显示错误
+      if (e instanceof Error && e.name === 'AbortError') return;
       setError(e instanceof Error ? e.message : '未知错误');
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // 组件卸载时取消进行中的请求
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
   }, []);
 
   useEffect(() => {

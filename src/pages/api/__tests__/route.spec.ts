@@ -357,11 +357,22 @@ describe('API Routes (route.ts)', () => {
   });
 
   describe('POST /api/payments/complete - 支付完成', () => {
+    async function seedApproval(piTransactionId: string, amount: string) {
+      const { req, res } = createMocks({
+        method: 'POST',
+        body: { piTransactionId, amount },
+        headers: { cookie: 'pi_auth_token=valid-token' },
+      });
+      await handlePaymentApprove(req as any, res as any);
+      return JSON.parse(res._getData()).approvalId as string;
+    }
+
     it('应该完成支付流程', async () => {
+      const approvalId = await seedApproval('pi-txn-123', '10.5');
       const { req, res } = createMocks({
         method: 'POST',
         body: {
-          approvalId: 'approval-123',
+          approvalId,
           piTransactionId: 'pi-txn-123',
         },
         headers: {
@@ -378,10 +389,11 @@ describe('API Routes (route.ts)', () => {
     });
 
     it('应该写入区块链分布式账本', async () => {
+      const approvalId = await seedApproval('pi-txn-456', '25.0');
       const { req, res } = createMocks({
         method: 'POST',
         body: {
-          approvalId: 'approval-456',
+          approvalId,
           piTransactionId: 'pi-txn-456',
         },
         headers: {
