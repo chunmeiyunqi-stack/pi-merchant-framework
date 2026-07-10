@@ -24,7 +24,11 @@ describe('verifyPaymentSignature', () => {
 
   // ── Test 2: 签名不匹配返回 false ────────────
   it('returns false for a mismatched signature', () => {
-    const result = verifyPaymentSignature(payload, 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', secret);
+    const result = verifyPaymentSignature(
+      payload,
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      secret
+    );
     expect(result).toBe(false);
   });
 

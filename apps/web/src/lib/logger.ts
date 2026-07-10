@@ -10,7 +10,7 @@ const logLevel = process.env.LOG_LEVEL ?? (isProduction ? 'info' : 'debug');
 
 // 单例 Transport
 const transport = isProduction
-  ? undefined  // 生产环境输出 JSON 行，由容器运行时（Docker/Paas）收集
+  ? undefined // 生产环境输出 JSON 行，由容器运行时（Docker/Paas）收集
   : pino.transport({
       target: 'pino-pretty',
       options: {
@@ -37,14 +37,16 @@ export const logger = pino(
       return {};
     },
   },
-  transport,
+  transport
 );
 
 /**
  * 获取当前请求的 traceId（从 AsyncLocalStorage 或 headers）
  * 若不存在则生成新的 UUID 兜底
  */
-export function getTraceId(request?: { headers?: { get?: (name: string) => string | null } }): string {
+export function getTraceId(request?: {
+  headers?: { get?: (name: string) => string | null };
+}): string {
   if (request?.headers?.get) {
     const fromHeader = request.headers.get('x-trace-id');
     if (fromHeader) return fromHeader;
@@ -60,9 +62,7 @@ export function logWithTrace(
   traceId: string,
   level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace',
   message: string,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ): void {
   logger[level]({ traceId, ...context }, message);
 }
-
-

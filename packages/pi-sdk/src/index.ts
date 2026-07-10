@@ -20,24 +20,14 @@ export * from './tenant';
 // ─── V2.1.0 新增: 中间件层导出 ───────────────────────────────
 export { PiRequestClient } from './client/request';
 
-export {
-  createAuthInterceptor,
-  createRefreshingAuthInterceptor,
-} from './interceptors/auth';
+export { createAuthInterceptor, createRefreshingAuthInterceptor } from './interceptors/auth';
 export type { TokenProvider } from './interceptors/auth';
 
-export {
-  createRateLimitInterceptor,
-  createAutoRetryInterceptor,
-} from './interceptors/rateLimit';
+export { createRateLimitInterceptor, createAutoRetryInterceptor } from './interceptors/rateLimit';
 export type { RateLimitCallbacks } from './interceptors/rateLimit';
 
 export { useRequest } from './hooks/useRequest';
-export type {
-  UseRequestReturn,
-  UseRequestState,
-  UseRequestOptions,
-} from './hooks/useRequest';
+export type { UseRequestReturn, UseRequestState, UseRequestOptions } from './hooks/useRequest';
 
 export { ApiError } from './types/api';
 export type {
@@ -53,7 +43,6 @@ export type {
 
 // ─── License ─────────────────────────────────
 export * from './license/manager';
-
 
 // ─── License (V2.1.0) ────────────────────────────────────────────────
 export { deserializeLicense, validateLicense } from './license';

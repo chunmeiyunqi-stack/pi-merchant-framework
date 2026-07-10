@@ -26,10 +26,10 @@
 
 ### 创建项目
 
-| 项目 | 根目录 | 框架预设 |
-|------|--------|----------|
-| 商户前台 | `apps/web` | Next.js |
-| 管理后台 | `apps/admin` | Next.js |
+| 项目     | 根目录       | 框架预设 |
+| -------- | ------------ | -------- |
+| 商户前台 | `apps/web`   | Next.js  |
+| 管理后台 | `apps/admin` | Next.js  |
 
 web 和 admin 需要分别创建两个 Vercel 项目。
 
@@ -53,14 +53,14 @@ apps/admin/vercel.env.example.json
 
 ### 关键环境变量
 
-| 变量 | 说明 |
-|------|------|
-| `DATABASE_URL` | PostgreSQL 连接字符串 |
-| `NEXT_PUBLIC_APP_URL` | Web 应用公开 URL |
-| `NEXT_PUBLIC_ADMIN_URL` | Admin 应用公开 URL |
-| `PI_API_KEY` | Pi Network API Key |
-| `PI_SANDBOX` | 沙箱模式（生产设为 `false`） |
-| `LICENSE_PAYLOAD` | License 载荷 |
+| 变量                    | 说明                         |
+| ----------------------- | ---------------------------- |
+| `DATABASE_URL`          | PostgreSQL 连接字符串        |
+| `NEXT_PUBLIC_APP_URL`   | Web 应用公开 URL             |
+| `NEXT_PUBLIC_ADMIN_URL` | Admin 应用公开 URL           |
+| `PI_API_KEY`            | Pi Network API Key           |
+| `PI_SANDBOX`            | 沙箱模式（生产设为 `false`） |
+| `LICENSE_PAYLOAD`       | License 载荷                 |
 
 ### 数据库迁移
 
@@ -78,12 +78,12 @@ pnpm db:migrate:deploy
 
 ### 架构
 
-| 服务 | 镜像 | 端口 |
-|------|------|------|
-| app (web) | `Dockerfile` | :3000 |
-| admin | `Dockerfile.admin` | :3001 |
-| db | postgres:15-alpine | 内网 |
-| nginx | nginx:alpine | :80 |
+| 服务      | 镜像               | 端口  |
+| --------- | ------------------ | ----- |
+| app (web) | `Dockerfile`       | :3000 |
+| admin     | `Dockerfile.admin` | :3001 |
+| db        | postgres:15-alpine | 内网  |
+| nginx     | nginx:alpine       | :80   |
 
 ### 首次部署
 
@@ -214,18 +214,18 @@ git push origin main
 
 ### 所需 Secrets
 
-| Secret | 用途 |
-|--------|------|
-| `DOCKER_USERNAME` | Docker Hub 用户名 |
-| `DOCKER_PASSWORD` | Docker Hub 密码/Token |
-| `DOCKER_REPOSITORY` | Docker 镜像仓库名 |
-| `STAGING_DATABASE_URL` | Staging 数据库连接 |
-| `PRODUCTION_DATABASE_URL` | 生产数据库连接 |
-| `VERCEL_TOKEN` | Vercel 部署 Token |
-| `DEPLOY_HOST` | 部署服务器 IP |
-| `DEPLOY_USER` | SSH 用户 |
-| `DEPLOY_SSH_KEY` | SSH 私钥 |
-| `DEPLOY_PATH` | 部署目录路径 |
+| Secret                    | 用途                  |
+| ------------------------- | --------------------- |
+| `DOCKER_USERNAME`         | Docker Hub 用户名     |
+| `DOCKER_PASSWORD`         | Docker Hub 密码/Token |
+| `DOCKER_REPOSITORY`       | Docker 镜像仓库名     |
+| `STAGING_DATABASE_URL`    | Staging 数据库连接    |
+| `PRODUCTION_DATABASE_URL` | 生产数据库连接        |
+| `VERCEL_TOKEN`            | Vercel 部署 Token     |
+| `DEPLOY_HOST`             | 部署服务器 IP         |
+| `DEPLOY_USER`             | SSH 用户              |
+| `DEPLOY_SSH_KEY`          | SSH 私钥              |
+| `DEPLOY_PATH`             | 部署目录路径          |
 
 ### 环境保护
 

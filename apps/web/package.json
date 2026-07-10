@@ -1,40 +1,40 @@
 ﻿{
-    "name":  "@pi-merchant/web",
-    "version":  "2.1.0",
-    "private":  true,
-    "scripts":  {
-                    "dev":  "next dev -p 3000",
-                    "build":  "next build \u0026\u0026 node -e \"const fs=require(\u0027fs\u0027),p=require(\u0027path\u0027);const expDir=p.resolve(\u0027.next/export\u0027);const det=p.resolve(\u0027.next/export-detail.json\u0027);fs.mkdirSync(expDir,{recursive:true});fs.writeFileSync(p.join(expDir,\u0027404.html\u0027),\u0027\u003c!DOCTYPE html\u003e\u003chtml lang=zh-CN\u003e\u003chead\u003e\u003cmeta charset=utf-8\u003e\u003ctitle\u003e404\u003c/title\u003e\u003cmeta http-equiv=refresh content=0;url=/\u003e\u003c/head\u003e\u003cbody\u003e\u003c/body\u003e\u003c/html\u003e\u0027);fs.writeFileSync(p.join(expDir,\u0027500.html\u0027),\u0027500\u0027);fs.writeFileSync(det,JSON.stringify({version:0,success:true,outDirectory:expDir}))\"",
-                    "start":  "next start -p 3000",
-                    "lint":  "next lint",
-                    "type-check":  "tsc --noEmit",
-                    "start:prod":  "node server.js"
-                },
-    "dependencies":  {
-                         "@pi-merchant/pi-sdk":  "workspace:*",
-                         "react-dom":  "^18.3.0",
-                         "pino-pretty":  "^11.0.0",
-                         "bullmq":  "^5.0.0",
-                         "sonner":  "^2.0.7",
-                         "react":  "^18.3.0",
-                         "next":  "^14.2.0",
-                         "@prisma/client":  "^5.12.0",
-                         "pino":  "^9.0.0",
-                         "jose":  "^5.2.0",
-                         "@pi-merchant/config":  "workspace:*",
-                         "@pi-merchant/types":  "workspace:*",
-                         "ioredis":  "^5.4.0"
-                     },
-    "devDependencies":  {
-                            "@types/node":  "^20.0.0",
-                            "@types/react":  "^18.3.0",
-                            "@types/react-dom":  "^18.3.0",
-                            "autoprefixer":  "^10.4.0",
-                            "eslint":  "^8.0.0",
-                            "eslint-config-next":  "^14.2.0",
-                            "postcss":  "^8.4.0",
-                            "prisma":  "^5.12.0",
-                            "tailwindcss":  "^3.4.0",
-                            "typescript":  "^5.4.0"
-                        }
+  "name": "@pi-merchant/web",
+  "version": "2.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build \u0026\u0026 node -e \"const fs=require(\u0027fs\u0027),p=require(\u0027path\u0027);const expDir=p.resolve(\u0027.next/export\u0027);const det=p.resolve(\u0027.next/export-detail.json\u0027);fs.mkdirSync(expDir,{recursive:true});fs.writeFileSync(p.join(expDir,\u0027404.html\u0027),\u0027\u003c!DOCTYPE html\u003e\u003chtml lang=zh-CN\u003e\u003chead\u003e\u003cmeta charset=utf-8\u003e\u003ctitle\u003e404\u003c/title\u003e\u003cmeta http-equiv=refresh content=0;url=/\u003e\u003c/head\u003e\u003cbody\u003e\u003c/body\u003e\u003c/html\u003e\u0027);fs.writeFileSync(p.join(expDir,\u0027500.html\u0027),\u0027500\u0027);fs.writeFileSync(det,JSON.stringify({version:0,success:true,outDirectory:expDir}))\"",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "start:prod": "node server.js"
+  },
+  "dependencies": {
+    "@pi-merchant/pi-sdk": "workspace:*",
+    "react-dom": "^18.3.0",
+    "pino-pretty": "^11.0.0",
+    "bullmq": "^5.0.0",
+    "sonner": "^2.0.7",
+    "react": "^18.3.0",
+    "next": "^14.2.0",
+    "@prisma/client": "^5.12.0",
+    "pino": "^9.0.0",
+    "jose": "^5.2.0",
+    "@pi-merchant/config": "workspace:*",
+    "@pi-merchant/types": "workspace:*",
+    "ioredis": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.2.0",
+    "postcss": "^8.4.0",
+    "prisma": "^5.12.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.4.0"
+  }
 }

@@ -2,7 +2,11 @@
 // AI Provider Factory - Unit Tests
 // Tests: getProvider(), ConfigurationError, ProviderNotFoundError
 // ============================================================
-import { AIProviderFactory, resetProviderFactory, getProviderFactory } from '../../ai-providers/factory';
+import {
+  AIProviderFactory,
+  resetProviderFactory,
+  getProviderFactory,
+} from '../../ai-providers/factory';
 import { OpenAIProvider } from '../../ai-providers/openai';
 import { AnthropicProvider } from '../../ai-providers/anthropic';
 import { OllamaProvider } from '../../ai-providers/ollama';
@@ -73,20 +77,14 @@ describe('AI Provider Factory', () => {
     it('throws ConfigurationError-like when routing to unavailable provider', async () => {
       factory = new AIProviderFactory();
       await expect(
-        factory.route(
-          { messages: [{ role: 'user', content: 'test' }] },
-          'openai'
-        )
+        factory.route({ messages: [{ role: 'user', content: 'test' }] }, 'openai')
       ).rejects.toThrow(/not available/i);
     });
 
     it('throws when routing to anthropic without API key', async () => {
       factory = new AIProviderFactory();
       await expect(
-        factory.route(
-          { messages: [{ role: 'user', content: 'test' }] },
-          'anthropic'
-        )
+        factory.route({ messages: [{ role: 'user', content: 'test' }] }, 'anthropic')
       ).rejects.toThrow(/not available/i);
     });
   });
@@ -114,4 +112,3 @@ describe('AI Provider Factory', () => {
     });
   });
 });
-

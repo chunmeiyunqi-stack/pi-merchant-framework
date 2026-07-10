@@ -20,7 +20,6 @@ export async function GET() {
 
   checks.database = dbOk ? 'connected' : 'unavailable';
 
-  const healthy = !process.env.DATABASE_URL || dbOk ;
+  const healthy = !process.env.DATABASE_URL || dbOk;
   return NextResponse.json(checks, { status: healthy ? 200 : 503 });
 }
-

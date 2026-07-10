@@ -71,7 +71,10 @@ async function __POST(req: Request) {
   const validSizes = isDallE3 ? dallE3Sizes : dallE2Sizes;
   if (!validSizes.includes(size)) {
     return NextResponse.json(
-      { success: false, error: `Invalid size for ${model}. Must be one of: ${validSizes.join(', ')}` },
+      {
+        success: false,
+        error: `Invalid size for ${model}. Must be one of: ${validSizes.join(', ')}`,
+      },
       { status: 400 }
     );
   }
@@ -92,8 +95,13 @@ async function __POST(req: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Monthly AI request quota exceeded. Please upgrade your plan or wait for the next billing cycle.',
-        quota: { used: quota.usedRequestsThisMonth, limit: quota.maxRequestsPerMonth, resetAt: quota.resetAt },
+        error:
+          'Monthly AI request quota exceeded. Please upgrade your plan or wait for the next billing cycle.',
+        quota: {
+          used: quota.usedRequestsThisMonth,
+          limit: quota.maxRequestsPerMonth,
+          resetAt: quota.resetAt,
+        },
       },
       { status: 429 }
     );
@@ -107,9 +115,12 @@ async function __POST(req: Request) {
   try {
     const record = await db.generationHistory.create({
       data: {
-        merchantId, piUid,
-        type: 'IMAGE', provider: 'openai',
-        model, prompt,
+        merchantId,
+        piUid,
+        type: 'IMAGE',
+        provider: 'openai',
+        model,
+        prompt,
         status: 'pending',
       },
     });
@@ -139,22 +150,31 @@ async function __POST(req: Request) {
 
     logger.info({ traceId, jobId: job.id, historyId }, 'Image generation job enqueued');
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        jobId: job.id,
-        historyId,
-        status: 'pending',
-        estimatedWaitMs: 5000,
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          jobId: job.id,
+          historyId,
+          status: 'pending',
+          estimatedWaitMs: 5000,
+        },
       },
-    }, { status: 202 });
+      { status: 202 }
+    );
   } catch (queueError: any) {
     logger.error({ traceId, err: queueError, historyId }, 'Failed to enqueue image generation job');
 
-    await db.generationHistory.update({
-      where: { id: historyId },
-      data: { status: 'failed', errorMessage: 'Queue unavailable', durationMs: Date.now() - startTime },
-    }).catch(() => {});
+    await db.generationHistory
+      .update({
+        where: { id: historyId },
+        data: {
+          status: 'failed',
+          errorMessage: 'Queue unavailable',
+          durationMs: Date.now() - startTime,
+        },
+      })
+      .catch(() => {});
 
     return NextResponse.json(
       { success: false, error: 'Generation service temporarily unavailable. Please try again.' },
@@ -164,4 +184,3 @@ async function __POST(req: Request) {
 }
 
 export const POST = withMetrics(__POST);
-

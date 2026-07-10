@@ -33,7 +33,18 @@ interface DallEResponse {
 export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJobResult>(
   'image-generation',
   async (job: Job<ImageGenerationJobData>): Promise<ImageGenerationJobResult> => {
-    const { traceId, piUid, merchantId, prompt, size, quality, model, n, openaiApiKey, openaiBaseUrl } = job.data;
+    const {
+      traceId,
+      piUid,
+      merchantId,
+      prompt,
+      size,
+      quality,
+      model,
+      n,
+      openaiApiKey,
+      openaiBaseUrl,
+    } = job.data;
     const startTime = Date.now();
     const db = prisma as AnyPrisma;
 
@@ -41,7 +52,10 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
     const activeTraceId = traceId || getTraceId();
     let historyId: string | null = null;
 
-    logger.info({ traceId: activeTraceId, jobId: job.id, attempt: job.attemptsMade + 1 }, 'Processing image generation');
+    logger.info(
+      { traceId: activeTraceId, jobId: job.id, attempt: job.attemptsMade + 1 },
+      'Processing image generation'
+    );
 
     // Create history record in pending state
     try {
@@ -58,12 +72,18 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
       });
       historyId = record.id as string;
     } catch (dbError) {
-      logger.error({ traceId: activeTraceId, jobId: job.id, err: dbError }, 'Failed to create history record');
+      logger.error(
+        { traceId: activeTraceId, jobId: job.id, err: dbError },
+        'Failed to create history record'
+      );
       throw dbError; // Let BullMQ retry
     }
 
     try {
-      logger.info({ traceId: activeTraceId, jobId: job.id, merchantId, model, size, quality }, 'Calling OpenAI image API');
+      logger.info(
+        { traceId: activeTraceId, jobId: job.id, merchantId, model, size, quality },
+        'Calling OpenAI image API'
+      );
 
       const controller = new AbortController();
       const timeoutMs = parseInt(process.env.IMAGE_GENERATION_TIMEOUT_MS || '30000', 10);
@@ -92,15 +112,25 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
         try {
           const errorData = JSON.parse(errorText);
           errorMessage = errorData?.error?.message || errorMessage;
-        } catch { }
+        } catch {}
 
-        logger.warn({ traceId: activeTraceId, jobId: job.id, httpStatus: openaiResponse.status, errorMessage }, 'OpenAI API returned error');
+        logger.warn(
+          {
+            traceId: activeTraceId,
+            jobId: job.id,
+            httpStatus: openaiResponse.status,
+            errorMessage,
+          },
+          'OpenAI API returned error'
+        );
 
         if (historyId) {
-          await db.generationHistory.update({
-            where: { id: historyId },
-            data: { status: 'failed', errorMessage, durationMs },
-          }).catch(() => {});
+          await db.generationHistory
+            .update({
+              where: { id: historyId },
+              data: { status: 'failed', errorMessage, durationMs },
+            })
+            .catch(() => {});
         }
 
         // 429/功屋译发批次重复过期生成重复
@@ -124,7 +154,9 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
             status: 'completed',
             durationMs,
             metadata: {
-              size, quality, n,
+              size,
+              quality,
+              n,
               revisedPrompt: revisedPrompt || prompt,
               allImages: images.map((img) => img.url).filter(Boolean),
             },
@@ -132,7 +164,10 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
         });
       }
 
-      logger.info({ traceId: activeTraceId, jobId: job.id, durationMs, imageCount: images.length }, 'Image generation completed');
+      logger.info(
+        { traceId: activeTraceId, jobId: job.id, durationMs, imageCount: images.length },
+        'Image generation completed'
+      );
 
       return {
         success: true,
@@ -150,30 +185,35 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
           ? error.message
           : 'Image generation failed';
 
-      logger.error({
-        traceId: activeTraceId,
-        jobId: job.id,
-        attempt: job.attemptsMade + 1,
-        maxAttempts: job.opts?.attempts ?? 3,
-        err: error,
-        durationMs,
-        isAbort,
-      }, 'Image generation failed');
+      logger.error(
+        {
+          traceId: activeTraceId,
+          jobId: job.id,
+          attempt: job.attemptsMade + 1,
+          maxAttempts: job.opts?.attempts ?? 3,
+          err: error,
+          durationMs,
+          isAbort,
+        },
+        'Image generation failed'
+      );
 
       // Update GenerationHistory to FAILED
       if (historyId) {
-        await db.generationHistory.update({
-          where: { id: historyId },
-          data: {
-            status: 'failed',
-            errorMessage,
-            durationMs,
-            metadata: {
-              failedAt: new Date().toISOString(),
-              attempt: job.attemptsMade+ 1,
+        await db.generationHistory
+          .update({
+            where: { id: historyId },
+            data: {
+              status: 'failed',
+              errorMessage,
+              durationMs,
+              metadata: {
+                failedAt: new Date().toISOString(),
+                attempt: job.attemptsMade + 1,
+              },
             },
-          },
-        }).catch(() => {});
+          })
+          .catch(() => {});
       }
 
       throw error;
@@ -189,22 +229,36 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
         delay: 2000,
       },
     },
-  },);
+  }
+);
 
 // Event listeners
-imageWorker.on('completed', (job: Job<ImageGenerationJobData>, result: ImageGenerationJobResult) => {
-  logger.info({ traceId: job.data.traceId, jobId: job.id, success: result.success, durationMs: result.durationMs }, 'Job completed');
-});
+imageWorker.on(
+  'completed',
+  (job: Job<ImageGenerationJobData>, result: ImageGenerationJobResult) => {
+    logger.info(
+      {
+        traceId: job.data.traceId,
+        jobId: job.id,
+        success: result.success,
+        durationMs: result.durationMs,
+      },
+      'Job completed'
+    );
+  }
+);
 
 imageWorker.on('failed', (job: Job<ImageGenerationJobData> | undefined, error: Error) => {
   if (!job) return;
-  logger.error({ traceId: job.data.traceId, jobId: job.id, attemptsMade: job.attemptsMade, err: error }, 'Job failed after all retries');
+  logger.error(
+    { traceId: job.data.traceId, jobId: job.id, attemptsMade: job.attemptsMade, err: error },
+    'Job failed after all retries'
+  );
 });
 
 imageWorker.on('error', (error: Error) => {
   logger.error({ err: error }, 'Worker error');
 });
-
 
 // ── Graceful shutdown handler ───────────────────────────
 const SHUTDOWN_TIMEOUT_MS = 10_000; // 10s forced exit
@@ -237,4 +291,3 @@ process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 process.on('unhandledRejection', (reason) => {
   logger.error({ err: reason }, 'Unhandled rejection detected');
 });
-
