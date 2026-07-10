@@ -1,4 +1,4 @@
-import type { PrismaClient, Prisma } from '@prisma/client';
+﻿import type { PrismaClient, Prisma } from '@prisma/client';
 import { getTenantId } from './context';
 
 /**
@@ -28,17 +28,17 @@ export function applyTenantMiddleware(prisma: PrismaClient) {
       'Booking',
       'Membership',
       'Service',
-      'GenerationHistory', // AI 生成记录必须按租户隔离，防止跨商户数据泄露
+      'GenerationHistory',
     ];
 
     try {
       if (tenantId && params.model && modelsRequiringIsolation.includes(params.model)) {
-        // Ensure args exists
         params.args = params.args || {};
 
-        // For findUnique/findFirst, Prisma expects where to be present
         if (params.action === 'findUnique' || params.action === 'findFirst') {
           params.args.where = { ...params.args.where, merchantId: tenantId };
+        } else if (params.action === 'create' && params.args.data) {
+          params.args.data = { ...params.args.data, merchantId: tenantId };
         } else if (
           params.action === 'findMany' ||
           params.action === 'updateMany' ||

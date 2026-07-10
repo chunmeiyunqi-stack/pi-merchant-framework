@@ -1,4 +1,4 @@
-name: CI / CD
+﻿name: CI / CD
 
 on:
   push:
@@ -10,81 +10,54 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PNPM_VERSION: "8"
+  NODE_VERSION: "20"
+
 jobs:
   lint-typecheck:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: ${{ env.PNPM_VERSION }}
           cache: true
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.pnpm-store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run ESLint
-        run: pnpm lint
-
-      - name: Type check
-        run: |
-          if pnpm -v >/dev/null 2>&1; then
-            pnpm run type-check || npx tsc --noEmit
-          else
-            npx tsc --noEmit
-          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm type-check || npx tsc --noEmit
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: lint-typecheck
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: ${{ env.PNPM_VERSION }}
           cache: true
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.pnpm-store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run tests
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:ci
         env:
           CI: true
-        run: pnpm test:ci
-
-      - name: Upload coverage artifact
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: |
@@ -96,38 +69,26 @@ jobs:
     runs-on: ubuntu-latest
     needs: unit-tests
     env:
-      # Mock values for build-time envs. Replace with ${{ secrets.NAME }} in production.
       DATABASE_URL: 'postgresql://mock:mock@localhost:5432/mock'
       OPENAI_API_KEY: 'mock-openai-key'
       PI_SESSION_SECRET: 'mock-session-secret'
       PI_API_KEY: 'mock-pi-api-key'
       LICENSE_PAYLOAD_SECRET: 'mock-license-secret'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: ${{ env.PNPM_VERSION }}
           cache: true
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.pnpm-store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build (pnpm build)
-        run: pnpm build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
 
   check-docker-secrets:
     name: Check Docker Credentials
@@ -153,20 +114,74 @@ jobs:
     needs: check-docker-secrets
     if: github.ref == 'refs/heads/main' && needs.check-docker-secrets.outputs.configured == 'true'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v4
+      - uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: |
             ${{ secrets.DOCKER_REPOSITORY }}:latest
             ${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - name: Run DB migrations (staging)
+        run: pnpm db:migrate:deploy
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      - name: Trigger Vercel deploy (staging)
+        run: npx vercel deploy --prebuilt --token ${{ secrets.VERCEL_TOKEN }} --yes
+        working-directory: apps/web
+        continue-on-error: true
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - name: Run DB migrations (production)
+        run: pnpm db:migrate:deploy
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+      - name: Deploy via SSH + Docker Compose
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker system prune -f
+
+

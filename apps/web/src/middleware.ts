@@ -9,6 +9,7 @@
 // ================================================================
 
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import type { NextRequest } from 'next/server';
 
 // ── Configuration ─────────────────────────────────────────────────────────────
@@ -34,14 +35,23 @@ const TOKEN_COOKIE = 'pi_auth_token';
 // ── Middleware ────────────────────────────────────────────────────────────────
 
 export function middleware(request: NextRequest) {
+  // Inject traceId for end-to-end request tracing
+  const traceId = request.headers.get('x-trace-id') || randomUUID();
+  request.headers.set('x-trace-id', traceId);
   const { pathname } = request.nextUrl;
 
   // Skip static assets and Next.js internals
-  if (isStaticAsset(pathname)) return NextResponse.next();
+  if (isStaticAsset(pathname)) {
+    const resp = NextResponse.next();
+    resp.headers.set('x-trace-id', traceId);
+    return resp;
+  }
 
   // Skip explicitly public routes
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+    const resp = NextResponse.next();
+    resp.headers.set('x-trace-id', traceId);
+    return resp;
   }
 
   const token = request.cookies.get(TOKEN_COOKIE)?.value;
@@ -56,6 +66,7 @@ export function middleware(request: NextRequest) {
 
     // Attach token for any server-component fetch within this route
     const response = NextResponse.next();
+    response.headers.set('x-trace-id', traceId);
     response.headers.set('X-Pi-Token', token);
     return response;
   }
@@ -63,11 +74,14 @@ export function middleware(request: NextRequest) {
   // ── API route: forward token ───────────────────────────────────────────────
   if (pathname.startsWith('/api/') && token) {
     const response = NextResponse.next();
+    response.headers.set('x-trace-id', traceId);
     response.headers.set('X-Pi-Token', token);
     return response;
   }
 
-  return NextResponse.next();
+  const finalResp = NextResponse.next();
+  finalResp.headers.set('x-trace-id', traceId);
+  return finalResp;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -1,197 +1,127 @@
-# 系统架构文档
+﻿# 绯荤粺鏋舵瀯鏂囨。
 
-> Pi Merchant Framework — 架构设计说明  
-> 版本：v0.1.0
-
----
-
-## 架构总览
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                    Pi Browser (客户端)                     │
-│                                                          │
-│  ┌─────────────────┐        ┌─────────────────────────┐  │
-│  │   apps/web      │        │   apps/admin            │  │
-│  │  商户前台       │        │  商户后台                │  │
-│  │  Next.js 14     │        │  Next.js 14             │  │
-│  │  :3000          │        │  :3001                  │  │
-│  └────────┬────────┘        └───────────┬─────────────┘  │
-└───────────┼─────────────────────────────┼────────────────┘
-            │                             │
-            ▼                             ▼
-┌─────────────────────────────────────────────────────────┐
-│                  packages (共享层)                        │
-│                                                         │
-│  ┌────────────┐  ┌──────────┐  ┌──────────┐            │
-│  │  pi-sdk    │  │  config  │  │  types   │            │
-│  │  支付/认证 │  │ 商户配置 │  │ 业务类型 │            │
-│  └────────────┘  └──────────┘  └──────────┘            │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-            ┌───────────────┼──────────────────┐
-            ▼               ▼                  ▼
-     ┌─────────────┐ ┌──────────────┐ ┌──────────────┐
-     │  PostgreSQL │ │ Pi Platform  │ │   Vercel /   │
-     │  数据库     │ │  API         │ │   Docker     │
-     │  (Prisma)   │ │  api.minepi  │ │   部署       │
-     └─────────────┘ └──────────────┘ └──────────────┘
-```
+> Pi Merchant Framework 鈥?鏋舵瀯璁捐璇存槑  
+> 鐗堟湰锛歷0.1.0
 
 ---
 
-## Monorepo 结构设计
+## 鏋舵瀯鎬昏
 
-本项目采用 **pnpm Workspace + Turborepo** 管理：
+```
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                   Pi Browser (瀹㈡埛绔?                     鈹?鈹?                                                         鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?       鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹? 鈹?  apps/web      鈹?       鈹?  apps/admin            鈹? 鈹?鈹? 鈹? 鍟嗘埛鍓嶅彴       鈹?       鈹? 鍟嗘埛鍚庡彴                鈹? 鈹?鈹? 鈹? Next.js 14     鈹?       鈹? Next.js 14             鈹? 鈹?鈹? 鈹? :3000          鈹?       鈹? :3001                  鈹? 鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?       鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹尖攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹尖攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?            鈹?                            鈹?            鈻?                            鈻?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                 packages (鍏变韩灞?                        鈹?鈹?                                                        鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?           鈹?鈹? 鈹? pi-sdk    鈹? 鈹? config  鈹? 鈹? types   鈹?           鈹?鈹? 鈹? 鏀粯/璁よ瘉 鈹? 鈹?鍟嗘埛閰嶇疆 鈹? 鈹?涓氬姟绫诲瀷 鈹?           鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?           鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                            鈹?            鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹尖攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?            鈻?              鈻?                 鈻?     鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?     鈹? PostgreSQL 鈹?鈹?Pi Platform  鈹?鈹?  Vercel /   鈹?     鈹? 鏁版嵁搴?    鈹?鈹? API         鈹?鈹?  Docker     鈹?     鈹? (Prisma)   鈹?鈹? api.minepi  鈹?鈹?  閮ㄧ讲       鈹?     鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
 
-| 包                | 职责                | 依赖方向                    |
+---
+
+## Monorepo 缁撴瀯璁捐
+
+鏈」鐩噰鐢?**pnpm Workspace + Turborepo** 绠＄悊锛?
+| 鍖?               | 鑱岃矗                | 渚濊禆鏂瑰悜                    |
 | ----------------- | ------------------- | --------------------------- |
-| `packages/types`  | 业务类型定义        | 无依赖，被所有包引用        |
-| `packages/pi-sdk` | Pi SDK 封装         | → types                     |
-| `packages/config` | 商户配置 + 行业预设 | → types                     |
-| `packages/ui`     | 共用 UI 组件        | → types, config             |
-| `apps/web`        | 商户前台            | → pi-sdk, config, ui, types |
-| `apps/admin`      | 商户后台            | → types, ui                 |
+| `packages/types`  | 涓氬姟绫诲瀷瀹氫箟        | 鏃犱緷璧栵紝琚墍鏈夊寘寮曠敤        |
+| `packages/pi-sdk` | Pi SDK 灏佽         | 鈫?types                     |
+| `packages/config` | 鍟嗘埛閰嶇疆 + 琛屼笟棰勮 | 鈫?types                     |
+| `packages/ui`     | 鍏辩敤 UI 缁勪欢        | 鈫?types, config             |
+| `apps/web`        | 鍟嗘埛鍓嶅彴            | 鈫?pi-sdk, config, ui, types |
+| `apps/admin`      | 鍟嗘埛鍚庡彴            | 鈫?types, ui                 |
 
-**依赖方向**：packages 之间只能向上依赖，apps 可以引用所有 packages。
-
+**渚濊禆鏂瑰悜**锛歱ackages 涔嬮棿鍙兘鍚戜笂渚濊禆锛宎pps 鍙互寮曠敤鎵€鏈?packages銆?
 ---
 
-## 数据库设计
-
-### 核心关系图
-
+## 鏁版嵁搴撹璁?
+### 鏍稿績鍏崇郴鍥?
 ```
 merchants (1)
-  ├─── merchant_users (N)   # 商户管理员
-  ├─── customers (N)        # 顾客档案（按商户隔离）
-  ├─── services (N)         # 服务目录
-  ├─── orders (N)           # 订单
-  │      └── payments (1)   # 关联支付记录
-  ├─── bookings (N)         # 预约记录
-  ├─── memberships (N)      # 会员方案定义
-  │      └── customer_memberships (N)  # 已购会员
-  └─── app_configs (1)      # 商户配置（一对一）
-```
+  鈹溾攢鈹€鈹€ merchant_users (N)   # 鍟嗘埛绠＄悊鍛?  鈹溾攢鈹€鈹€ customers (N)        # 椤惧妗ｆ锛堟寜鍟嗘埛闅旂锛?  鈹溾攢鈹€鈹€ services (N)         # 鏈嶅姟鐩綍
+  鈹溾攢鈹€鈹€ orders (N)           # 璁㈠崟
+  鈹?     鈹斺攢鈹€ payments (1)   # 鍏宠仈鏀粯璁板綍
+  鈹溾攢鈹€鈹€ bookings (N)         # 棰勭害璁板綍
+  鈹溾攢鈹€鈹€ memberships (N)      # 浼氬憳鏂规瀹氫箟
+  鈹?     鈹斺攢鈹€ customer_memberships (N)  # 宸茶喘浼氬憳
+  鈹斺攢鈹€鈹€ app_configs (1)      # 鍟嗘埛閰嶇疆锛堜竴瀵逛竴锛?```
 
-### 多租户设计
-
-- 当前版本：**单租户**（DEFAULT_MERCHANT_ID 环境变量控制）
-- 所有业务表均有 `merchant_id` 字段，自然支持多租户扩展
-- 未来 SaaS 化只需在 API 层注入 `merchantId`，数据库无需改动
+### 澶氱鎴疯璁?
+- 褰撳墠鐗堟湰锛?*鍗曠鎴?*锛圖EFAULT_MERCHANT_ID 鐜鍙橀噺鎺у埗锛?- 鎵€鏈変笟鍔¤〃鍧囨湁 `merchant_id` 瀛楁锛岃嚜鐒舵敮鎸佸绉熸埛鎵╁睍
+- 鏈潵 SaaS 鍖栧彧闇€鍦?API 灞傛敞鍏?`merchantId`锛屾暟鎹簱鏃犻渶鏀瑰姩
 
 ---
 
-## 认证架构
+## 璁よ瘉鏋舵瀯
 
 ```
-前端                    后端               Pi Platform
- │                       │                     │
- │ Pi.authenticate()     │                     │
- │──────────────────►Pi SDK                    │
- │                       │                     │
- │◄──── authResult.accessToken                 │
- │                       │                     │
- │ POST /api/auth/pi     │                     │
- │ { accessToken }       │                     │
- │──────────────────►    │                     │
- │                       │ GET /v2/me          │
- │                       │ Bearer accessToken  │
- │                       │──────────────────►  │
- │                       │◄── { uid, username }│
- │                       │                     │
- │                       │ upsert customers    │
- │                       │ sign JWT            │
-│◄─── Set-Cookie: pi_auth_token (HttpOnly JWT)   │
-```
+鍓嶇                    鍚庣               Pi Platform
+ 鈹?                      鈹?                    鈹? 鈹?Pi.authenticate()     鈹?                    鈹? 鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻篜i SDK                    鈹? 鈹?                      鈹?                    鈹? 鈹傗梽鈹€鈹€鈹€鈹€ authResult.accessToken                 鈹? 鈹?                      鈹?                    鈹? 鈹?POST /api/auth/pi     鈹?                    鈹? 鈹?{ accessToken }       鈹?                    鈹? 鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻?   鈹?                    鈹? 鈹?                      鈹?GET /v2/me          鈹? 鈹?                      鈹?Bearer accessToken  鈹? 鈹?                      鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻? 鈹? 鈹?                      鈹傗梽鈹€鈹€ { uid, username }鈹? 鈹?                      鈹?                    鈹? 鈹?                      鈹?upsert customers    鈹? 鈹?                      鈹?sign JWT            鈹?鈹傗梽鈹€鈹€鈹€ Set-Cookie: pi_auth_token (HttpOnly JWT)   鈹?```
 
-Session 存储：
-
-- 后端签发 JWT，存入 **HttpOnly Cookie**（防 XSS）
-- JWT Payload：`{ sub: customerId, piUid, username, merchantId }`
-- 有效期：7 天
-
+Session 瀛樺偍锛?
+- 鍚庣绛惧彂 JWT锛屽瓨鍏?**HttpOnly Cookie**锛堥槻 XSS锛?- JWT Payload锛歚{ sub: customerId, piUid, username, merchantId }`
+- 鏈夋晥鏈燂細7 澶?
 ---
 
-## 配置化架构
-
+## 閰嶇疆鍖栨灦鏋?
 ```
 MerchantConfig (packages/config)
-       │
-       ├── modules.booking     → 控制预约模块显示/隐藏
-       ├── modules.membership  → 控制会员模块
-       ├── homepage.layout     → 决定首页布局顺序
-       ├── industry.skin       → 控制主题色/UI 风格
-       └── payment.checkoutMode → single/subscription
-       │
-       ▼
-行业预设 (industry-presets.ts)
+       鈹?       鈹溾攢鈹€ modules.booking     鈫?鎺у埗棰勭害妯″潡鏄剧ず/闅愯棌
+       鈹溾攢鈹€ modules.membership  鈫?鎺у埗浼氬憳妯″潡
+       鈹溾攢鈹€ homepage.layout     鈫?鍐冲畾棣栭〉甯冨眬椤哄簭
+       鈹溾攢鈹€ industry.skin       鈫?鎺у埗涓婚鑹?UI 椋庢牸
+       鈹斺攢鈹€ payment.checkoutMode 鈫?single/subscription
+       鈹?       鈻?琛屼笟棰勮 (industry-presets.ts)
   beauty / fitness / education / consulting / generic
 ```
 
-**核心约束**：所有行业差异通过 `MerchantConfig` 控制，禁止在业务代码中写死 `if skin === 'beauty'` 这样的判断。
-
+**鏍稿績绾︽潫**锛氭墍鏈夎涓氬樊寮傞€氳繃 `MerchantConfig` 鎺у埗锛岀姝㈠湪涓氬姟浠ｇ爜涓啓姝?`if skin === 'beauty'` 杩欐牱鐨勫垽鏂€?
 ---
 
-## API 路由规范
+## API 璺敱瑙勮寖
 
-### 状态码规范
+### 鐘舵€佺爜瑙勮寖
 
-| 场景             | 状态码 |
+| 鍦烘櫙             | 鐘舵€佺爜 |
 | ---------------- | ------ |
-| 成功             | 200    |
-| 创建成功         | 201    |
-| 参数错误         | 400    |
-| 未认证           | 401    |
-| 无权限           | 403    |
-| 不存在           | 404    |
-| Pi Platform 异常 | 502    |
-| 服务器内部错误   | 500    |
+| 鎴愬姛             | 200    |
+| 鍒涘缓鎴愬姛         | 201    |
+| 鍙傛暟閿欒         | 400    |
+| 鏈璇?          | 401    |
+| 鏃犳潈闄?          | 403    |
+| 涓嶅瓨鍦?          | 404    |
+| Pi Platform 寮傚父 | 502    |
+| 鏈嶅姟鍣ㄥ唴閮ㄩ敊璇?  | 500    |
 
-### 响应体规范
-
+### 鍝嶅簲浣撹鑼?
 ```typescript
-// 成功
+// 鎴愬姛
 { success: true, data: T }
 
-// 失败
+// 澶辫触
 { success: false, error: string }
 ```
 
 ---
 
-## 部署架构
+## 閮ㄧ讲鏋舵瀯
 
-### Vercel 部署（推荐）
+### Vercel 閮ㄧ讲锛堟帹鑽愶級
 
 ```
 vercel.com
-  ├── pi-merchant-web.vercel.app     (apps/web)
-  └── pi-merchant-admin.vercel.app   (apps/admin)
+  鈹溾攢鈹€ pi-merchant-web.vercel.app     (apps/web)
+  鈹斺攢鈹€ pi-merchant-admin.vercel.app   (apps/admin)
 
-共享：
-  └── Vercel Postgres / Supabase (DATABASE_URL)
+鍏变韩锛?  鈹斺攢鈹€ Vercel Postgres / Supabase (DATABASE_URL)
 ```
 
-### Docker 部署（自托管）
-
+### Docker 閮ㄧ讲锛堣嚜鎵樼锛?
 ```dockerfile
-# 参考：Dockerfile 待生成
-# 每个 app 独立容器，共享同一 PostgreSQL 实例
+# 鍙傝€冿細Dockerfile 寰呯敓鎴?# 姣忎釜 app 鐙珛瀹瑰櫒锛屽叡浜悓涓€ PostgreSQL 瀹炰緥
 ```
 
 ---
 
-## 扩展性设计
+## 鎵╁睍鎬ц璁?
+### P2锛歋aaS 澶氱鎴?
+鍙渶锛?
+1. 澧炲姞 `platform_admins` 琛紙骞冲彴绠＄悊鍛橈級
+2. 澧炲姞 `tenant_plans` 琛紙璁㈤槄濂楅锛?3. 涓棿浠跺眰娉ㄥ叆 `merchantId`锛堥€氳繃瀛愬煙鍚嶆垨 URL 鍙傛暟锛?
+### P2锛歅i 璁㈤槄鍚堢害
 
-### P2：SaaS 多租户
+Pi 鐨勮闃?(Subscription) API 鐩存帴闆嗘垚鍒?`payment-service.ts`锛屼笉褰卞搷鐜版湁 U2A 娴佺▼銆?
 
-只需：
-
-1. 增加 `platform_admins` 表（平台管理员）
-2. 增加 `tenant_plans` 表（订阅套餐）
-3. 中间件层注入 `merchantId`（通过子域名或 URL 参数）
-
-### P2：Pi 订阅合约
-
-Pi 的订阅 (Subscription) API 直接集成到 `payment-service.ts`，不影响现有 U2A 流程。

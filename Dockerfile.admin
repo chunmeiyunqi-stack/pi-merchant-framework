@@ -1,4 +1,4 @@
-﻿# Multi-stage Dockerfile for Next.js web app (Turborepo / pnpm)
+﻿# Multi-stage Dockerfile for Next.js admin app (Turborepo / pnpm)
 
 # ---- Builder ----
 FROM node:20-bullseye-slim AS builder
@@ -38,7 +38,7 @@ RUN sed -i 's/--dts//g' packages/pi-sdk/package.json || true
 RUN npx prisma generate
 RUN pnpm build
 
-# ---- Runner (web standalone) ----
+# ---- Runner (admin standalone) ----
 FROM node:20-bullseye-slim AS runner
 
 RUN apt-get update \
@@ -48,21 +48,22 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder /app/apps/admin/.next/standalone ./
+COPY --from=builder /app/apps/admin/.next/static ./apps/admin/.next/static
+COPY --from=builder /app/apps/admin/public ./apps/admin/public
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
+
 
 USER nextjs
 
 ENV NODE_ENV=production
-ENV PORT=3000
-EXPOSE 3000
+ENV PORT=3001
+EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD node -e "require('http').get('http://127.0.0.1:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"
+  CMD node -e "require('http').get('http://127.0.0.1:3001/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"
 
-CMD ["node", "apps/web/server.js"]
+CMD ["node", "apps/admin/server.js"]
 
 

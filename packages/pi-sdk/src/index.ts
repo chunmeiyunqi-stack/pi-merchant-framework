@@ -58,3 +58,6 @@ export * from './license/manager';
 // ─── License (V2.1.0) ────────────────────────────────────────────────
 export { deserializeLicense, validateLicense } from './license';
 export type { SerializedLicense, LicenseValidationResult } from './license';
+
+// ─── Payment Webhook Signature Verification ───────────────────
+export { verifyPaymentSignature } from './payment/verify';
