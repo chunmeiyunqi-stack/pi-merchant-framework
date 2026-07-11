@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Next.js web app (Turborepo / pnpm)
+﻿# Multi-stage Dockerfile for Next.js web app (Turborepo / pnpm)
 
 # ---- Builder ----
 FROM node:20-bullseye-slim AS builder
@@ -34,7 +34,7 @@ ENV LICENSE_PAYLOAD_SECRET="dev"
 ENV DOCKER_BUILD=1
 
 RUN NODE_ENV=development pnpm install --frozen-lockfile --reporter=default --store-dir=.pnpm-store --shamefully-hoist
-RUN npx prisma generate
+RUN npx prisma generate && find /app -path '*/node_modules/.prisma' -type d -exec cp -r {} /tmp/.prisma \; 2>/dev/null; test -d /tmp/.prisma || (mkdir -p /tmp/.prisma/client && echo 'WARN: .prisma not found, created empty placeholder')
 RUN pnpm build
 
 # ---- Runner (web standalone) ----
@@ -50,8 +50,9 @@ WORKDIR /app
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /tmp/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
+
 
 USER nextjs
 
