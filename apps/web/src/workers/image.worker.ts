@@ -222,13 +222,6 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
   {
     connection,
     concurrency: parseInt(process.env.WORKER_CONCURRENCY || '3', 10),
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
-      },
-    },
   }
 );
 
