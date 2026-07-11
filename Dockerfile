@@ -1,4 +1,4 @@
-﻿# Multi-stage Dockerfile for Next.js web app (Turborepo / pnpm)
+# Multi-stage Dockerfile for Next.js web app (Turborepo / pnpm)
 
 # ---- Builder ----
 FROM node:20-bullseye-slim AS builder
@@ -20,7 +20,7 @@ COPY src ./src
 COPY prisma ./prisma
 
 ENV NODE_ENV=production
-ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 ENV NPM_CONFIG_STRICT_SSL=false
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
@@ -34,7 +34,6 @@ ENV LICENSE_PAYLOAD_SECRET="dev"
 ENV DOCKER_BUILD=1
 
 RUN NODE_ENV=development pnpm install --frozen-lockfile --reporter=default --store-dir=.pnpm-store --shamefully-hoist
-RUN sed -i 's/--dts//g' packages/pi-sdk/package.json || true
 RUN npx prisma generate
 RUN pnpm build
 

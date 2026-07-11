@@ -2,28 +2,42 @@ name: CI / CD
 on:
   push:
     branches: [main]
-
 jobs:
-  docker-build-push:
-    name: Docker Build & Push (GHCR)
+  build-main:
+    name: Build & Push Main Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
           push: true
           tags: ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:latest,ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:${{ github.sha }}
-          secrets: |
-            "NPM_CONFIG_REGISTRY=https://registry.npmjs.org"
+  build-admin:
+    name: Build & Push Admin Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.admin
+          push: true
+          tags: ghcr.io/chunmeiyunqi-stack/pi-merchant-framework-admin:latest,ghcr.io/chunmeiyunqi-stack/pi-merchant-framework-admin:${{ github.sha }}
