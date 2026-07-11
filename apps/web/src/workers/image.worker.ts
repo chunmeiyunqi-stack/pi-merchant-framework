@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Image generation worker (BullMQ)
 // - Processes jobs from image-generation queue
 // - Exponential backoff retry via queue config
@@ -158,7 +158,7 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
               quality,
               n,
               revisedPrompt: revisedPrompt || prompt,
-              allImages: images.map((img) => img.url).filter(Boolean),
+              allImages: images.map((img) => img.url).filter((u): u is string => u !== undefined),
             },
           },
         });

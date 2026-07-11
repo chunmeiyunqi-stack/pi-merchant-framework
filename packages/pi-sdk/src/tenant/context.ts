@@ -10,7 +10,8 @@ interface TenantStore {
 let tenantStore: TenantStore | undefined;
 try {
   if (typeof process !== 'undefined' && (process as unknown as { versions?: unknown }).versions) {
-    const r = eval('require') as unknown as (moduleName: string) => unknown;
+    const { createRequire } = require('module');
+    const r = createRequire(typeof __filename !== 'undefined' ? __filename : '/') as unknown as (moduleName: string) => unknown;
     const asyncHooks = r('async_hooks') as {
       AsyncLocalStorage: new <T>() => {
         getStore: () => T | undefined;
