@@ -26,8 +26,6 @@ export type { TokenProvider } from './interceptors/auth';
 export { createRateLimitInterceptor, createAutoRetryInterceptor } from './interceptors/rateLimit';
 export type { RateLimitCallbacks } from './interceptors/rateLimit';
 
-export { useRequest } from './hooks/useRequest';
-export type { UseRequestReturn, UseRequestState, UseRequestOptions } from './hooks/useRequest';
 
 export { ApiError } from './types/api';
 export type {
