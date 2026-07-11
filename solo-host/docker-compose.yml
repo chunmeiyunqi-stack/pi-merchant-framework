@@ -1,0 +1,65 @@
+# docker-compose.yml — Pi Desktop SoloHost
+# Pi Merchant Framework v2.1.0
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pimerchant
+      POSTGRES_PASSWORD: pimerchant_docker_pw
+      POSTGRES_DB: pi_prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pimerchant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  migrate:
+    image: ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:latest
+    command: npx prisma migrate deploy
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    image: ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  admin:
+    image: ghcr.io/chunmeiyunqi-stack/pi-merchant-framework-admin:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    image: ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:latest
+    restart: unless-stopped
+    command: pnpm --filter @pi-merchant/web start:prod
+    depends_on:
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
