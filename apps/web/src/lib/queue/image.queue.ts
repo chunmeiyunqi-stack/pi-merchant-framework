@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Image generation queue (BullMQ)
 // - Exponential backoff retry for OpenAI throttling (429) / timeouts
 // - Each job carries traceId for end-to-end tracing
@@ -79,6 +79,6 @@ process.on('SIGTERM', async () => {
 });
 
 logger.info('Image generation queue initialized', {
-  redisUrl: (process.env.REDIS_URL ?? 'redis://localhost:6379').replace(///.*@/, '//***@'),
+  redisUrl: (process.env.REDIS_URL ?? 'redis://localhost:6379').replace(/\/\/.*@/, '//***@'),
 });
 
