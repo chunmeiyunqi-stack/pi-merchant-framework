@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Pioneer AI Framework — POST /api/v1/images/generate
 // Image generation API — enqueues async job via BullMQ
 // Returns 202 Accepted with jobId immediately
@@ -9,7 +9,7 @@ import { verifySessionToken } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { logEvent, logError, runWithTenant, checkQuota, trackUsage } from '@pi-merchant/pi-sdk';
 import { withMetrics } from '@/lib/metrics-middleware';
-import { imageQueue } from '@/lib/queue/image.queue';
+import { imageQueue, addImageGenerationJob } from '@/lib/queue/image.queue';
 import { logger, getTraceId } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -135,7 +135,7 @@ async function __POST(req: Request) {
 
   // Enqueue async job with exponential backoff retry
   try {
-    const job = await imageQueue.add('generate-image', {
+    const job = await addImageGenerationJob('generate-image', {
       traceId,
       piUid,
       merchantId,
