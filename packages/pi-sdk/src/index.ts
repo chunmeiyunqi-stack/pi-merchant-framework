@@ -26,7 +26,6 @@ export type { TokenProvider } from './interceptors/auth';
 export { createRateLimitInterceptor, createAutoRetryInterceptor } from './interceptors/rateLimit';
 export type { RateLimitCallbacks } from './interceptors/rateLimit';
 
-
 export { ApiError } from './types/api';
 export type {
   HttpMethod,
