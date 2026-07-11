@@ -1,266 +1,153 @@
-# Pi Merchant Framework
+﻿# Pi Merchant Framework
 
-> **面向 Pi Network 生态的白标商户应用模板框架**  
-> 设计理念：80% 通用底座 + 20% 行业配置，快速交付，降本增效
+> **Production-ready, white-label merchant application framework built on Pi Network ecosystem**
+>
+> Next.js 14 | TypeScript Strict | Prisma | BullMQ | Turborepo | PostgreSQL
 
 ---
 
+## Architecture
 
-<!-- ============================================================ -->
-<!-- AI 数据工程扩展 (Monorepo)                                    -->
-<!-- ============================================================ -->
+```
+┌──────────────────────────────────────────────────────┐
+│                   Vercel (Serverless)                │
+│  ┌────────────────────────────────────────────────┐  │
+│  │           apps/web (Next.js 14)                │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐ │  │
+│  │  │ Frontend │  │ API      │  │ Swagger Docs │ │  │
+│  │  │ (RSC)    │  │ Routes   │  │ (/api/docs)  │ │  │
+│  │  └──────────┘  └──────────┘  └──────────────┘ │  │
+│  └────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────┘
 
-## 🚀 AI 数据工程扩展 (Monorepo)
+┌──────────────────────────────────────────────────────┐
+│                  Docker / VPS                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │
+│  │ Admin    │  │ BullMQ   │  │ Redis            │   │
+│  │ (Next.js)│  │ Worker   │  │ (Queue + Cache)  │   │
+│  └──────────┘  └──────────┘  └──────────────────┘   │
+└──────────────────────────────────────────────────────┘
 
-> 本项目已演进为 **Monorepo 架构**，内置 Python AI 微服务，支持基于 LongCat-2.0 的代码质量自动评测与训练数据导出。详情见 [python-service/](python-service/README.md)。
+┌──────────────────────────────────────────────────────┐
+│               Shared Packages (Monorepo)              │
+│  @pi-merchant/pi-sdk  @pi-merchant/types             │
+│  @pi-merchant/config  @pi-merchant/ui                │
+└──────────────────────────────────────────────────────┘
 
-### 核心亮点
+┌──────────────────────────────────────────────────────┐
+│          PostgreSQL 15 (Neon / Supabase / Docker)    │
+│  Prisma ORM · Multi-Tenant · Row-Level Security      │
+└──────────────────────────────────────────────────────┘
+```
 
-| Icon | 特性 | 说明 |
-|------|------|------|
-| 🤖 | **全栈 AI 闭环** | Next.js 14 前端 + FastAPI 微服务 + LongCat-2.0 大模型 + PostgreSQL 15 |
-| 🕷️ | **自动化数据构建** | GitHub 异步爬取引擎，自动构建 TypeScript 代码评测数据集 |
-| 🧠 | **多维度 AI 评分** | 基于大模型自动评估代码的 **可读性 / 性能 / 规范性**，0-10 分量化输出 |
-| 📊 | **多格式训练数据导出** | 支持 JSON / CSV / JSONL（模型微调）格式一键导出 |
-| 🛡️ | **生产级质量保障** | 内置 **56 个自动化测试** (Pytest)，覆盖数据库、API、导出全链路 |
+## Features
 
-### 快速启动 AI 微服务
+| Feature                    | Description                                              |
+| -------------------------- | -------------------------------------------------------- |
+| 🔐 **Pi Network Auth**     | Pi Sign-In + JWT session management                      |
+| 🧾 **License System**      | RSA-signed license payloads with hardware binding        |
+| 👥 **Multi-Tenant**        | Tenant isolation via Prisma middleware                   |
+| 🎨 **AI Image Generation** | Multi-provider (OpenAI, Anthropic, Ollama) with fallback |
+| ⏱️ **Async Queue**         | BullMQ + Redis with exponential backoff retry            |
+| 💰 **Pi Payments**         | Webhook signature verification (HMAC-SHA256)             |
+| 📊 **Usage Quotas**        | Per-tenant rate limiting and quota tracking              |
+| 🌐 **Swagger Docs**        | Auto-generated API documentation at `/api/docs`          |
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 20.x
+- pnpm 8.x
+- PostgreSQL 15+
+- Redis 7+ (for queue worker)
+
+### 1. Clone & Install
 
 ```bash
-# 进入 AI 微服务目录
-cd python-service
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env，填入 LONGCAT_API_KEY 和 DATABASE_URL
-
-# 安装依赖并启动
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-# 服务启动在 http://localhost:8000
-# API 文档在 http://localhost:8000/docs
-```
-
-> 详细文档请参见 [python-service/README.md](python-service/README.md)，包含完整的 API 参考、架构说明、测试运行指南和 56 项测试结果。
-
-## 🎯 项目定位
-
-这不是一个单一商户 App，而是一个**可复用、可配置、可快速交付的商户应用框架**。
-
-目标是通过**行业预设 + 商户配置**，让每个商户在 1-2 天内获得自己的 Pi 应用，而非从零开发。
-
-### 第一阶段支持的行业
-
-| 行业      | 皮肤标识     | 核心功能          |
-| --------- | ------------ | ----------------- |
-| 美容/美甲 | `beauty`     | 预约 + 次卡       |
-| 健身      | `fitness`    | 月卡 + 课程预约   |
-| 培训/课程 | `education`  | 课时包 + 在线预约 |
-| 咨询/维修 | `consulting` | 时间预约          |
-| 通用      | `generic`    | 服务列表 + 下单   |
-
----
-
-## 🏗️ 技术栈
-
-| 层级     | 技术                                         |
-| -------- | -------------------------------------------- |
-| 前端框架 | Next.js 14 (App Router) + React + TypeScript |
-| UI 样式  | Tailwind CSS                                 |
-| 后端     | Next.js API Routes                           |
-| 数据库   | PostgreSQL                                   |
-| ORM      | Prisma                                       |
-| 包管理   | pnpm (Monorepo)                              |
-| 构建工具 | Turborepo                                    |
-| 部署     | Vercel / Docker 兼容                         |
-| 支付     | Pi Network U2A Payment                       |
-
----
-
-
-## 🏛️ 系统架构
-
-```mermaid
-graph TD
-    subgraph Monorepo
-        A[Next.js 14 Frontend] -->|API Routes| F[Next.js API Layer]
-        F -->|Prisma ORM| G[(PostgreSQL)]
-        A -->|/api/quality| B[FastAPI 微服务]
-        subgraph python-service
-            B --> H[CodeAnalyzer]
-            B --> I[DataExporter]
-            B -->|LLM Review| C[LongCat-2.0]
-            B -->|读写| D[(PostgreSQL)]
-            B -->|爬取| E[GitHub API]
-        end
-    end
-```
-
-**图例：**
-
-| 颜色 | 组件 | 说明 |
-|------|------|------|
-| 蓝色 | `python-service/` | Python AI 微服务（FastAPI + LLM 评测） |
-| 橙色 | LongCat-2.0 | AI 代码审查引擎 |
-| 绿色 | PostgreSQL | 主项目 Prisma + 微服务直连 |
-| 紫色 | GitHub API | 异步代码爬取 |
-| 灰色 | Next.js | 前端 + API 代理层 |
-
----
-
-## 📁 目录结构
-
-```
-D:\PiMerchantFramework
-├─ apps
-│  ├─ web/          # 商户前台（客户端，Pi Browser 中运行）
-│  └─ admin/        # 商户后台（管理员使用）
-├─ packages
-│  ├─ pi-sdk/       # Pi SDK 封装（支付 + 认证，最核心）
-│  ├─ ui/           # 共用 UI 组件
-│  ├─ config/       # 商户配置类型 + 行业预设
-│  └─ types/        # 共用业务类型
-├─ prisma/          # 数据库 Schema + 迁移 + Seed
-├─ docs/            # 技术文档
-└─ scripts/         # 工具脚本
-```
-
----
-
-## 🚀 快速开始
-
-### 1. 安装依赖
-
-```bash
-# 确保已安装 pnpm
-npm install -g pnpm
-
-# 安装所有依赖
+git clone https://github.com/chunmeiyunqi-stack/pi-merchant-framework.git
+cd pi-merchant-framework
 pnpm install
 ```
 
-### 2. 配置环境变量
+### 2. Setup Database
 
 ```bash
-cp .env.example .env
-# 编辑 .env，填写 DATABASE_URL 和 PI_API_KEY
-```
+# Copy environment file
+cp .env.example .env.local
+# Edit .env.local with your credentials
 
-### 3. 初始化数据库
-
-```bash
-# 执行迁移
-pnpm db:migrate
-
-# 插入测试数据
+# Generate Prisma client & migrate
+pnpm prisma generate
+pnpm prisma db push
 pnpm db:seed
 ```
 
-### 4. 启动开发服务器
+### 3. Run Development
 
 ```bash
-# 同时启动前台 (3000) 和后台 (3001)
 pnpm dev
+# → Frontend: http://localhost:3000
+# → API Docs: http://localhost:3000/api/docs
 ```
 
----
-
-## 💳 Pi 支付流程
-
-```
-前端                    后端                    Pi Platform API
- │                       │                           │
- │ Pi.createPayment()    │                           │
- │──────────────────     │                           │
- │                       │                           │
- │ onReadyForServerApproval(paymentId)               │
- │──────► POST /api/payments/approve ──► POST /v2/payments/{id}/approve
- │                       │                           │
- │ (用户在 Pi 钱包确认)   │                           │
- │                       │                           │
- │ onReadyForServerCompletion(paymentId, txid)        │
- │──────► POST /api/payments/complete ─► POST /v2/payments/{id}/complete
- │                       │                           │
- │ ← 跳转支付结果页       │ 更新订单状态=COMPLETED    │
-```
-
-详细流程见 [`docs/payment-flow.md`](./docs/payment-flow.md)
-
----
-
-## ⚙️ 商户配置
-
-通过修改 `packages/config/src/merchant-config.ts` 接口配置商户。
-
-使用行业预设快速初始化：
-
-```typescript
-import { getIndustryPreset } from '@pi-merchant/config';
-
-const config = {
-  merchantId: 'your-merchant-id',
-  info: { name: '美丽时光美甲店', type: 'beauty' },
-  ...getIndustryPreset('beauty'), // 一行应用行业预设
-};
-```
-
----
-
-## 📋 开发优先级
-
-| 优先级 | 功能               | 状态   |
-| ------ | ------------------ | ------ |
-| P0     | Pi 用户登录        | 骨架✅ |
-| P0     | 服务列表展示       | 骨架✅ |
-| P0     | 创建订单 + Pi 支付 | 骨架✅ |
-| P0     | 后台查看订单/支付  | 骨架✅ |
-| P1     | 会员方案购买       | 骨架✅ |
-| P1     | 预约管理           | 骨架✅ |
-| P2     | A2U 退款           | 待开发 |
-| P2     | 优惠券             | 待开发 |
-
----
-
-## 📚 文档索引
-
-- [支付流程文档](./docs/payment-flow.md)
-- [系统架构文档](./docs/architecture.md)
-- [MVP 开发排期](./docs/mvp-roadmap.md)
-- [商户配置指南](./docs/merchant-config-guide.md)
-- [数据库设计](./docs/database-design.md)
-
----
-
-## 🔐 安全注意事项
-
-- **绝不在客户端暴露 `PI_API_KEY`**（仅在 Server-side 使用）
-- 所有支付审批必须走后端，禁止前端直接调用 Pi Platform API
-- 数据库操作统一走 Prisma，禁止裸 SQL
-- JWT Session 使用 HttpOnly Cookie 存储
-
----
-
-## 📄 License
-
-MIT
-
----
-
-## 监控与可观测性
-
-项目已集成 Prometheus 与 Grafana 的监控栈。
-
-- 启动监控堆栈：
+### 4. Run Tests
 
 ```bash
-docker-compose -f docker-compose.monitoring.yml up -d
+pnpm test
+pnpm test:coverage
 ```
 
-- Grafana: http://localhost:3001 （默认账号 admin / admin）
-- Prometheus: http://localhost:9090
+## Production Deployment
 
-- Prometheus 已配置抓取目标：`host.docker.internal:3000/api/metrics`，抓取间隔 10s。
+### Vercel (Frontend + API)
 
-- 项目内指标端点：`GET /api/metrics`，由 `src/app/api/metrics/route.ts` 提供。
+```bash
+# Configure in Vercel Dashboard:
+# Install:  pnpm install --frozen-lockfile
+# Build:    pnpm turbo run build --filter=@pi-merchant/web
+# Node:     20.x
+```
 
-如需在代码中记录或使用指标，请参阅 `src/lib/metrics.ts` 中的指标定义（`http_requests_total`, `http_request_duration_seconds`, `ai_provider_requests_total`, `ai_fallback_activations_total`, `active_sessions`, `rate_limit_hits_total`）。
+Set environment variables in Vercel Dashboard — see [docs/deployment/ENVIRONMENT.md](docs/deployment/ENVIRONMENT.md).
+
+### Docker (Worker + Admin + Redis)
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+See [docs/deployment/DOCKER-WORKER.md](docs/deployment/DOCKER-WORKER.md).
+
+## Project Structure
+
+```
+pi-merchant-framework/
+├── apps/
+│   ├── web/          # Next.js 14 main app (Vercel)
+│   └── admin/        # Admin dashboard (Docker)
+├── packages/
+│   ├── pi-sdk/       # Pi Network SDK (npm-publishable)
+│   ├── types/        # Shared TypeScript types
+│   ├── config/       # Shared configuration
+│   └── ui/           # Shared UI components
+├── deploy/
+│   └── nginx/        # Nginx config for Docker
+├── docs/
+│   └── deployment/   # Deployment guides
+├── prisma/           # Database schema
+└── scripts/          # Utilities (license signing, etc.)
+```
+
+## Documentation
+
+- [Deployment Guide](docs/deployment/VERCEL.md) — Vercel production setup
+- [Worker Guide](docs/deployment/DOCKER-WORKER.md) — BullMQ worker deployment
+- [Environment Variables](docs/deployment/ENVIRONMENT.md) — Full env reference
+- [System Architecture](docs/architecture.md) — Detailed architecture docs
+- [Database Design](docs/database-design.md) — Schema documentation
+- [Payment Flow](docs/payment-flow.md) — Pi payment integration
+
+## License
+
+Pioneer AI Merchant Framework — Commercial License

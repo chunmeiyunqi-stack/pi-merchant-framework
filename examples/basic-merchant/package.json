@@ -1,0 +1,11 @@
+﻿{
+  "name": "basic-merchant",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/app.js"
+  },
+  "dependencies": {
+    "@pi-merchant/pi-sdk": "^2.1.0"
+  }
+}

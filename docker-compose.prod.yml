@@ -1,6 +1,10 @@
-﻿version: '3.8'
+﻿# Pi Merchant Framework — Production Docker Compose
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+version: "3.8"
 
 services:
+  # ─── PostgreSQL ──────────────────────────────────────────
   db:
     image: postgres:15-alpine
     environment:
@@ -10,12 +14,25 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
+  # ─── Redis (BullMQ Queue) ────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Database Migration ─────────────────────────────────
   migrate:
     build:
       context: .
@@ -27,6 +44,7 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # ─── Main App ────────────────────────────────────────────
   app:
     build:
       context: .
@@ -34,13 +52,13 @@ services:
     image: ${DOCKER_REPOSITORY:-pi-merchant-framework:latest}
     env_file: .env
     ports:
-      - '3000:3000'
+      - "3000:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
-    volumes: []
 
+  # ─── Admin Dashboard ─────────────────────────────────────
   admin:
     build:
       context: .
@@ -48,16 +66,32 @@ services:
     image: ${DOCKER_REPOSITORY:-pi-merchant-framework:admin-latest}
     env_file: .env
     ports:
-      - '3001:3001'
+      - "3001:3001"
     depends_on:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # ─── BullMQ Worker ───────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${DOCKER_REPOSITORY:-pi-merchant-framework:latest}
+    env_file: .env
+    command: pnpm --filter @pi-merchant/web start:prod
+    environment:
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-3}
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+
+  # ─── Nginx Reverse Proxy ─────────────────────────────────
   nginx:
     image: nginx:alpine
     ports:
-      - '80:80'
+      - "80:80"
     volumes:
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
@@ -67,4 +101,3 @@ services:
 
 volumes:
   pgdata:
-

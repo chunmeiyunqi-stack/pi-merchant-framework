@@ -1,39 +1,24 @@
-﻿# ----- PiMerchantFramework generated .gitignore (generated) -----
-# NOTE: This is a generated ignore file.
+﻿# Pi Merchant Framework — Product .gitignore
+# -----------------------------------------
 
-# Ignore all env files (per request)
-.env*
+# Environment
+.env
+.env.*
+.env.local
+.env.*.local
 
-# Ignore generated documentation (common formats)
-*.pdf
-*.docx
-*.html
-*.md.pdf
-
-# Ignore Python scripts (.py) as requested
-*.py
-
-# Ignore source_code_* files
-source_code_*
-
-# Ignore output*.txt files
-output*.txt
-
-# Node / JS common
+# Dependencies
 node_modules/
-.pnpm-debug.log
 .pnpm-store/
 .npm/
+.pnpm-debug.log
 package-lock.json
-pnpm-lock.yaml
 
-# Next.js build
+# Build output
 .next/
-.next/*
 .out/
-/dist/
-
-# TypeScript incremental build cache
+build/
+dist/
 *.tsbuildinfo
 
 # Coverage
@@ -43,61 +28,27 @@ lcov.info
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# IDEs
+# IDE & OS
 .vscode/
 .idea/
 *.suo
-*.ntvs*
 *.njsproj
 *.sln
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Temporary files
+# Temp files
 tmp/
 temp/
 *.tmp
 *.swp
 
-# Build artifacts
-build/
-dist/
-
-# Ignore generated source_code printouts and large outputs
-source_code_print.*
-source_code_combined.*
-output_combined.txt
-fixed_output*.md
-fixed_output*.txt
-
-# Optional: ignore environment-specific local files
-.env.local
-.env.*.local
-
 # Git hooks
 .husky/_
 
-# Misc
-coverage/
-reports/
-
-# End of generated .gitignore
-
-# Local archive of copyright artifacts
-archive/
- 
-# Local temp scripts
-.scripts/
-
-# Turbo build/cache artifacts
+# Turbo cache
 .turbo/
 
-
+# Vercel
 .vercel
-.env*
