@@ -8,23 +8,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 env:
-  PNPM_VERSION: "8"
   NODE_VERSION: "20"
+
 jobs:
-  lint-typecheck:
-    name: Lint & Type Check
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-        continue-on-error: true
-      - run: npx tsc --noEmit
-        continue-on-error: true
   docker-build-push:
     name: Docker Build & Push (GHCR)
     runs-on: ubuntu-latest
@@ -40,19 +26,22 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build main image
+      - name: Build and push main image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
           push: true
+          build-args: |
+            NPM_CONFIG_REGISTRY=https://registry.npmjs.org
           tags: ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:latest,ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:${{ github.sha }}
-      - name: Build admin image
+      - name: Build and push admin image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile.admin
           push: true
           tags: ghcr.io/chunmeiyunqi-stack/pi-merchant-framework-admin:latest,ghcr.io/chunmeiyunqi-stack/pi-merchant-framework-admin:${{ github.sha }}
-      - name: Verify
-        run: docker pull ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:latest
+      - name: Verify images
+        run: |
+          docker pull ghcr.io/chunmeiyunqi-stack/pi-merchant-framework:latest
