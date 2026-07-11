@@ -78,9 +78,9 @@ process.on('SIGTERM', async () => {
   if (connection) await connection.quit();
 });
 
-logger.info('Image generation queue initialized', {
+logger.info({
   redisUrl: (process.env.REDIS_URL ?? 'redis://localhost:6379').replace(/\/\/.*@/, '//***@'),
-});
+}, 'Image generation queue initialized');
 // Type-safe wrapper for queue.add() to work around BullMQ strict generics
 export async function addImageGenerationJob(
   name: string,
