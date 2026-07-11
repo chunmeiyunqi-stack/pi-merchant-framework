@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@pi-merchant/types",
   "version": "2.1.0",
   "main": "./dist/index.js",
