@@ -52,3 +52,18 @@ temp/
 
 # Vercel
 .vercel
+
+# Nested repos (standalone git repos, not submodules)
+pi-merchant-framework/
+assets/
+trustwallet-fork/
+
+# Generated documentation and copyright files
+scripts/prepare_source_code.py
+softcopyright_output/
+user_manual_with_images/
+screenshots/
+archive/
+backups/
+out/
+.scripts/
