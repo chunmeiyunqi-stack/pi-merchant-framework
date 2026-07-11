@@ -1,4 +1,4 @@
-﻿generator client {
+generator client {
   provider = "prisma-client-js"
   output = "../node_modules/.prisma/client"
 }
@@ -339,4 +339,3 @@ model GenerationHistory {
   @@index([type, status, createdAt])
   @@map("generation_histories")
 }
-
