@@ -57,3 +57,5 @@ temp/
 pi-merchant-framework/
 assets/
 trustwallet-fork/
+
+.scripts/
