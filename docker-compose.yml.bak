@@ -1,7 +1,8 @@
-# docker-compose.yml — Pi Desktop SoloHost
+# docker-compose.yml — Pi Desktop SoloHost (Backup)
 # Pi Merchant Framework v2.1.0
 
 services:
+
   postgres:
     image: postgres:15-alpine
     restart: unless-stopped

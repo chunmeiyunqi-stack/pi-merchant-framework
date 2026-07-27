@@ -1,5 +1,5 @@
 # Pi Merchant Framework — Production Docker Compose
-# Usage: docker compose -f docker-compose.prod.yml up -d
+# Usage: docker compose -f docker-compose.yml up -d
 
 services:
   # --- PostgreSQL ---
@@ -21,7 +21,6 @@ services:
   # --- Redis (BullMQ Queue) ---
   redis:
     image: redis:7-alpine
-    # Do not expose Redis port to host in production
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

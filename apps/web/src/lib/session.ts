@@ -1,4 +1,4 @@
-﻿import crypto from 'crypto';
+import crypto from 'crypto';
 
 let _secretKey: string | null = null;
 
@@ -20,7 +20,7 @@ function getSecretKey(): string {
  * Signs a piUid into an HMAC-SHA256 signed opaque token.
  * Payload: JSON { uid, exp } → base64url → HMAC-SHA256 signature.
  */
-export function signSessionToken(piUid: string, ttlSeconds = 60 * 60): string {
+export function signSessionToken(piUid: string, ttlSeconds = 60 * 60 * 24 * 7): string {
   const exp = Math.floor(Date.now() / 1000) + Math.max(0, Math.floor(ttlSeconds));
   const payloadObj = { uid: piUid, exp };
   const payloadJson = JSON.stringify(payloadObj);

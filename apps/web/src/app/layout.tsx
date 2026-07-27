@@ -1,4 +1,4 @@
-﻿import './globals.css';
+import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import EnvBanner from '@/components/EnvBanner';
 import FooterLegal from '@/components/FooterLegal';
@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script src="https://sdk.minepi.com/pi-sdk.js" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `Pi.init({ version: "2.0", sandbox: true });`,
+            __html: `Pi.init({ version: "2.0", sandbox: ${process.env.NEXT_PUBLIC_PI_SANDBOX === 'true' ? 'true' : 'false'} });`,
           }}
         />
       </head>

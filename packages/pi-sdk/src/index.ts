@@ -1,4 +1,4 @@
-﻿// packages/pi-sdk/src/index.ts
+// packages/pi-sdk/src/index.ts
 // Pi SDK 灏佽灞傜粺涓€瀵煎嚭鍏ュ彛
 
 import { validateEnv } from './env-validator';
