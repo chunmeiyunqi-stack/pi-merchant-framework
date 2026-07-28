@@ -42,16 +42,71 @@ export default function CheckoutClient() {
   const plan = PLANS[initPlan] ?? PLANS.basic6;
 
   const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState('准备收银台...');
+  const [statusText, setStatusText] = useState('');
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState(plan.amount || 0);
+  const [piAuthDone, setPiAuthDone] = useState(false);
 
   const selectedPlan = plan;
   const finalAmount = isCustom ? customAmount : plan.amount;
 
+  // 步骤 0: Pi 身份验证 + 未完成支付处理
+  const handlePiAuth = async () => {
+    if (typeof window === 'undefined' || !window.Pi) {
+      setErrorStatus('⚠️ 请在 Pi Browser 中打开此页面。');
+      return;
+    }
+
+    setLoading(true);
+    setStatusText('正在验证 Pi 身份...');
+    setErrorStatus(null);
+
+    try {
+      const scopes: ('username' | 'payments')[] = ['username', 'payments'];
+
+      const auth = await window.Pi.authenticate(scopes, async (payment: any) => {
+        // 处理未完成的支付
+        if (payment?.transaction?.txid) {
+          await fetch('/api/payments/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              paymentId: payment.identifier,
+              txid: payment.transaction.txid,
+            }),
+          });
+        }
+      });
+
+      // 通知后端验证
+      await fetch('/api/auth/pi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessToken: auth.accessToken,
+          piUid: auth.user.uid,
+          username: auth.user.username,
+        }),
+      });
+
+      setPiAuthDone(true);
+      setStatusText('');
+      setLoading(false);
+    } catch (err: any) {
+      setLoading(false);
+      setStatusText('');
+      setErrorStatus('身份验证失败: ' + (err?.message || '请重试'));
+    }
+  };
+
   const handlePayment = async () => {
     if (typeof window === 'undefined' || !window.Pi) {
       setErrorStatus('⚠️ 请在 Pi Browser 中打开此页面。');
+      return;
+    }
+
+    if (!piAuthDone) {
+      await handlePiAuth();
       return;
     }
 
