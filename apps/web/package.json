@@ -23,9 +23,7 @@
         "jose": "^5.2.0",
         "@pi-merchant/config": "workspace:*",
         "@pi-merchant/types": "workspace:*",
-        "ioredis": "5.10.1",
-        "lucide-react": "^0.454.0",
-        "framer-motion": "^11.0.0"
+        "ioredis": "5.10.1"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",

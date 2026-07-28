@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import LogoutButton from '@/components/LogoutButton';
 import { verifySessionToken } from '@/lib/session';
-import { Shield, Zap, Sparkles, Calendar, CreditCard } from 'lucide-react';
+import { Shield, Zap, Sparkles, Calendar, CreditCard } from '@/components/icons';
 
 // 强制动态渲染策略，确保读取最新的 session cookie
 export const dynamic = 'force-dynamic';

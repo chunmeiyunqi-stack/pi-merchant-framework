@@ -1,5 +1,7 @@
+import type { FC } from 'react';
 import { cn } from '@/lib/utils';
-import { type LucideIcon } from 'lucide-react';
+
+type IconComponent = FC<{ className?: string }>;
 
 // ── Card ──
 export function Card({
@@ -33,7 +35,7 @@ export function StatCard({
   action,
   variant = 'purple',
 }: {
-  icon: LucideIcon;
+  icon: IconComponent;
   label: string;
   value: string | number;
   sub?: string;
@@ -59,8 +61,7 @@ export function StatCard({
       </p>
       {action && (
         <a href={action.href} className="text-sm font-semibold text-brand-purple hover:text-brand-purple-hover transition-colors">
-          {action.label} →
-        </a>
+          {action.label} �?        </a>
       )}
     </Card>
   );
@@ -114,7 +115,7 @@ export function EmptyState({
   description,
   action,
 }: {
-  icon: LucideIcon;
+  icon: IconComponent;
   title: string;
   description: string;
   action?: { label: string; href: string };

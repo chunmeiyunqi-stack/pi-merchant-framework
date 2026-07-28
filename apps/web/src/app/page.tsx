@@ -1,6 +1,6 @@
 import PiLoginButton from '@/components/PiLoginButton';
 import Link from 'next/link';
-import { Sparkles, Shield, Zap, ArrowRight, Check } from 'lucide-react';
+import { Sparkles, Shield, Zap, ArrowRight, Check } from '@/components/icons';
 
 export default function HomePage() {
   return (
