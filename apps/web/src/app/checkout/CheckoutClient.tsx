@@ -112,7 +112,8 @@ export default function CheckoutClient() {
 
     if (!piAuthDone) {
       await handlePiAuth();
-      return;
+      // 身份验证完成后继续执行支付
+      if (!piAuthDone) return; // 验证失败则停止
     }
 
     if (isCustom && finalAmount <= 0) {
