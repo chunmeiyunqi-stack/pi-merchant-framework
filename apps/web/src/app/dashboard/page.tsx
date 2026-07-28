@@ -13,7 +13,11 @@ export default async function DashboardPage() {
   const cookieStore = cookies();
   const token = cookieStore.get('pi_auth_token')?.value;
   const piUid = token ? verifySessionToken(token) : null;
-  const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
+  // 使用 ?? 与 auth/pi/route.ts 保持一致，防止空字符串导致 merchantId 不匹配
+  const merchantId =
+    process.env.NEXT_PUBLIC_MERCHANT_ID ??
+    process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ??
+    'merchant-demo-001';
 
   let customer: any = null;
   let activeMemberships = 0;
@@ -22,10 +26,29 @@ export default async function DashboardPage() {
 
   // P1-A: 服务端纯身份鉴权拦截
   if (piUid) {
-    customer = await prisma.customer.findUnique({
+    // 确保商户存在（与 auth route 防御逻辑一致）
+    await prisma.merchant.upsert({
+      where: { id: merchantId },
+      update: {},
+      create: { id: merchantId, name: 'Pioneer AI 商户' },
+    });
+
+    // 查找或自动创建 customer（解决 auth 与 dashboard 之间的数据一致性问题）
+    customer = await prisma.customer.upsert({
       where: {
         merchantId_piUid: { merchantId, piUid },
       },
+      update: {},
+      create: {
+        merchantId,
+        piUid,
+        username: piUid, // 兜底 username
+      },
+    });
+
+    // 补充关联数据
+    const enriched = await prisma.customer.findUnique({
+      where: { id: customer.id },
       include: {
         _count: {
           select: {
@@ -39,10 +62,11 @@ export default async function DashboardPage() {
       },
     });
 
-    if (customer) {
-      activeMemberships = customer.customerMemberships.length;
-      totalBookings = customer._count.bookings;
-      totalPayments = customer._count.orders;
+    if (enriched) {
+      customer = enriched;
+      activeMemberships = enriched.customerMemberships.length;
+      totalBookings = enriched._count.bookings;
+      totalPayments = enriched._count.orders;
     }
   }
 
