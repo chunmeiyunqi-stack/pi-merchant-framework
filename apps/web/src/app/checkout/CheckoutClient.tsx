@@ -123,11 +123,16 @@ export default function CheckoutClient() {
         {
           onReadyForServerApproval: async (paymentId: string) => {
             setStatusText('审批中...');
-            await fetchWithPiAuth('/api/payments/approve', {
+            const approveRes = await fetchWithPiAuth('/api/payments/approve', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ paymentId, orderId: orderData.order.orderNo }),
             });
+            if (!approveRes.ok) {
+              const errText = await approveRes.text();
+              console.error('[Payment] approve failed:', approveRes.status, errText);
+              setStatusText('审批失败: ' + errText);
+            }
           },
           onReadyForServerCompletion: async (paymentId: string, txid: string) => {
             setStatusText('交易上链成功！');
