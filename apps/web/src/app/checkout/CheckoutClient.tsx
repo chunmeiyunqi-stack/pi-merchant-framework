@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchWithPiAuth } from '@/lib/apiClient';
 
-type PlanKey = 'basic' | 'pro';
+type PlanKey = 'basic6' | 'basic12' | 'custom';
 
 type Plan = {
   name: string;
   amount: number;
+  duration: string;
 };
 
 type OrderResponse =
@@ -25,29 +26,42 @@ type OrderResponse =
     };
 
 const PLANS: Record<PlanKey, Plan> = {
-  basic: { name: '基础建站先锋 (Basic Plan)', amount: 5.0 },
-  pro: { name: '专业 AI 架构 (Pro Plan)', amount: 25.0 },
+  basic6:  { name: '初级服务 (6个月)',    amount: 50, duration: '6个月' },
+  basic12: { name: '初级服务 (12个月)',   amount: 90, duration: '12个月' },
+  custom:  { name: '全套订阅 (自定义)',   amount: 0,  duration: '自定义' },
 };
 
 export default function CheckoutClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const plan = (searchParams?.get('plan') ?? 'basic') as PlanKey;
+  const planParam = searchParams?.get('plan');
+
+  // 如果 plan=custom 或带 amount 参数，启用自定义模式
+  const isCustom = planParam === 'custom';
+  const initPlan = (isCustom ? 'custom' : (planParam ?? 'basic6')) as PlanKey;
+  const plan = PLANS[initPlan] ?? PLANS.basic6;
 
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('准备收银台...');
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
+  const [customAmount, setCustomAmount] = useState(plan.amount || 0);
 
-  const selectedPlan = PLANS[plan] ?? PLANS.basic;
+  const selectedPlan = plan;
+  const finalAmount = isCustom ? customAmount : plan.amount;
 
   const handlePayment = async () => {
     if (typeof window === 'undefined' || !window.Pi) {
-      setErrorStatus('⚠️ 侦测到您并未在 Pi Browser 内发起支付。');
+      setErrorStatus('⚠️ 请在 Pi Browser 中打开此页面。');
+      return;
+    }
+
+    if (isCustom && finalAmount <= 0) {
+      setErrorStatus('⚠️ 请输入有效的 π 数量。');
       return;
     }
 
     setLoading(true);
-    setStatusText('1. 正在服务器生成生态商户订单...');
+    setStatusText('1. 正在生成订单...');
     setErrorStatus(null);
 
     try {
@@ -57,8 +71,8 @@ export default function CheckoutClient() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: selectedPlan.amount,
-          planId: plan,
+          amount: finalAmount,
+          planId: initPlan,
           memo: `Framework Subscription: ${selectedPlan.name}`,
         }),
       });
@@ -67,26 +81,26 @@ export default function CheckoutClient() {
 
       if (!orderData.success) {
         if (orderRes.status === 401) {
-          setErrorStatus('身份未授权，请回首页通过 Pi Wallet 连接。');
+          setErrorStatus('身份未授权，请回首页通过 Pi Wallet 登录。');
         } else {
-          setErrorStatus('服务器创建订单失败: ' + (orderData.error ?? '未知错误'));
+          setErrorStatus('创建订单失败: ' + (orderData.error ?? '未知错误'));
         }
         setLoading(false);
         return;
       }
 
-      setStatusText('2. 正在唤醒区块链底层安全验证...');
+      setStatusText('2. 正在唤醒 Pi Wallet...');
       const Pi = window.Pi;
 
       Pi.createPayment(
         {
-          amount: selectedPlan.amount,
+          amount: finalAmount,
           memo: `Subscription: ${selectedPlan.name}`,
-          metadata: { orderId: orderData.order.orderNo, planId: plan },
+          metadata: { orderId: orderData.order.orderNo, planId: initPlan },
         },
         {
           onReadyForServerApproval: async (paymentId: string) => {
-            setStatusText(`3. 服务器核算对价中 [${paymentId.slice(0, 6)}...]`);
+            setStatusText(`3. 审批中 [${paymentId.slice(0, 6)}...]`);
             await fetchWithPiAuth('/api/payments/approve', {
               method: 'POST',
               headers: {
@@ -96,7 +110,7 @@ export default function CheckoutClient() {
             });
           },
           onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-            setStatusText('4. 交易上链成功！正在为您颁发数字权益...');
+            setStatusText('4. 交易上链成功！');
             await fetchWithPiAuth('/api/payments/complete', {
               method: 'POST',
               headers: {
@@ -109,20 +123,20 @@ export default function CheckoutClient() {
           onCancel: () => {
             setLoading(false);
             setStatusText('');
-            setErrorStatus('💡 动作已中止，您取消了支付，未发生资产转移。');
+            setErrorStatus('已取消支付，未发生资产转移。');
           },
           onError: (error: Error) => {
             setLoading(false);
             setStatusText('');
             console.error('Payment API error', error);
-            setErrorStatus(`⚠️ 支付唤起遭遇异常: ${error?.message || '未知错误'}`);
+            setErrorStatus(`支付异常: ${error?.message || '未知错误'}`);
           },
         }
       );
     } catch (error: unknown) {
       console.error(error);
       setLoading(false);
-      setErrorStatus(`本地逻辑发生异常: ${error instanceof Error ? error.message : '未知异常'}`);
+      setErrorStatus(`发生异常: ${error instanceof Error ? error.message : '未知异常'}`);
     }
   };
 
@@ -142,13 +156,31 @@ export default function CheckoutClient() {
 
       <div className="bg-brand-dark-elevated rounded-card p-6 mb-8 border border-brand-purple/20">
         <h2 className="text-sm font-semibold text-gray-400 mb-2">订阅方案</h2>
-        <p className="text-lg font-black text-brand-gold mb-6">{selectedPlan.name}</p>
+        <p className="text-lg font-black text-brand-gold mb-4">{selectedPlan.name}</p>
 
-        <h2 className="text-sm font-semibold text-gray-400 mb-2">金额</h2>
-        <div className="flex items-baseline gap-2">
-          <span className="text-brand-gold text-4xl font-black">π</span>
-          <span className="text-4xl font-black text-white">{selectedPlan.amount.toFixed(2)}</span>
-        </div>
+        {isCustom ? (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-400 mb-2">自定义金额 (π)</h2>
+            <input
+              type="number"
+              min={1}
+              step={0.01}
+              value={customAmount || ''}
+              onChange={(e) => setCustomAmount(parseFloat(e.target.value) || 0)}
+              placeholder="输入 π 数量"
+              className="w-full bg-brand-dark border border-brand-border rounded-btn px-4 py-3 text-white text-2xl font-black focus:outline-none focus:border-brand-gold transition-colors"
+            />
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-400 mb-2">金额</h2>
+            <div className="flex items-baseline gap-2">
+              <span className="text-brand-gold text-4xl font-black">π</span>
+              <span className="text-4xl font-black text-white">{selectedPlan.amount}</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">有效期：{selectedPlan.duration}（仅框架订阅，不含商品上架）</p>
+          </div>
+        )}
       </div>
 
       {errorStatus && (

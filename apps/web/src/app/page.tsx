@@ -148,74 +148,50 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-stretch">
-            {/* Basic Plan */}
+            {/* 初级服务 6个月 */}
             <div className="bg-[#150B20] border border-white/10 rounded-2xl md:rounded-[2rem] p-6 md:p-10 flex flex-col hover:bg-[#1A0E2A] hover:border-white/20 transition-all lg:mt-8 lg:mb-8">
-              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">基础先锋</h3>
-              <p className="text-gray-400 text-sm mb-6 md:mb-8 h-auto md:h-10">
-                极速跑通底层支付账本与标准业务流。
-              </p>
+              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">初级服务</h3>
+              <p className="text-gray-400 text-sm mb-6">6 个月框架订阅，不含商品上架功能。</p>
               <div className="text-4xl md:text-5xl font-black text-[#F3C136] mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/10 tracking-tight">
-                π 5{' '}
-                <span className="text-sm md:text-base text-gray-500 font-medium tracking-normal">
-                  / 期
-                </span>
+                π 50
               </div>
               <ul className="space-y-4 md:space-y-5 mb-8 md:mb-10 flex-1 text-sm text-gray-300 font-medium">
-                <li className="flex items-start">
-                  <span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 标准化组件授权池
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 基础数据大盘洞察
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 社区异步技术辅导
-                </li>
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> AI 智能助手</li>
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> Pi 支付接入</li>
+                <li className="flex items-start"><span className="text-[#8B5CF6] mr-3 font-bold">✓</span> 控制台管理</li>
               </ul>
               <Link
-                href="/checkout?plan=basic"
+                href="/checkout?plan=basic6"
                 className="w-full inline-flex justify-center items-center py-3.5 md:py-4 rounded-xl font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
               >
-                配置前瞻框架
+                订阅 6 个月 · π 50
               </Link>
             </div>
 
-            {/* Pro Plan (Hero Card) */}
-            <div className="relative bg-gradient-to-b from-[#2A1642] to-[#1E112E] border border-[#F3C136]/30 rounded-2xl md:rounded-[2rem] p-6 md:p-10 flex flex-col shadow-2xl shadow-[#F3C136]/5 transform lg:-translate-y-4 mt-2 mb-2 lg:my-0">
+            {/* 初级服务 12个月 (推荐) */}
+            <div className="relative bg-gradient-to-b from-[#2A1642] to-[#1E112E] border border-[#F3C136]/30 rounded-2xl md:rounded-[2rem] p-6 md:p-10 flex flex-col shadow-2xl shadow-[#F3C136]/5 transform lg:-translate-y-4">
               <div className="absolute top-0 inset-x-0 h-1 md:h-1.5 bg-gradient-to-r from-[#F3C136] to-[#EEA834] rounded-t-2xl md:rounded-t-[2rem]"></div>
               <div className="absolute top-[-12px] md:top-[-14px] left-1/2 transform -translate-x-1/2 bg-[#F3C136] text-[#1E112A] text-[9px] md:text-[10px] font-black uppercase tracking-widest py-1 md:py-1.5 px-3 md:px-4 rounded-full shadow-lg whitespace-nowrap">
-                专业应用精选
+                推荐
               </div>
-              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">专业架构</h3>
-              <p className="text-gray-300 text-sm mb-6 md:mb-8 h-auto md:h-10">
-                全量的高级 AI 组件接入和专属核心架构护航。
-              </p>
+              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">初级服务 · 年度</h3>
+              <p className="text-gray-300 text-sm mb-6">12 个月框架订阅，节省 10π，不含商品上架功能。</p>
               <div className="text-5xl md:text-6xl font-black text-[#F3C136] mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/10 tracking-tight flex items-end">
-                π 25{' '}
+                π 90{' '}
                 <span className="text-sm md:text-base text-gray-400 font-medium tracking-normal pb-1.5 md:pb-2 ml-2">
-                  / 期
+                  / 年
                 </span>
               </div>
               <ul className="space-y-4 md:space-y-5 mb-8 md:mb-10 flex-1 text-sm text-gray-200 font-medium">
-                <li className="flex items-start">
-                  <span className="text-[#F3C136] mr-3 font-bold">✓</span>{' '}
-                  <strong className="text-white">深度护航：</strong>专有架构师资源辅导
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[#F3C136] mr-3 font-bold">✓</span>{' '}
-                  <strong className="text-white">AI赋能：</strong>自动化商用调度节点
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[#F3C136] mr-3 font-bold">✓</span> 包含所有前瞻版底层构件
-                </li>
-                <li className="flex items-start">
-                  <span className="text-[#F3C136] mr-3 font-bold">✓</span> 专线解决开发链路卡点
-                </li>
+                <li className="flex items-start"><span className="text-[#F3C136] mr-3 font-bold">✓</span> <strong className="text-white">全部初级功能</strong></li>
+                <li className="flex items-start"><span className="text-[#F3C136] mr-3 font-bold">✓</span> 优先技术支持</li>
+                <li className="flex items-start"><span className="text-[#F3C136] mr-3 font-bold">✓</span> 节省 10π (vs 半年续费)</li>
               </ul>
               <Link
-                href="/checkout?plan=pro"
+                href="/checkout?plan=basic12"
                 className="w-full inline-flex justify-center items-center py-3.5 md:py-4 rounded-xl font-bold text-[#1E112A] bg-[#F3C136] hover:bg-[#EEA834] transition-colors shadow-lg shadow-[#F3C136]/20"
               >
-                激活智能专业引擎
+                订阅 12 个月 · π 90
               </Link>
             </div>
 
