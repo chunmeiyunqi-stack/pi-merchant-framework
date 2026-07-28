@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { fetchWithPiAuth, storePiAuthToken } from '@/lib/apiClient';
 
 type PlanKey = 'basic6' | 'basic12' | 'custom';
@@ -32,7 +32,6 @@ const PLANS: Record<PlanKey, Plan> = {
 };
 
 export default function CheckoutClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const planParam = searchParams?.get('plan');
 
@@ -45,35 +44,36 @@ export default function CheckoutClient() {
   const [statusText, setStatusText] = useState('');
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState(plan.amount || 0);
-  const [piAuthDone, setPiAuthDone] = useState(false);
 
   const selectedPlan = plan;
   const finalAmount = isCustom ? customAmount : plan.amount;
 
-  // 步骤 0: Pi 身份验证 + 未完成支付处理
-  const handlePiAuth = async () => {
+  // 一键完成：身份验证 → 创建订单 → 唤醒支付
+  const handlePay = async () => {
     if (typeof window === 'undefined' || !window.Pi) {
       setErrorStatus('⚠️ 请在 Pi Browser 中打开此页面。');
       return;
     }
 
+    if (isCustom && finalAmount <= 0) {
+      setErrorStatus('⚠️ 请输入有效的 π 数量。');
+      return;
+    }
+
     setLoading(true);
-    setStatusText('正在验证 Pi 身份...');
     setErrorStatus(null);
 
     try {
+      // 步骤 0: Pi 身份验证（含 payments scope + 未完成支付处理）
+      setStatusText('正在验证 Pi 身份...');
       const scopes: ('username' | 'payments')[] = ['username', 'payments'];
 
       const auth = await window.Pi.authenticate(scopes, async (payment: any) => {
-        // 处理未完成的支付
         if (payment?.transaction?.txid) {
           await fetch('/api/payments/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              paymentId: payment.identifier,
-              txid: payment.transaction.txid,
-            }),
+            body: JSON.stringify({ paymentId: payment.identifier, txid: payment.transaction.txid }),
           });
         }
       });
@@ -88,116 +88,71 @@ export default function CheckoutClient() {
           username: auth.user.username,
         }),
       });
-
       const authData = await authRes.json();
-      if (authData.token) {
-        storePiAuthToken(authData.token);
-      }
+      if (authData.token) storePiAuthToken(authData.token);
 
-      setPiAuthDone(true);
-      setStatusText('');
-      setLoading(false);
-    } catch (err: any) {
-      setLoading(false);
-      setStatusText('');
-      setErrorStatus('身份验证失败: ' + (err?.message || '请重试'));
-    }
-  };
-
-  const handlePayment = async () => {
-    if (typeof window === 'undefined' || !window.Pi) {
-      setErrorStatus('⚠️ 请在 Pi Browser 中打开此页面。');
-      return;
-    }
-
-    if (!piAuthDone) {
-      await handlePiAuth();
-      // 身份验证完成后继续执行支付
-      if (!piAuthDone) return; // 验证失败则停止
-    }
-
-    if (isCustom && finalAmount <= 0) {
-      setErrorStatus('⚠️ 请输入有效的 π 数量。');
-      return;
-    }
-
-    setLoading(true);
-    setStatusText('1. 正在生成订单...');
-    setErrorStatus(null);
-
-    try {
+      // 步骤 1: 创建订单
+      setStatusText('正在生成订单...');
       const orderRes = await fetchWithPiAuth('/api/orders', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: finalAmount,
           planId: initPlan,
-          memo: `Framework Subscription: ${selectedPlan.name}`,
+          memo: `Framework: ${selectedPlan.name}`,
         }),
       });
-
-      const orderData = (await orderRes.json()) as OrderResponse;
+      const orderData = await orderRes.json();
 
       if (!orderData.success) {
-        if (orderRes.status === 401) {
-          setErrorStatus('身份未授权，请回首页通过 Pi Wallet 登录。');
-        } else {
-          setErrorStatus('创建订单失败: ' + (orderData.error ?? '未知错误'));
-        }
+        setErrorStatus(orderRes.status === 401
+          ? '身份未授权，请返回首页重新登录。'
+          : '创建订单失败: ' + (orderData.error ?? '未知错误'));
         setLoading(false);
         return;
       }
 
-      setStatusText('2. 正在唤醒 Pi Wallet...');
-      const Pi = window.Pi;
-
-      Pi.createPayment(
+      // 步骤 2: 唤醒 Pi Wallet 支付
+      setStatusText('正在打开 Pi Wallet...');
+      window.Pi.createPayment(
         {
           amount: finalAmount,
-          memo: `Subscription: ${selectedPlan.name}`,
+          memo: selectedPlan.name,
           metadata: { orderId: orderData.order.orderNo, planId: initPlan },
         },
         {
           onReadyForServerApproval: async (paymentId: string) => {
-            setStatusText(`3. 审批中 [${paymentId.slice(0, 6)}...]`);
+            setStatusText('审批中...');
             await fetchWithPiAuth('/api/payments/approve', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ paymentId, orderId: orderData.order.orderNo }),
             });
           },
           onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-            setStatusText('4. 交易上链成功！');
+            setStatusText('交易上链成功！');
             await fetchWithPiAuth('/api/payments/complete', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ paymentId, txid }),
             });
-            router.push('/dashboard?success=true');
+            window.location.href = '/dashboard?success=true';
           },
           onCancel: () => {
             setLoading(false);
             setStatusText('');
-            setErrorStatus('已取消支付，未发生资产转移。');
+            setErrorStatus('已取消支付。');
           },
           onError: (error: Error) => {
             setLoading(false);
             setStatusText('');
-            console.error('Payment API error', error);
             setErrorStatus(`支付异常: ${error?.message || '未知错误'}`);
           },
         }
       );
-    } catch (error: unknown) {
-      console.error(error);
+    } catch (err: any) {
       setLoading(false);
-      setErrorStatus(`发生异常: ${error instanceof Error ? error.message : '未知异常'}`);
+      setErrorStatus(`操作失败: ${err?.message || '请重试'}`);
     }
   };
 
@@ -251,7 +206,7 @@ export default function CheckoutClient() {
       )}
 
       <button
-        onClick={handlePayment}
+        onClick={handlePay}
         disabled={loading}
         className="w-full bg-brand-gold hover:bg-brand-gold-hover text-brand-dark font-black text-lg py-4 rounded-btn shadow-glow-gold transition-all disabled:opacity-50 mb-4 flex justify-center items-center"
       >
