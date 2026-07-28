@@ -1,11 +1,22 @@
-﻿@charset "UTF-8";
+@charset "UTF-8";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-brand-dark text-white antialiased;
+  }
+  ::selection {
+    @apply bg-brand-gold/30 text-brand-gold;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-gold;
+  }
+}
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
 }
-

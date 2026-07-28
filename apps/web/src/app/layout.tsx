@@ -46,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="bg-gray-50 min-h-screen text-gray-900 font-sans flex flex-col">
+      <body className="bg-brand-dark min-h-screen text-white font-sans flex flex-col">
         <EnvBanner />
         <div className="flex-1 flex flex-col">{children}</div>
         <FooterLegal />

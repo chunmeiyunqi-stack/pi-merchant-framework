@@ -1,3 +1,7 @@
+export function cn(...inputs: (string | false | null | undefined)[]) {
+  return inputs.filter(Boolean).join(' ');
+}
+
 export function getMerchantId() {
   return (
     process.env.NEXT_PUBLIC_MERCHANT_ID ||

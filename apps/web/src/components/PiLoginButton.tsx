@@ -68,7 +68,7 @@ export default function PiLoginButton() {
         </div>
         <button
           onClick={handleGoDashboard}
-          className="bg-[#2A1642]/80 hover:bg-[#3B2D4F] text-[#F3C136] border border-[#F3C136]/50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+          className="bg-brand-dark-surface hover:bg-brand-dark-elevated text-brand-gold border border-brand-gold/30 px-3 py-1.5 rounded-btn text-xs font-bold transition-colors"
         >
           控制台
         </button>
@@ -81,12 +81,12 @@ export default function PiLoginButton() {
       <button
         onClick={handleLogin}
         disabled={loading}
-        className="bg-transparent border border-[#F3C136]/60 hover:bg-[#F3C136] hover:text-[#1E112A] text-[#F3C136] px-4 py-2 rounded-xl shadow-lg transition-all text-sm font-bold disabled:opacity-50 flex items-center space-x-2"
+        className="bg-transparent border border-brand-gold/50 hover:bg-brand-gold hover:text-brand-dark text-brand-gold px-5 py-2.5 rounded-btn shadow-lg transition-all text-sm font-bold disabled:opacity-50 flex items-center gap-2"
       >
-        <span>{loading ? '等待握手...' : '🔗 同步 Pi Wallet 身份'}</span>
+        <span>{loading ? '验证中...' : 'Pi Wallet 登录'}</span>
       </button>
-      <span className="text-[10px] text-gray-500 mt-1 pointer-events-none hidden sm:block">
-        由官方安全验证通道提供支持
+      <span className="text-[10px] text-gray-500 mt-1 hidden sm:block">
+        Pi Network 官方安全通道
       </span>
     </div>
   );

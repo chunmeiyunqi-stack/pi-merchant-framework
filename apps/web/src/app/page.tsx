@@ -1,5 +1,6 @@
 import PiLoginButton from '@/components/PiLoginButton';
 import Link from 'next/link';
+import { Sparkles, Shield, Zap, ArrowRight, Check } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -14,10 +15,8 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 bg-[#0A0510]/80 backdrop-blur-xl border-b border-white/5">
         <div className="w-full max-w-[1440px] mx-auto flex justify-between items-center px-4 sm:px-6 lg:px-12 h-16 md:h-20">
           <div className="flex items-center space-x-2 md:space-x-4 shrink-0">
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center p-[1px] shadow-lg shadow-[#F3C136]/10 shrink-0">
-              <div className="flex items-center justify-center w-full h-full bg-[#150B20] rounded-[7px] md:rounded-[11px]">
-                <span className="text-sm md:text-xl font-black text-[#F3C136]">AI</span>
-              </div>
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-[#F3C136] to-[#EEA834] flex items-center justify-center shadow-lg shadow-[#F3C136]/10 shrink-0">
+              <Zap className="w-5 h-5 md:w-6 md:h-6 text-[#1E112A]" />
             </div>
             <div className="flex flex-col justify-center truncate">
               <h1 className="text-base md:text-xl font-bold text-white tracking-tight leading-none truncate pr-2">
@@ -79,24 +78,15 @@ export default function HomePage() {
               浏览智能计划
             </a>
           </div>
-          <div className="flex justify-center lg:justify-start flex-wrap items-center gap-x-4 md:gap-x-8 gap-y-2 md:gap-y-4 pt-6 md:pt-8 text-xs md:text-sm font-semibold text-gray-500 border-t border-white/5 mt-6 md:mt-8">
-            <div className="flex items-center">
-              <span className="text-[#8B5CF6] mr-1.5 md:mr-2 text-lg md:text-xl leading-none">
-                ✓
-              </span>{' '}
-              原生验证架构
+          <div className="flex justify-center lg:justify-start flex-wrap items-center gap-x-4 md:gap-x-8 gap-y-2 md:gap-y-4 pt-6 md:pt-8 text-xs md:text-sm font-semibold text-gray-400 border-t border-white/5 mt-6 md:mt-8">
+            <div className="flex items-center gap-1">
+              <Check className="w-4 h-4 text-[#8B5CF6]" /> 原生 Pi 验证
             </div>
-            <div className="flex items-center">
-              <span className="text-[#8B5CF6] mr-1.5 md:mr-2 text-lg md:text-xl leading-none">
-                ✓
-              </span>{' '}
-              分布信任网络
+            <div className="flex items-center gap-1">
+              <Check className="w-4 h-4 text-[#8B5CF6]" /> 端到端加密
             </div>
-            <div className="flex items-center">
-              <span className="text-[#8B5CF6] mr-1.5 md:mr-2 text-lg md:text-xl leading-none">
-                ✓
-              </span>{' '}
-              无缝身份衔接
+            <div className="flex items-center gap-1">
+              <Check className="w-4 h-4 text-[#8B5CF6]" /> 秒级链上结算
             </div>
           </div>
         </div>
