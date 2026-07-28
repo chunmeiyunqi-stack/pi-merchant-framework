@@ -121,6 +121,7 @@ async function __POST(req: Request) {
 
     return NextResponse.json({
       success: true,
+      token: secureToken,
       user: { uid: verifiedUid, username: verifiedUsername },
     });
   } catch (error: unknown) {

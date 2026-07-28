@@ -37,9 +37,10 @@ export default function PiLoginButton() {
           storePiAuthToken(authResult.token);
         }
         setUsername(authResult.user.username);
-        // 使用 window.location.href 做完整页面跳转，确保 HttpOnly cookie 被浏览器携带
-        // router.push 是客户端导航，在 Pi Browser 中可能不会发送 Set-Cookie 刚写入的 token
-        window.location.href = '/dashboard';
+        // 将 token 通过 URL 参数传递，确保 Pi Browser 中 dashboard 能收到身份凭证
+        // HttpOnly cookie 在客户端导航中可能不会被发送
+        const tokenParam = authResult.token ? `?token=${encodeURIComponent(authResult.token)}` : '';
+        window.location.href = `/dashboard${tokenParam}`;
         return;
       }
 

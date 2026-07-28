@@ -9,9 +9,17 @@ export const dynamic = 'force-dynamic';
 
 const prisma = new PrismaClient();
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const cookieStore = cookies();
-  const token = cookieStore.get('pi_auth_token')?.value;
+  let token = cookieStore.get('pi_auth_token')?.value;
+  // 兼容 Pi Browser：如果 cookie 未被发送，从 URL 参数中获取 token
+  if (!token && searchParams.token && typeof searchParams.token === 'string') {
+    token = searchParams.token;
+  }
   const piUid = token ? verifySessionToken(token) : null;
   // 使用 ?? 与 auth/pi/route.ts 保持一致，防止空字符串导致 merchantId 不匹配
   const merchantId =
