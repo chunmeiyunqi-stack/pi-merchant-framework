@@ -23,8 +23,6 @@ async function __POST(req: Request) {
     }
 
     // ── 步骤 1：用 accessToken 调用 Pi Platform API 验证真实身份 ─────────────
-    // GET /v2/me 使用 Authorization: Bearer <accessToken>
-    // 这是 Pi 官方推荐的 token 验证方式，无需 PI_API_KEY
     let verifiedUid: string;
     let verifiedUsername: string;
 
@@ -73,6 +71,13 @@ async function __POST(req: Request) {
       bodyMerchantId ??
       process.env.NEXT_PUBLIC_MERCHANT_ID ??
       'merchant-demo-001';
+
+    // ── 步骤 1.5：确保商户存在（upsert 原子操作，避免 FK 约束违规）──────────
+    await prisma.merchant.upsert({
+      where: { id: merchantId },
+      update: {},
+      create: { id: merchantId, name: 'Pioneer AI 商户' },
+    });
 
     // ── 步骤 2：Upsert Customer 记录 ────────────────────────────────────────
     const customer = await prisma.customer.upsert({
