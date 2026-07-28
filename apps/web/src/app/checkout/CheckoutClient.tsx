@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { fetchWithPiAuth } from '@/lib/apiClient';
+import { fetchWithPiAuth, storePiAuthToken } from '@/lib/apiClient';
 
 type PlanKey = 'basic6' | 'basic12' | 'custom';
 
@@ -78,8 +78,8 @@ export default function CheckoutClient() {
         }
       });
 
-      // 通知后端验证
-      await fetch('/api/auth/pi', {
+      // 通知后端验证并存储 token
+      const authRes = await fetch('/api/auth/pi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -88,6 +88,11 @@ export default function CheckoutClient() {
           username: auth.user.username,
         }),
       });
+
+      const authData = await authRes.json();
+      if (authData.token) {
+        storePiAuthToken(authData.token);
+      }
 
       setPiAuthDone(true);
       setStatusText('');
