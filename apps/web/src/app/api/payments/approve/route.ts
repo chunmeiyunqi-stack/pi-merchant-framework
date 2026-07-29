@@ -1,11 +1,24 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
 import { withMetrics } from '@/lib/metrics-middleware';
-
-const prisma = new PrismaClient();
 
 async function __POST(req: Request) {
   try {
+    // ── 身份验证 ──────────────────────────────────────────
+    const cookieStore = cookies();
+    let token = cookieStore.get('pi_auth_token')?.value;
+    if (!token) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+    if (!token || !verifySessionToken(token)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { paymentId, orderId } = body;
 
@@ -13,7 +26,18 @@ async function __POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Missing paymentId' }, { status: 400 });
     }
 
-    // 1. 幂等策略: 检查数据库状态
+    // ── 环境变量校验 ──────────────────────────────────────
+    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
+    const apiKey = process.env.PI_API_KEY;
+    if (!apiKey) {
+      console.error('[Pi API] CRITICAL: Missing PI_API_KEY');
+      return NextResponse.json(
+        { success: false, error: 'Server misconfiguration: PI_API_KEY not set' },
+        { status: 500 }
+      );
+    }
+
+    // ── 1. 幂等策略：检查数据库状态 ───────────────────────
     const existingPayment = await prisma.payment.findUnique({
       where: { piPaymentId: paymentId },
     });
@@ -21,44 +45,35 @@ async function __POST(req: Request) {
     if (!existingPayment) {
       const order = await prisma.order.findUnique({ where: { orderNo: orderId } });
       if (order) {
-        await prisma.payment.create({
-          data: {
-            orderId: order.id,
-            piPaymentId: paymentId,
-            amount: order.amount,
-            status: 'PENDING',
-            developerApproved: true,
-            approvedAt: new Date(),
-            memo: `Paying for order ${order.orderNo}`,
-          },
-        });
-        await prisma.order.update({
-          where: { id: order.id },
-          data: { status: 'PENDING_APPROVAL', paymentId: paymentId },
-        });
+        await prisma.$transaction([
+          prisma.payment.create({
+            data: {
+              orderId: order.id,
+              piPaymentId: paymentId,
+              amount: order.amount,
+              status: 'PENDING',
+              developerApproved: true,
+              approvedAt: new Date(),
+              memo: `Payment for order ${order.orderNo}`,
+            },
+          }),
+          prisma.order.update({
+            where: { id: order.id },
+            data: { status: 'PENDING_APPROVAL', paymentId: paymentId },
+          }),
+        ]);
       }
     }
 
-    // 2. 极其关键：必须向 Pi 官方服务器发送 Approve 请求，否则 SDK 会死锁！
-    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
-    const apiKey = process.env.PI_API_KEY;
-
-    if (!apiKey) {
-      console.error('[Pi API] Missing PI_API_KEY in environment variables');
-      return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
-    }
-
+    // ── 2. 向 Pi Platform 发送 Approve ─────────────────────
     const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/approve`, {
       method: 'POST',
-      headers: {
-        Authorization: `Key ${apiKey}`,
-      },
+      headers: { Authorization: `Key ${apiKey}` },
     });
 
     if (!piRes.ok) {
       const errText = await piRes.text();
       console.error('[Pi API] Approve Failed:', piRes.status, errText);
-      // 如果 Pi 报错说已经 approve 过了，可以放行
       if (!errText.includes('already approved')) {
         return NextResponse.json(
           { success: false, error: `Pi API Error: ${errText}` },
@@ -69,10 +84,11 @@ async function __POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error('[POST /api/payments/approve] 审批异常:', error);
-    return new NextResponse(error instanceof Error ? error.message : 'Server error', {
-      status: 500,
-    });
+    console.error('[POST /api/payments/approve] Exception:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 

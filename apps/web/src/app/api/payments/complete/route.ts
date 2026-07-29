@@ -1,32 +1,52 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { verifySessionToken } from '@/lib/session';
 import { withMetrics } from '@/lib/metrics-middleware';
-
-const prisma = new PrismaClient();
 
 async function __POST(req: Request) {
   try {
+    // ── 身份验证 ──────────────────────────────────────────
+    const cookieStore = cookies();
+    let token = cookieStore.get('pi_auth_token')?.value;
+    if (!token) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+    if (!token || !verifySessionToken(token)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { paymentId, txid } = body;
 
     if (!paymentId || !txid) {
-      return NextResponse.json({ success: false, error: 'Missing parameters' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Missing paymentId or txid' },
+        { status: 400 }
+      );
     }
 
+    // ── 环境变量校验 ──────────────────────────────────────
+    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
+    const apiKey = process.env.PI_API_KEY;
+    if (!apiKey) {
+      console.error('[Pi API] CRITICAL: Missing PI_API_KEY');
+      return NextResponse.json(
+        { success: false, error: 'Server misconfiguration: PI_API_KEY not set' },
+        { status: 500 }
+      );
+    }
+
+    // ── 查找支付记录 ─────────────────────────────────────
     const payment = await prisma.payment.findUnique({
       where: { piPaymentId: paymentId },
       include: { order: true },
     });
 
-    // 1. 极其关键：向 Pi 官方服务器发送 Complete 请求，真正完结这笔支付
-    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
-    const apiKey = process.env.PI_API_KEY;
-
-    if (!apiKey) {
-      console.error('[Pi API] Missing PI_API_KEY in environment variables');
-      return NextResponse.json({ success: false, error: 'Missing PI_API_KEY' }, { status: 500 });
-    }
-
+    // ── 1. 向 Pi Platform 发送 Complete ────────────────────
     const piRes = await fetch(`${piApiBase}/v2/payments/${paymentId}/complete`, {
       method: 'POST',
       headers: {
@@ -47,17 +67,17 @@ async function __POST(req: Request) {
       }
     }
 
+    // ── 2. 幂等边界 ──────────────────────────────────────
     if (!payment || payment.status === 'COMPLETED') {
-      // 幂等边界
-      return NextResponse.json({ success: true, message: 'Already completed locally' });
+      return NextResponse.json({ success: true, message: 'Already completed' });
     }
 
-    // 2. 更新本地数据库
-    await prisma.$transaction(async (tx: any) => {
+    // ── 3. 事务更新本地数据库 ────────────────────────────
+    await prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { piPaymentId: paymentId },
         data: {
-          txid: txid,
+          txid,
           status: 'COMPLETED',
           transactionVerified: true,
           developerCompleted: true,
@@ -94,7 +114,7 @@ async function __POST(req: Request) {
           customerId: updatedOrder.customerId,
           membershipId: dbMembership.id,
           startAt: new Date(),
-          endAt: endAt,
+          endAt,
           status: 'ACTIVE',
         },
       });
@@ -102,10 +122,11 @@ async function __POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error('[POST /api/payments/complete] 完成支付异常:', error);
-    return new NextResponse(error instanceof Error ? error.message : 'Server error', {
-      status: 500,
-    });
+    console.error('[POST /api/payments/complete] Exception:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 

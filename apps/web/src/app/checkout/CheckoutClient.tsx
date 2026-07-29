@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { fetchWithPiAuth, storePiAuthToken } from '@/lib/apiClient';
+import { handleIncompletePayment } from '@pi-merchant/pi-sdk';
 
 type PlanKey = 'basic6' | 'basic12' | 'custom';
 
@@ -26,9 +27,9 @@ type OrderResponse =
     };
 
 const PLANS: Record<PlanKey, Plan> = {
-  basic6:  { name: '初级服务 (6个月)',    amount: 50, duration: '6个月' },
-  basic12: { name: '初级服务 (12个月)',   amount: 90, duration: '12个月' },
-  custom:  { name: '全套订阅 (自定义)',   amount: 0,  duration: '自定义' },
+  basic6: { name: '初级服务 (6个月)', amount: 50, duration: '6个月' },
+  basic12: { name: '初级服务 (12个月)', amount: 90, duration: '12个月' },
+  custom: { name: '全套订阅 (自定义)', amount: 0, duration: '自定义' },
 };
 
 export default function CheckoutClient() {
@@ -69,16 +70,17 @@ export default function CheckoutClient() {
       const scopes: ('username' | 'payments')[] = ['username', 'payments'];
 
       const auth = await window.Pi.authenticate(scopes, async (payment: any) => {
-        if (payment?.transaction?.txid) {
-          await fetch('/api/payments/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId: payment.identifier, txid: payment.transaction.txid }),
-          });
+        // 使用 SDK 提供的完整未完成支付处理逻辑，包含：
+        // - 重新审批（developer_approved = false）
+        // - 重新完成（已有 txid 但未 complete）
+        // - 取消同步（user_cancelled）
+        if (payment?.identifier) {
+          await handleIncompletePayment(payment);
         }
       });
 
       // 通知后端验证并存储 token
+      const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
       const authRes = await fetch('/api/auth/pi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,9 +88,15 @@ export default function CheckoutClient() {
           accessToken: auth.accessToken,
           piUid: auth.user.uid,
           username: auth.user.username,
+          merchantId,
         }),
       });
       const authData = await authRes.json();
+      if (!authData.success) {
+        setLoading(false);
+        setErrorStatus(`身份验证失败: ${authData.error || '请重试'}`);
+        return;
+      }
       if (authData.token) storePiAuthToken(authData.token);
 
       // 步骤 1: 创建订单
@@ -105,9 +113,11 @@ export default function CheckoutClient() {
       const orderData = await orderRes.json();
 
       if (!orderData.success) {
-        setErrorStatus(orderRes.status === 401
-          ? '身份未授权，请返回首页重新登录。'
-          : '创建订单失败: ' + (orderData.error ?? '未知错误'));
+        setErrorStatus(
+          orderRes.status === 401
+            ? '身份未授权，请返回首页重新登录。'
+            : '创建订单失败: ' + (orderData.error ?? '未知错误')
+        );
         setLoading(false);
         return;
       }
@@ -123,15 +133,23 @@ export default function CheckoutClient() {
         {
           onReadyForServerApproval: async (paymentId: string) => {
             setStatusText('审批中...');
-            const approveRes = await fetchWithPiAuth('/api/payments/approve', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paymentId, orderId: orderData.order.orderNo }),
-            });
-            if (!approveRes.ok) {
-              const errText = await approveRes.text();
-              console.error('[Payment] approve failed:', approveRes.status, errText);
-              setStatusText('审批失败: ' + errText);
+            try {
+              const approveRes = await fetchWithPiAuth('/api/payments/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, orderId: orderData.order.orderNo }),
+              });
+              if (!approveRes.ok) {
+                const errData = await approveRes.json().catch(() => ({}));
+                const errText = (errData as any)?.error || `HTTP ${approveRes.status}`;
+                console.error('[Payment] approve failed:', approveRes.status, errText);
+                setLoading(false);
+                setErrorStatus(`审批失败: ${errText}`);
+              }
+            } catch (approveErr: any) {
+              console.error('[Payment] approve exception:', approveErr);
+              setLoading(false);
+              setErrorStatus(`审批异常: ${approveErr?.message || '未知错误'}`);
             }
           },
           onReadyForServerCompletion: async (paymentId: string, txid: string) => {
@@ -199,7 +217,9 @@ export default function CheckoutClient() {
               <span className="text-brand-gold text-4xl font-black">π</span>
               <span className="text-4xl font-black text-white">{selectedPlan.amount}</span>
             </div>
-            <p className="text-xs text-gray-500 mt-2">有效期：{selectedPlan.duration}（仅框架订阅，不含商品上架）</p>
+            <p className="text-xs text-gray-500 mt-2">
+              有效期：{selectedPlan.duration}（仅框架订阅，不含商品上架）
+            </p>
           </div>
         )}
       </div>
@@ -224,10 +244,7 @@ export default function CheckoutClient() {
         )}
       </button>
 
-      <p className="text-xs text-center text-gray-500">
-        支付由 Pi Network 链上安全机制保护
-      </p>
+      <p className="text-xs text-center text-gray-500">支付由 Pi Network 链上安全机制保护</p>
     </div>
   );
 }
-
