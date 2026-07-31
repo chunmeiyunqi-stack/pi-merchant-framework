@@ -1,6 +1,0 @@
-{
-  "framework": "nextjs",
-  "buildCommand": "pnpm turbo run build --filter=@pi-merchant/web",
-  "installCommand": "pnpm install --no-frozen-lockfile",
-  "outputDirectory": "apps/web/.next"
-}
