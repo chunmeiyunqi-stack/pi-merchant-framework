@@ -92,7 +92,9 @@ export async function generateMerchantAiResponse(request: AIRequest): Promise<AI
  * @param request - AI 请求参数
  * @returns AI 流式块异步迭代器
  */
-export async function* streamMerchantAiResponse(request: AIRequest): AsyncIterable<AIStreamChunk> {
+export async function* streamMerchantAiResponse(
+  request: AIRequest
+): AsyncGenerator<AIStreamChunk, void, unknown> {
   const factory = getProviderFactory();
 
   try {

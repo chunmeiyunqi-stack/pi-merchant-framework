@@ -78,7 +78,11 @@ export async function POST(req: Request) {
         });
 
         try {
-          const streamIterable = streamMerchantAiResponse({ merchantId, prompt, provider });
+          const streamIterable = streamMerchantAiResponse({
+            merchantId,
+            prompt,
+            provider,
+          }) as AsyncIterable<any>;
 
           for await (const chunk of streamIterable) {
             // Check for client disconnect OR timeout
