@@ -1,4 +1,4 @@
-import client from '@/lib/metrics';
+﻿import client from '@/lib/metrics';
 
 export async function GET() {
   try {

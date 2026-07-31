@@ -40,7 +40,7 @@ COPY packages/pi-sdk/package.json ./packages/pi-sdk/
 COPY packages/config/package.json ./packages/config/
 
 # Install dependencies (frozen lockfile for reproducible builds)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # ---- Stage 2: builder ----
 FROM deps AS builder

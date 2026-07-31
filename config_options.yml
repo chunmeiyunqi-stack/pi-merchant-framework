@@ -1,0 +1,90 @@
+# config_options.yml — Install form for Pi Desktop SoloHost
+# Pi Merchant Framework v2.1.0 — Commercial Edition
+title: "Pi Merchant Framework"
+description: "Configure your merchant storefront. Database, secrets and worker settings are auto-configured."
+output_file: .env
+
+fixed_values:
+  - name: UID
+    detect: uid
+  - name: GID
+    detect: gid
+  - name: APP_NAME
+    value: "Pi Merchant Framework"
+  - name: NEXT_PUBLIC_APP_NAME
+    value: "Pi Merchant Framework"
+  - name: NEXT_PUBLIC_ADMIN_URL
+    value: "http://localhost:3001"
+  - name: PI_PLATFORM_API_BASE
+    value: "https://api.minepi.com"
+  - name: OPENAI_API_BASE
+    value: "https://api.openai.com/v1"
+  - name: AI_FALLBACK_PROVIDERS
+    value: "ollama,openai"
+  - name: POSTGRES_USER
+    value: "pimerchant"
+  - name: POSTGRES_PASSWORD
+    value: "pimerchant_docker_pw"
+  - name: POSTGRES_DB
+    value: "pi_prod"
+  - name: DATABASE_URL
+    value: "postgresql://pimerchant:pimerchant_docker_pw@postgres:5432/pi_prod"
+  - name: REDIS_URL
+    value: "redis://redis:6379"
+  - name: JWT_SECRET
+    value: "change_me_to_a_32_byte_hex_string"
+  - name: PI_SESSION_SECRET
+    value: "change_me_to_a_32_byte_hex_string"
+  - name: NEXTAUTH_SECRET
+    value: "change_me_to_a_32_byte_hex_string"
+  - name: NEXTAUTH_URL
+    value: "http://localhost:3000"
+  - name: LICENSE_PAYLOAD_SECRET
+    value: "change_me_to_a_32_byte_hex_string"
+  - name: WORKER_CONCURRENCY
+    value: "3"
+
+fields:
+  - name: APP_DOMAIN
+    label: "Your store domain"
+    type: text
+    required: true
+    default: "http://localhost:3000"
+    help: "Public URL for Pi Sign-In redirect. Use https in production."
+
+  - name: PI_API_KEY
+    label: "Pi Network API Key"
+    type: password
+    required: true
+    help: "From Pi Developer Dashboard → App Settings → API Key."
+
+  - name: MODEL_PROVIDER
+    label: "AI image provider"
+    type: select
+    default: openai
+    options:
+      - value: local
+        label: "Local (Ollama)"
+        set:
+          AI_PRIMARY_PROVIDER: "ollama"
+          OLLAMA_ENABLED: "true"
+          OLLAMA_MODEL: "llama3.1"
+      - value: openai
+        label: "OpenAI"
+        set:
+          AI_PRIMARY_PROVIDER: "openai"
+          OLLAMA_ENABLED: "false"
+    help: "Engine for product image generation."
+
+  - name: OPENAI_API_KEY
+    label: "OpenAI API Key"
+    type: password
+    visible_if:
+      field: MODEL_PROVIDER
+      in: [openai]
+    help: "From platform.openai.com/api-keys."
+
+  - name: LICENSE_PAYLOAD
+    label: "License key (optional)"
+    type: text
+    help: "Commercial license provided by Pioneer AI. Leave empty if none."

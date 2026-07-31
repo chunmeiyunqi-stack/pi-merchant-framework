@@ -59,3 +59,4 @@ assets/
 trustwallet-fork/
 
 .scripts/
+.env*
