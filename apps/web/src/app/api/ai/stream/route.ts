@@ -29,7 +29,8 @@ export async function POST(req: Request) {
   }
 
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  const provider = typeof body.provider === 'string' ? body.provider : undefined;
+  const provider = (typeof body.provider === 'string' ? body.provider : undefined) as
+    'openai' | 'anthropic' | 'ollama' | undefined;
 
   if (!prompt) {
     return NextResponse.json({ success: false, error: 'Missing prompt' }, { status: 400 });
