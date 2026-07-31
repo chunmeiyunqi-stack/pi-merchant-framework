@@ -41,9 +41,6 @@ async function __POST(req: Request) {
     const result = await generateMerchantAiResponse({
       merchantId,
       prompt,
-      model: undefined,
-      temperature: undefined,
-      provider: undefined,
     });
 
     if (!result.success) {

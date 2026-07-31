@@ -27,6 +27,7 @@
   "exclude": [
     "node_modules",
     "pi-merchant-framework",
+    "src",
     "**/*.spec.ts",
     "**/*.test.ts",
     "**/*.spec.tsx",
