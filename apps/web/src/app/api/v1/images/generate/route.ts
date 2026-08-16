@@ -9,7 +9,7 @@ import { verifySessionToken } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { logEvent, logError, runWithTenant, checkQuota, trackUsage } from '@pi-merchant/pi-sdk';
 import { withMetrics } from '@/lib/metrics-middleware';
-import { imageQueue, addImageGenerationJob } from '@/lib/queue/image.queue';
+import { addImageGenerationJob } from '@/lib/queue/image.queue';
 import { logger, getTraceId } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
