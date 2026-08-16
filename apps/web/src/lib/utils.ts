@@ -2,7 +2,13 @@ export function cn(...inputs: (string | false | null | undefined)[]) {
   return inputs.filter(Boolean).join(' ');
 }
 
-export function getMerchantId() {
+export function getMerchantId(req?: Request) {
+  if (req) {
+    const headerMerchantId = req.headers.get('x-merchant-id');
+    if (headerMerchantId) {
+      return headerMerchantId;
+    }
+  }
   return (
     process.env.NEXT_PUBLIC_MERCHANT_ID ||
     process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ||
