@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
@@ -33,7 +34,7 @@ async function __POST(req: Request) {
     }
 
     const body = await req.json();
-    const { amount, memo, planId } = body;
+    const { amount, memo, planId, orderNo: clientOrderNo } = body;
     const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
 
     // Verify customer exists
@@ -47,7 +48,8 @@ async function __POST(req: Request) {
 
     // 幂等策略: We could check if there's an existing DRAFT order for this same plan.
     // For simplicity, we just generate a new orderNo. The real deduplication is in the Pi Payment creation.
-    const orderNo = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    // 优先使用前端传入的 orderNo，保证前后端订单号一致（支付 metadata 与审批关联同一订单）
+    const orderNo = clientOrderNo ?? `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     const order = await prisma.order.create({
       data: {

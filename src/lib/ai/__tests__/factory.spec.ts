@@ -1,4 +1,4 @@
-﻿import { AIProviderFactory, AIProvider } from '@/lib/ai/factory';
+import { AIProviderFactory, AIProvider } from '@/lib/ai/factory';
 import { OpenAIProvider } from '@/lib/ai/providers/openai';
 import { AnthropicProvider } from '@/lib/ai/providers/anthropic';
 import { OllamaProvider } from '@/lib/ai/providers/ollama';
@@ -57,7 +57,7 @@ describe('AI Provider Factory (factory.ts)', () => {
       expect(result.content).toBe('Hello from OpenAI');
     });
 
-    it('搴旇楠岃瘉涓绘彁渚涘晢鐨勫彲鐢ㄦ€?, async () => {
+    it('should verify primary provider availability', async () => {
       factory.setPrimary('openai');
       mockOpenAI.isAvailable.mockResolvedValue(false);
 
@@ -97,6 +97,8 @@ describe('AI Provider Factory (factory.ts)', () => {
       factory.setPrimary('openai');
       factory.setFallbacks(['ollama', 'anthropic']);
 
+      // 使 ollama 参与 fallback 链，否则会被 isAvailable=false 提前跳过
+      mockOllama.isAvailable.mockResolvedValue(true);
       mockOpenAI.chat.mockRejectedValue(new Error('API Error'));
       mockOllama.chat.mockRejectedValue(new Error('Ollama down'));
       mockAnthropic.chat.mockResolvedValue({
@@ -112,7 +114,7 @@ describe('AI Provider Factory (factory.ts)', () => {
       expect(mockAnthropic.chat).toHaveBeenCalled();
     });
 
-    it('搴旇鍦ㄦ墍鏈夋彁渚涘晢澶辫触鏃舵姏鍑洪敊璇?, async () => {
+    it('should throw error when all providers fail', async () => {
       factory.setPrimary('openai');
       factory.setFallbacks(['anthropic', 'ollama']);
 
@@ -124,8 +126,8 @@ describe('AI Provider Factory (factory.ts)', () => {
     });
   });
 
-  describe('鐩磋繛璇锋眰', () => {
-    it('搴旇鍦ㄨ姹傛寚瀹氭彁渚涘晢鏃剁洿杩烇紙涓?fallback锛?, async () => {
+  describe('Direct calls', () => {
+    it('should call direct provider without fallback', async () => {
       mockAnthropic.chat.mockResolvedValue({
         id: 'test-5',
         content: 'Direct call',
@@ -139,7 +141,7 @@ describe('AI Provider Factory (factory.ts)', () => {
       expect(mockOllama.chat).not.toHaveBeenCalled();
     });
 
-    it('搴旇鍦ㄦ寚瀹氭彁渚涘晢涓嶅彲鐢ㄦ椂杩斿洖閿欒', async () => {
+    it('should return error when specified provider is unavailable', async () => {
       mockOllama.isAvailable.mockResolvedValue(false);
 
       await expect(factory.chat('Test prompt', {}, 'ollama')).rejects.toThrow(
@@ -148,8 +150,8 @@ describe('AI Provider Factory (factory.ts)', () => {
     });
   });
 
-  describe('娴佸紡璇锋眰鐨?Fallback', () => {
-    it('搴旇鍦ㄩ涓?token 鍓嶅厑璁?Fallback', async () => {
+  describe('Streaming requests fallback', () => {
+    it('should allow fallback before first token', async () => {
       factory.setPrimary('openai');
       factory.setFallbacks(['anthropic']);
 
@@ -176,7 +178,7 @@ describe('AI Provider Factory (factory.ts)', () => {
       expect(chunks[0].delta).toBe('success');
     });
 
-    it('搴旇鍦ㄩ涓?token 鍚庣姝?Fallback', async () => {
+    it('should disable fallback after first token', async () => {
       factory.setPrimary('openai');
       factory.setFallbacks(['anthropic']);
 
@@ -193,14 +195,14 @@ describe('AI Provider Factory (factory.ts)', () => {
 
       await expect(async () => {
         for await (const chunk of stream) {
-          // 缁х画杩唬
+          // continue iterating
         }
       }).rejects.toThrow();
     });
   });
 
-  describe('鎻愪緵鍟嗙姸鎬佺鐞?, () => {
-    it('搴旇缂撳瓨鎻愪緵鍟嗙殑鍙敤鎬х姸鎬?, async () => {
+  describe('Provider state management', () => {
+    it('should cache provider availability', async () => {
       factory.setPrimary('openai');
 
       mockOpenAI.isAvailable.mockResolvedValue(true);
@@ -208,10 +210,10 @@ describe('AI Provider Factory (factory.ts)', () => {
       await factory.chat('Test 1', {});
       await factory.chat('Test 2', {});
 
-      // 鍙敤鎬ф鏌ュ彲鑳戒細琚紦瀛橈紝鎵€浠ヨ皟鐢ㄦ鏁板彲鑳藉皯浜?2 娆?      expect(mockOpenAI.isAvailable.mock.calls.length).toBeLessThanOrEqual(2);
+      expect(mockOpenAI.isAvailable.mock.calls.length).toBeLessThanOrEqual(2);
     });
 
-    it('搴旇鏀寔鎻愪緵鍟嗙殑鍔ㄦ€佹敞鍐?, async () => {
+    it('should support dynamic provider registration', async () => {
       const newProvider: AIProvider = {
         name: 'gpt-4-turbo',
         isAvailable: jest.fn().mockResolvedValue(true),
@@ -234,8 +236,8 @@ describe('AI Provider Factory (factory.ts)', () => {
     });
   });
 
-  describe('鏅鸿兘妯″瀷閫夋嫨绛栫暐', () => {
-    it('搴旇鏀寔鍩轰簬鎴愭湰鐨勬ā鍨嬮€夋嫨', async () => {
+  describe('Smart model selection strategy', () => {
+    it('should support cost-based model selection', async () => {
       mockOpenAI.chat.mockResolvedValue({
         id: 'test-7',
         content: 'Cheap option',
@@ -257,8 +259,7 @@ describe('AI Provider Factory (factory.ts)', () => {
       expect(result.estimatedCost).toBeLessThan(0.05);
     });
 
-    // 策略路由功能暂未实现，留待 v2.2 路线图优化
-    it.skip('搴旇鏀寔鍩轰簬寤惰繜鐨勬ā鍨嬮€夋嫨', async () => {
+    it.skip('should support latency-based model selection', async () => {
       mockOpenAI.chat.mockImplementation(
         () =>
           new Promise((resolve) =>

@@ -52,6 +52,9 @@ import { cookies } from 'next/headers';
 jest.mock('@pi-merchant/pi-sdk', () => ({
   streamMerchantAiResponse: jest.fn(),
   logError: jest.fn(),
+  runWithTenant: jest.fn((_id: string, fn: () => any) => fn()),
+  checkQuota: jest.fn().mockReturnValue({ isExceeded: false }),
+  trackUsage: jest.fn(),
 }));
 
 jest.mock('@/lib/session', () => ({

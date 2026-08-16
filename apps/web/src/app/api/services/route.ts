@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { withMetrics } from '@/lib/metrics-middleware';
 import { getMerchantId } from '@/lib/utils';

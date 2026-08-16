@@ -1,4 +1,4 @@
-﻿# Pi Merchant Framework — Product .gitignore
+# Pi Merchant Framework — .gitignore
 # -----------------------------------------
 
 # Environment
@@ -38,6 +38,12 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+
 # Temp files
 tmp/
 temp/
@@ -53,37 +59,18 @@ temp/
 # Vercel
 .vercel
 
-# Nested repos (standalone git repos, not submodules)
-pi-merchant-framework/
-assets/
-trustwallet-fork/
-
-# Generated documentation and copyright files
-scripts/prepare_source_code.py
+# Generated documentation and copyright artifacts
 softcopyright_output/
 user_manual_with_images/
 screenshots/
 archive/
 backups/
 out/
-.scripts/
-
-# Generated documentation artifacts
 *.pdf
-fixed_output.*
-output.txt
-source_code_*.md
-source_code_*.txt
+*.docx
 source_code_*
 copyright_*.html
 user_manual_*.html
 mock_screenshots.html
 advanced_syntax_fix.py
 generate_*.py
-
-# Software copyright docs
-scripts/create_copyright_docx.py
-scripts/gen-*.py
-*.docx
-docs/manual.html
-先锋*

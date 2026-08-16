@@ -28,6 +28,32 @@ export default function HomePage() {
               </p>
             </div>
           </div>
+          <nav className="hidden items-center gap-1 lg:flex mr-6">
+            <Link
+              href="/dashboard"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              控制台
+            </Link>
+            <Link
+              href="/services"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              生态服务
+            </Link>
+            <Link
+              href="/docs"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              开发者文档
+            </Link>
+            <a
+              href="#pricing"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              订阅方案
+            </a>
+          </nav>
           <div className="flex items-center shrink-0">
             <PiLoginButton />
           </div>
@@ -165,7 +191,7 @@ export default function HomePage() {
                 极速跑通底层支付账本与标准业务流。
               </p>
               <div className="text-4xl md:text-5xl font-black text-[#F3C136] mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/10 tracking-tight">
-                π 5{' '}
+                π 50{' '}
                 <span className="text-sm md:text-base text-gray-500 font-medium tracking-normal">
                   / 期
                 </span>
@@ -200,7 +226,7 @@ export default function HomePage() {
                 全量的高级 AI 组件接入和专属核心架构护航。
               </p>
               <div className="text-5xl md:text-6xl font-black text-[#F3C136] mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/10 tracking-tight flex items-end">
-                π 25{' '}
+                π 90{' '}
                 <span className="text-sm md:text-base text-gray-400 font-medium tracking-normal pb-1.5 md:pb-2 ml-2">
                   / 期
                 </span>
@@ -412,17 +438,17 @@ export default function HomePage() {
               <h4 className="text-white font-bold mb-4 md:mb-6 text-sm">生态资源</h4>
               <ul className="space-y-3 md:space-y-4 text-xs md:text-sm text-gray-500 font-medium">
                 <li>
-                  <Link href="/" className="md:hover:text-white transition-colors">
+                  <Link href="/docs" className="md:hover:text-white transition-colors">
                     组件文档集
                   </Link>
                 </li>
                 <li>
-                  <Link href="/" className="md:hover:text-white transition-colors">
+                  <Link href="/services" className="md:hover:text-white transition-colors">
                     安全接入网
                   </Link>
                 </li>
                 <li>
-                  <Link href="/" className="md:hover:text-white transition-colors">
+                  <Link href="/demo/stream" className="md:hover:text-white transition-colors">
                     架构演示间
                   </Link>
                 </li>
@@ -452,17 +478,17 @@ export default function HomePage() {
               <h4 className="text-white font-bold mb-4 md:mb-6 text-sm">平台法则</h4>
               <ul className="flex justify-center lg:flex-col lg:space-y-4 lg:space-x-0 space-x-6 text-xs md:text-sm text-gray-500 font-medium list-none">
                 <li>
-                  <Link href="/" className="md:hover:text-white transition-colors">
+                  <Link href="/terms" className="md:hover:text-white transition-colors">
                     合规明细
                   </Link>
                 </li>
                 <li>
-                  <Link href="/" className="md:hover:text-white transition-colors">
+                  <Link href="/privacy" className="md:hover:text-white transition-colors">
                     隐私保护
                   </Link>
                 </li>
                 <li>
-                  <Link href="/" className="md:hover:text-white transition-colors">
+                  <Link href="/terms" className="md:hover:text-white transition-colors">
                     用户条款
                   </Link>
                 </li>

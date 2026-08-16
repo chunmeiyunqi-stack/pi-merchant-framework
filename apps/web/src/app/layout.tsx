@@ -1,7 +1,6 @@
-﻿import './globals.css';
+import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import EnvBanner from '@/components/EnvBanner';
-import FooterLegal from '@/components/FooterLegal';
 
 export const metadata: Metadata = {
   title: 'Pioneer AI Service Framework',
@@ -22,7 +21,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#1a1a2e',
+  themeColor: '#07030E',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -36,22 +35,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Pi SDK 官方标准初始化（来自 Pi Developer Docs）:
             <script src="https://sdk.minepi.com/pi-sdk.js"></script>
             <script>Pi.init({ version: "2.0" })</script>
-          两个顺序 <script>，Pi Browser 保证同步执行，无需 defer / load 事件
+           两个顺序 <script>，Pi Browser 保证同步执行，无需 defer / load 事件
         */}
         {/* eslint-disable-next-line */}
         <script src="https://sdk.minepi.com/pi-sdk.js" />
+        {/* 沙盒/主网由环境变量控制：NEXT_PUBLIC_PI_SANDBOX 未设置或为 "true" 时走沙盒，显式 "false" 时走主网 */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `Pi.init({ version: "2.0", sandbox: true });`,
+            __html: `Pi.init({ version: "2.0", sandbox: ${process.env.NEXT_PUBLIC_PI_SANDBOX !== 'false'} });`,
           }}
         />
       </head>
-      <body className="bg-gray-50 min-h-screen text-gray-900 font-sans flex flex-col">
+      <body className="min-h-screen font-sans antialiased">
         <EnvBanner />
-        <div className="flex-1 flex flex-col">{children}</div>
-        <FooterLegal />
+        {children}
       </body>
     </html>
   );
 }
-

@@ -8,13 +8,34 @@ if (typeof global.Response === 'undefined') {
 // Mock Next.js modules MUST come before imports that use them
 jest.mock('next/server', () => ({
   NextResponse: {
-    next: jest.fn(() => ({ type: 'next' })),
-    redirect: jest.fn((url) => ({ type: 'redirect', url: url.href || url.toString() })),
+    next: jest.fn(() => ({ type: 'next', headers: { set: jest.fn() } })),
+    redirect: jest.fn((url) => ({
+      type: 'redirect',
+      url: url.href || url.toString(),
+      headers: { set: jest.fn() },
+    })),
   },
 }));
 
 import { middleware } from '../middleware';
 import { NextResponse } from 'next/server';
+
+function createMockRequest(pathname: string, hasToken = false) {
+  const headersMap = new Map<string, string>();
+  return {
+    cookies: {
+      get: jest.fn((name: string) =>
+        name === 'pi_auth_token' && hasToken ? { value: 'valid-token' } : undefined
+      ),
+    },
+    headers: {
+      get: jest.fn((key: string) => headersMap.get(key)),
+      set: jest.fn((key: string, val: string) => headersMap.set(key, val)),
+    },
+    nextUrl: { pathname },
+    url: `https://example.com${pathname}`,
+  } as unknown as any;
+}
 
 describe('Middleware', () => {
   beforeEach(() => {
@@ -23,107 +44,47 @@ describe('Middleware', () => {
 
   describe('Authentication and routing', () => {
     it('redirects unauthenticated users from protected paths to login', () => {
-      const mockRequest = {
-        cookies: {
-          get: jest.fn(() => undefined), // No token
-        },
-        nextUrl: {
-          pathname: '/dashboard',
-        },
-        url: 'https://example.com/dashboard',
-      } as unknown as any;
-
+      const mockRequest = createMockRequest('/dashboard', false);
       middleware(mockRequest);
-
       expect(NextResponse.redirect).toHaveBeenCalled();
     });
 
     it('allows authenticated users to access protected paths', () => {
-      const mockRequest = {
-        cookies: {
-          get: jest.fn(() => ({ value: 'valid-token' })),
-        },
-        nextUrl: {
-          pathname: '/dashboard',
-        },
-        url: 'https://example.com/dashboard',
-      } as unknown as any;
-
+      const mockRequest = createMockRequest('/dashboard', true);
       middleware(mockRequest);
-
       expect(NextResponse.next).toHaveBeenCalled();
     });
 
     it('allows unauthenticated users to access the landing page', () => {
-      const mockRequest = {
-        cookies: {
-          get: jest.fn(() => undefined),
-        },
-        nextUrl: {
-          pathname: '/',
-        },
-        url: 'https://example.com/',
-      } as unknown as any;
-
+      const mockRequest = createMockRequest('/', false);
       middleware(mockRequest);
-
       expect(NextResponse.next).toHaveBeenCalled();
     });
 
     it('allows authenticated users to access public pages', () => {
-      const mockRequest = {
-        cookies: {
-          get: jest.fn(() => ({ value: 'valid-token' })),
-        },
-        nextUrl: {
-          pathname: '/about',
-        },
-        url: 'https://example.com/about',
-      } as unknown as any;
-
+      const mockRequest = createMockRequest('/about', true);
       middleware(mockRequest);
-
       expect(NextResponse.next).toHaveBeenCalled();
     });
   });
 
   describe('Path matching', () => {
-    const protectedPaths = ['/dashboard', '/account', '/billing'];
+    const protectedPaths = ['/dashboard', '/history', '/settings'];
 
     protectedPaths.forEach((path) => {
       it(`recognizes ${path} as protected`, () => {
-        const mockRequest = {
-          cookies: {
-            get: jest.fn(() => undefined),
-          },
-          nextUrl: {
-            pathname: path,
-          },
-          url: 'https://example.com' + path,
-        } as unknown as any;
-
+        const mockRequest = createMockRequest(path, false);
         middleware(mockRequest);
-
         expect(NextResponse.redirect).toHaveBeenCalled();
       });
     });
 
-    const publicPaths = ['/about', '/contact', '/pricing'];
+    const publicPaths = ['/login', '/register', '/services'];
 
     publicPaths.forEach((path) => {
       it(`allows access to public path ${path}`, () => {
-        const mockRequest = {
-          cookies: {
-            get: jest.fn(() => undefined),
-          },
-          nextUrl: {
-            pathname: path,
-          },
-          url: 'https://example.com' + path,
-        } as unknown as any;
-
+        const mockRequest = createMockRequest(path, false);
         middleware(mockRequest);
-
         expect(NextResponse.next).toHaveBeenCalled();
       });
     });

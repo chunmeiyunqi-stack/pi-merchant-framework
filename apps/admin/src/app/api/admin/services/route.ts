@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getMerchantId } from '@/lib/utils';
 import { requireAdminSession } from '@/lib/admin-auth';
 import type { ServiceStatus, ServiceType } from '@prisma/client';
+import { apiSuccess, apiError, getTraceId } from '@/lib/api-response';
 
 function serializeService(service: {
   id: string;
@@ -27,14 +28,15 @@ function serializeService(service: {
 }
 
 export async function GET(req: Request) {
+  const traceId = getTraceId(req);
   if (!requireAdminSession()) {
-    return NextResponse.json({ services: [], pagination: null });
+    return apiError('未登录或会话凭证失效', 401, 401, traceId);
   }
 
   const { searchParams } = new URL(req.url);
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10) || 50));
-  const merchantId = getMerchantId();
+  const merchantId = getMerchantId(req);
 
   try {
     const where = { merchantId };
@@ -46,19 +48,24 @@ export async function GET(req: Request) {
       take: limit,
     });
 
-    return NextResponse.json({
-      services: services.map(serializeService),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 },
-    });
+    return apiSuccess(
+      {
+        services: services.map(serializeService),
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 },
+      },
+      '获取服务列表成功',
+      200,
+      traceId
+    );
   } catch (error) {
-    console.error('[GET /api/admin/services]', error);
-    return NextResponse.json({ services: [], pagination: null });
+    return apiError('获取服务列表数据库操作异常', 500, 500, traceId, error);
   }
 }
 
 export async function POST(req: Request) {
+  const traceId = getTraceId(req);
   if (!requireAdminSession()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return apiError('未授权操作', 401, 401, traceId);
   }
 
   try {
@@ -66,12 +73,12 @@ export async function POST(req: Request) {
     const { title, description, price, durationMinutes, type } = body;
 
     if (!title || price == null) {
-      return NextResponse.json({ error: 'title and price are required' }, { status: 400 });
+      return apiError('服务标题 (title) 和价格 (price) 为必填项', 400, 400, traceId);
     }
 
     const service = await prisma.service.create({
       data: {
-        merchantId: getMerchantId(),
+        merchantId: getMerchantId(req),
         title: String(title),
         description: description ? String(description) : null,
         price: Number(price),
@@ -81,9 +88,8 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ service: serializeService(service) }, { status: 201 });
+    return apiSuccess({ service: serializeService(service) }, '创建服务成功', 201, traceId);
   } catch (error) {
-    console.error('[POST /api/admin/services]', error);
-    return NextResponse.json({ error: 'Failed to create service' }, { status: 500 });
+    return apiError('创建服务失败，请重试', 500, 500, traceId, error);
   }
 }

@@ -25,8 +25,8 @@ type OrderResponse =
     };
 
 const PLANS: Record<PlanKey, Plan> = {
-  basic: { name: '基础建站先锋 (Basic Plan)', amount: 5.0 },
-  pro: { name: '专业 AI 架构 (Pro Plan)', amount: 25.0 },
+  basic: { name: '基础建站先锋 (Basic Plan)', amount: 50.0 },
+  pro: { name: '专业 AI 架构 (Pro Plan)', amount: 90.0 },
 };
 
 export default function CheckoutClient() {
@@ -177,4 +177,3 @@ export default function CheckoutClient() {
     </div>
   );
 }
-

@@ -5,6 +5,7 @@
  * route handler can be imported and exercised in pure Jest (no running
  * Next.js server required).
  */
+export {};
 
 // ─── polyfills ───────────────────────────────────────────────────────────────
 if (typeof global.Request === 'undefined') {

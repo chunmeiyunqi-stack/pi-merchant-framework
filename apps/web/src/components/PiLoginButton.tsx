@@ -8,6 +8,7 @@ import { storePiAuthToken } from '@/lib/apiClient';
 export default function PiLoginButton() {
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -21,12 +22,12 @@ export default function PiLoginButton() {
   }, []);
 
   const handleLogin = async () => {
-    // Pi Browser 同步加载 SDK，Pi.init() 也是同步的，此处直接检查即可
     if (typeof window === 'undefined' || !window.Pi) {
-      alert('💡 请在 Pi Browser 中打开此应用后再操作。');
+      setStatus('请在 Pi Browser 中打开此应用后操作。');
       return;
     }
 
+    setStatus(null);
     setLoading(true);
     try {
       const authResult = await authenticateWithPi(
@@ -41,12 +42,9 @@ export default function PiLoginButton() {
         return;
       }
 
-      console.error('[PiLogin] 后端验证失败:', authResult.error);
-      alert('身份验证失败: ' + (authResult.error ?? '未知错误'));
+      setStatus(authResult.error ?? '身份验证失败');
     } catch (error: unknown) {
-      console.error('[PiLogin] 握手异常:', error);
-      const errorMessage = error instanceof Error ? error.message : '未知';
-      alert('握手中止，请重试。错误: ' + errorMessage);
+      setStatus(error instanceof Error ? error.message : '握手中止，请重试');
     } finally {
       setLoading(false);
     }
@@ -56,18 +54,18 @@ export default function PiLoginButton() {
 
   if (username) {
     return (
-      <div className="flex items-center space-x-3">
-        <div className="flex items-center space-x-2 text-sm font-semibold text-gray-200">
-          <div className="w-8 h-8 rounded-full bg-[#3B2D4F] flex items-center justify-center text-[#F3C136] font-bold shadow-sm border border-[#F3C136]/30">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 rounded-xl border border-pi-gold/30 bg-pi-surface2 px-3 py-1.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pi-violet text-sm font-bold text-white">
             {username.charAt(0).toUpperCase()}
           </div>
-          <span className="hidden sm:inline-block">{username}</span>
+          <div className="hidden leading-tight sm:block">
+            <p className="text-xs font-bold text-white">{username}</p>
+            <p className="text-[10px] text-pi-gold/80">Pi 已连接</p>
+          </div>
         </div>
-        <button
-          onClick={handleGoDashboard}
-          className="bg-[#2A1642]/80 hover:bg-[#3B2D4F] text-[#F3C136] border border-[#F3C136]/50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-        >
-          控制台
+        <button onClick={handleGoDashboard} className="pi-btn-gold !px-4 !py-2 text-xs">
+          进入控制台
         </button>
       </div>
     );
@@ -78,11 +76,17 @@ export default function PiLoginButton() {
       <button
         onClick={handleLogin}
         disabled={loading}
-        className="bg-transparent border border-[#F3C136]/60 hover:bg-[#F3C136] hover:text-[#1E112A] text-[#F3C136] px-4 py-2 rounded-xl shadow-lg transition-all text-sm font-bold disabled:opacity-50 flex items-center space-x-2"
+        className="pi-btn-gold group !rounded-xl !px-5 !py-2.5"
       >
-        <span>{loading ? '等待握手...' : '🔗 同步 Pi Wallet 身份'}</span>
+        <span className="text-base leading-none">π</span>
+        {loading ? '正在握手…' : '连接 Pi Wallet'}
       </button>
-      <span className="text-[10px] text-gray-500 mt-1 pointer-events-none hidden sm:block">
+      {status && (
+        <span className="mt-1.5 max-w-[260px] text-right text-[11px] font-medium text-amber-400/90">
+          {status}
+        </span>
+      )}
+      <span className="pointer-events-none mt-1 hidden text-[10px] text-pi-muted/60 sm:block">
         由官方安全验证通道提供支持
       </span>
     </div>

@@ -12,6 +12,10 @@ export function middleware(request: NextRequest) {
     '/services',
     '/bookings',
     '/settings',
+    '/members',
+    '/merchants',
+    '/monitoring',
+    '/history',
   ];
 
   const isProtectedPath = protectedPaths.some(
@@ -19,23 +23,33 @@ export function middleware(request: NextRequest) {
   );
 
   if (isProtectedPath && !token) {
-    // According to req: If unauthenticated in /dashboard, /memberships, etc., redirect to /login
-    // Assuming the login page is physically at /login in the admin app, or we redirect them to the web app's login.
-    // Given standard NextJS architectures, navigating to /login is appropriate.
-    // If Admin app doesn't have a /login page natively, standard would rely on Web App, but here we redirect to /login.
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('mode', 'signin');
     return NextResponse.redirect(loginUrl);
   }
 
-  // Prevent redirect to signup if somehow triggered to root mapping
+  // 提取与注入多租户 Merchant Context Header
+  const requestHeaders = new Headers(request.headers);
+  const cookieMerchantId = request.cookies.get('pi_merchant_id')?.value;
+  const envMerchantId =
+    process.env.NEXT_PUBLIC_MERCHANT_ID ||
+    process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ||
+    'merchant-demo-001';
+
+  const tenantMerchantId = cookieMerchantId || envMerchantId;
+  requestHeaders.set('x-merchant-id', tenantMerchantId);
+
   if (request.nextUrl.pathname === '/') {
-    return NextResponse.next(); // Explicit approve
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)', '/api/admin/:path*'],
 };

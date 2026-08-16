@@ -10,6 +10,7 @@
  *  - Quota exceeded path
  *  - GenerationHistory DB lifecycle (create → update)
  */
+export {};
 
 // ─── polyfills ───────────────────────────────────────────────────────────────
 if (typeof global.Request === 'undefined') {
@@ -70,6 +71,17 @@ jest.mock('@pi-merchant/pi-sdk', () => ({
   trackUsage: (...args: any[]) => mockTrackUsage(...args),
 }));
 
+const mockAddImageGenerationJob = jest.fn();
+jest.mock('@/lib/queue/image.queue', () => ({
+  imageQueue: { close: jest.fn() },
+  addImageGenerationJob: (...args: any[]) => mockAddImageGenerationJob(...args),
+}));
+
+jest.mock('@/lib/logger', () => ({
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn() },
+  getTraceId: () => 'test-trace-id',
+}));
+
 // ─── subject ─────────────────────────────────────────────────────────────────
 
 let POST: (req: any) => Promise<any>;
@@ -101,27 +113,10 @@ function injectPrismaDb() {
 
 function makeRequest(body: Record<string, unknown>): Request {
   return {
+    headers: { get: () => null },
     json: async () => body,
     url: 'https://localhost/api/v1/images/generate',
   } as unknown as Request;
-}
-
-function dalleSuccessResponse(url = 'https://openai.com/img/test.png') {
-  return {
-    ok: true,
-    json: async () => ({
-      created: Date.now(),
-      data: [{ url, revised_prompt: 'A beautiful cat' }],
-    }),
-  } as Response;
-}
-
-function dalleErrorResponse(status = 400, message = 'Bad request') {
-  return {
-    ok: false,
-    status,
-    text: async () => JSON.stringify({ error: { message } }),
-  } as unknown as Response;
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -210,6 +205,7 @@ describe('POST /api/v1/images/generate', () => {
 
     it('returns 400 when JSON body is malformed', async () => {
       const badReq = {
+        headers: { get: () => null },
         json: async () => {
           throw new SyntaxError('Unexpected token');
         },
@@ -255,17 +251,18 @@ describe('POST /api/v1/images/generate', () => {
 
   // ── successful generation ─────────────────────────────────────────────────
 
-  describe('Successful generation', () => {
+  describe('Successful job enqueuing', () => {
     beforeEach(() => {
       authAsUser();
-      mockFetch.mockResolvedValue(dalleSuccessResponse());
+      mockAddImageGenerationJob.mockResolvedValue({ id: 'job-abc-123' });
     });
 
-    it('returns success=true with images array', async () => {
+    it('returns status 202 with jobId', async () => {
       const res = await POST(makeRequest({ prompt: 'A serene forest' }));
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(202);
       expect(res.body.success).toBe(true);
-      expect(Array.isArray(res.body.data.images)).toBe(true);
+      expect(res.body.data.jobId).toBe('job-abc-123');
+      expect(res.body.data.status).toBe('pending');
     });
 
     it('returns historyId in the response', async () => {
@@ -273,13 +270,7 @@ describe('POST /api/v1/images/generate', () => {
       expect(res.body.data.historyId).toBe('hist-abc-123');
     });
 
-    it('returns model and provider metadata', async () => {
-      const res = await POST(makeRequest({ prompt: 'A serene forest' }));
-      expect(res.body.data.model).toBe('dall-e-3');
-      expect(res.body.data.provider).toBe('openai');
-    });
-
-    it('creates a pending history record before calling OpenAI', async () => {
+    it('creates a pending history record', async () => {
       await POST(makeRequest({ prompt: 'A cat' }));
       expect(mockHistoryCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -288,84 +279,29 @@ describe('POST /api/v1/images/generate', () => {
       );
     });
 
-    it('updates history record to completed after success', async () => {
-      await POST(makeRequest({ prompt: 'A cat' }));
-      expect(mockHistoryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ status: 'completed' }),
-        })
-      );
-    });
-
-    it('calls trackUsage with success=true', async () => {
-      await POST(makeRequest({ prompt: 'A cat' }));
-      expect(mockTrackUsage).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
-    });
-
-    it('uses dall-e-2 when explicitly requested', async () => {
-      const res = await POST(
-        makeRequest({ prompt: 'A house', model: 'dall-e-2', size: '512x512' })
-      );
-      expect(res.status).toBe(200);
-      expect(res.body.data.model).toBe('dall-e-2');
-    });
-  });
-
-  // ── OpenAI API errors ─────────────────────────────────────────────────────
-
-  describe('OpenAI API error propagation', () => {
-    beforeEach(() => authAsUser());
-
-    it('returns 400 when OpenAI returns a 4xx error', async () => {
-      mockFetch.mockResolvedValue(dalleErrorResponse(400, 'Invalid prompt'));
-      const res = await POST(makeRequest({ prompt: 'A cat' }));
-      // 4xx from OpenAI → route returns 400
-      expect(res.status).toBe(400);
-      expect(res.body.success).toBe(false);
-      expect(res.body.error).toContain('Invalid prompt');
-    });
-
-    it('returns 502 when OpenAI returns a 5xx error', async () => {
-      mockFetch.mockResolvedValue(dalleErrorResponse(500, 'OpenAI server error'));
-      const res = await POST(makeRequest({ prompt: 'A cat' }));
-      expect(res.status).toBe(502);
-    });
-
-    it('updates history to failed when OpenAI returns an error', async () => {
-      mockFetch.mockResolvedValue(dalleErrorResponse(400, 'Content policy violated'));
-      await POST(makeRequest({ prompt: 'A cat' }));
-      expect(mockHistoryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ status: 'failed' }),
-        })
+    it('enqueues job with request parameters', async () => {
+      await POST(makeRequest({ prompt: 'A cat', model: 'dall-e-3' }));
+      expect(mockAddImageGenerationJob).toHaveBeenCalledWith(
+        'generate-image',
+        expect.objectContaining({ prompt: 'A cat', model: 'dall-e-3', piUid: 'pi-user-123' })
       );
     });
   });
 
-  // ── timeout ───────────────────────────────────────────────────────────────
+  // ── Queue error handling ──────────────────────────────────────────────────
 
-  describe('Timeout handling', () => {
+  describe('Queue failure handling', () => {
     beforeEach(() => authAsUser());
 
-    it('returns 504 when the fetch aborts due to timeout', async () => {
-      const abortError = new DOMException('The operation was aborted', 'AbortError');
-      mockFetch.mockRejectedValue(abortError);
-
+    it('returns 503 when queue fails to enqueue job', async () => {
+      mockAddImageGenerationJob.mockRejectedValue(new Error('Queue connection failed'));
       const res = await POST(makeRequest({ prompt: 'A cat' }));
-      expect(res.status).toBe(504);
-      expect(res.body.error).toMatch(/timed out/i);
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatch(/temporarily unavailable/i);
     });
 
-    it('returns 500 for generic network errors', async () => {
-      mockFetch.mockRejectedValue(new Error('Connection refused'));
-      const res = await POST(makeRequest({ prompt: 'A cat' }));
-      expect(res.status).toBe(500);
-    });
-
-    it('updates history to failed on timeout', async () => {
-      const abortError = new DOMException('Aborted', 'AbortError');
-      mockFetch.mockRejectedValue(abortError);
-
+    it('updates history to failed on queue error', async () => {
+      mockAddImageGenerationJob.mockRejectedValue(new Error('Queue error'));
       await POST(makeRequest({ prompt: 'A cat' }));
       expect(mockHistoryUpdate).toHaveBeenCalledWith(
         expect.objectContaining({

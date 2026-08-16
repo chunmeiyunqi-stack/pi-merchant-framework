@@ -1,7 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface PiAuthResult {
   accessToken: string;
@@ -26,27 +26,77 @@ interface PiPaymentCallbacks {
   onError: (error: Error, payment?: PiPayment) => void;
 }
 
-export default function CheckoutPage() {
+interface PiSDKLike {
+  authenticate: (scopes: string[], cb: (p: PiPayment) => void) => Promise<PiAuthResult>;
+  createPayment: (data: PiPaymentData, callbacks: PiPaymentCallbacks) => void;
+}
+
+/** 订阅方案表（首页定价卡跳转 ?plan=basic|pro，以 UI 展示为准：π50 / π90） */
+const PLANS: Record<string, { title: string; amount: number; memo: string }> = {
+  basic: {
+    title: '基础建站先锋 (Basic Plan)',
+    amount: 50,
+    memo: '基础先锋 - 极速跑通支付账本与标准业务流',
+  },
+  pro: {
+    title: '专业 AI 架构 (Pro Plan)',
+    amount: 90,
+    memo: '专业架构 - 全量高级 AI 组件与专属护航',
+  },
+};
+
+function CheckoutContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const planKey = (searchParams?.get('plan') ?? 'pro') as string;
+  const serviceId = searchParams?.get('serviceId') ?? '';
+
   const [status, setStatus] = useState<'idle' | 'auth' | 'processing' | 'failed'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [piUser, setPiUser] = useState<{ uid: string; username: string } | null>(null);
   const [isPiBrowser, setIsPiBrowser] = useState(false);
+  const [product, setProduct] = useState<{ title: string; amount: number; memo: string }>(() => {
+    const base = PLANS[planKey] ?? PLANS.pro;
+    return { ...base };
+  });
+  const [productLoading, setProductLoading] = useState(!!serviceId);
 
   useEffect(() => {
-    setIsPiBrowser(typeof window !== 'undefined' && !!(window as any).Pi);
+    setIsPiBrowser(typeof window !== 'undefined' && !!window.Pi);
   }, []);
 
-  const getPi = () =>
-    (window as any).Pi as
-      | {
-          authenticate: (scopes: string[], cb: (p: PiPayment) => void) => Promise<PiAuthResult>;
-          createPayment: (data: PiPaymentData, callbacks: PiPaymentCallbacks) => void;
-        }
-      | undefined;
+  // 如果从服务商城跳转（?serviceId=），拉取该服务并以其价格结算
+  useEffect(() => {
+    if (!serviceId) return;
+    let cancelled = false;
+    fetch(`/api/services/${serviceId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled || !data?.service) return;
+        const s = data.service;
+        setProduct({
+          title: s.title,
+          amount: Number(s.price) || 0,
+          memo: `服务订阅 - ${s.title}`,
+        });
+      })
+      .catch(() => {
+        // 拉取失败时回退到默认方案
+      })
+      .finally(() => {
+        if (!cancelled) setProductLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serviceId]);
 
-  // 处理未完成的支付
-  const handleIncompletePayment = async (payment: PiPayment) => {
+  const getPi = useCallback((): PiSDKLike | undefined => {
+    return (window as any).Pi as PiSDKLike | undefined;
+  }, []);
+
+  // 处理 Pi.authenticate 发现的上次未完成支付
+  const handleIncompletePayment = useCallback(async (payment: PiPayment) => {
     if (payment.transaction?.txid) {
       await fetch('/api/payments/complete', {
         method: 'POST',
@@ -55,20 +105,22 @@ export default function CheckoutPage() {
           paymentId: payment.identifier,
           txid: payment.transaction.txid,
         }),
-      });
+      }).catch(() => {});
     }
-  };
+  }, []);
 
-  const handleAuth = async () => {
+  // 身份握手：成功后返回用户信息（供后续直接进入支付环节）
+  const handleAuth = useCallback(async (): Promise<{ uid: string; username: string } | null> => {
     const Pi = getPi();
     if (!Pi) {
       setErrorMsg('请在 Pi Browser 中打开此页面');
-      return;
+      return null;
     }
     setStatus('auth');
+    setErrorMsg('');
     try {
       const auth = await Pi.authenticate(['username', 'payments'], handleIncompletePayment);
-      await fetch('/api/auth/pi', {
+      const res = await fetch('/api/auth/pi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,123 +129,178 @@ export default function CheckoutPage() {
           username: auth.user.username,
         }),
       });
+      if (!res.ok) {
+        setErrorMsg('服务端身份校验失败，请重试');
+        setStatus('failed');
+        return null;
+      }
       setPiUser(auth.user);
       setStatus('idle');
+      return auth.user;
     } catch (e) {
-      setErrorMsg('身份验证失败，请重试');
+      console.error('[Checkout] Pi 身份验证异常:', e);
+      setErrorMsg('身份验证被取消或失败，请重试');
       setStatus('failed');
+      return null;
     }
-  };
+  }, [getPi, handleIncompletePayment]);
 
-  const handlePay = async () => {
+  const handlePay = useCallback(async () => {
     const Pi = getPi();
     if (!Pi) {
       setErrorMsg('请在 Pi Browser 中打开此页面');
       return;
     }
-    if (!piUser) {
-      await handleAuth();
-      return;
+
+    // 1. 若尚未登录，先完成 Pi 握手，成功后【直接】进入支付环节
+    let user = piUser;
+    if (!user) {
+      user = await handleAuth();
+      if (!user) return;
     }
+
     setStatus('processing');
     setErrorMsg('');
 
+    // 2. 客户端生成订单号：支付面板【不依赖】服务端订单创建结果，保证能正常唤起钱包
+    const orderNo = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // 3. 尽力创建服务端订单（后台异步，失败不阻断支付面板）
+    fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: product.amount,
+        memo: product.memo,
+        planId: planKey,
+        orderNo,
+      }),
+      credentials: 'include',
+    }).catch(() => {
+      console.warn('[Checkout] 服务端订单创建失败（不阻断支付）');
+    });
+
+    // 4. 立即唤起 Pi 原生支付确认（确认支付验证环节）
     Pi.createPayment(
       {
-        amount: 25,
-        memo: '先锋 AI 框架 - 专业架构版 年度授权',
-        metadata: { product: 'ai-framework-pro', duration: '12months' },
+        amount: product.amount,
+        memo: product.memo,
+        metadata: {
+          orderId: orderNo,
+          planId: planKey,
+          ...(serviceId ? { serviceId } : {}),
+        },
       },
       {
         onReadyForServerApproval: async (paymentId: string) => {
-          const res = await fetch('/api/payments/approve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId }),
-          });
-          if (!res.ok) {
-            setErrorMsg('支付审批失败，请重试');
-            setStatus('failed');
+          try {
+            await fetch('/api/payments/approve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId, orderId: orderNo }),
+              credentials: 'include',
+            });
+          } catch (e) {
+            console.error('[Checkout] 审批失败:', e);
           }
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          const res = await fetch('/api/payments/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId, txid }),
-          });
-          if (res.ok) {
-            router.push('/payment-result?status=success');
-          } else {
+          try {
+            const res = await fetch('/api/payments/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId, txid }),
+              credentials: 'include',
+            });
+            if (res.ok) {
+              router.push(`/payment-result?status=success&orderId=${encodeURIComponent(orderNo)}`);
+            } else {
+              router.push('/payment-result?status=failed');
+            }
+          } catch (e) {
             router.push('/payment-result?status=failed');
           }
         },
-        onCancel: (_paymentId: string) => {
+        onCancel: () => {
           router.push('/payment-result?status=cancelled');
         },
         onError: (error: Error) => {
-          console.error('Pi payment error:', error);
+          console.error('[Checkout] Pi 支付错误:', error);
           setErrorMsg('支付出错：' + error.message);
           setStatus('failed');
         },
       }
     );
-  };
+  }, [getPi, piUser, handleAuth, product, planKey, serviceId, router]);
 
   return (
-    <div className="min-h-screen bg-[#05020A] text-white flex items-center justify-center p-6">
-      <div className="max-w-xl w-full">
-        <div className="flex items-center gap-3 mb-10 justify-center">
-          <div className="w-8 h-8 rounded-lg bg-[#F3C136] flex items-center justify-center text-black font-black text-xs">
-            PI
+    <div className="min-h-screen bg-pi-bg text-white flex items-center justify-center p-6">
+      <div className="w-full max-w-xl">
+        <div className="mb-10 flex items-center justify-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pi-brand text-sm font-black text-[#1a0f2a] shadow-pi-glow">
+            π
           </div>
           <h1 className="text-xl font-bold tracking-tight">先锋生态收银台</h1>
         </div>
 
-        <div className="bg-[#150B20] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
-          <div className="p-8 md:p-12 space-y-8">
+        <div className="relative overflow-hidden rounded-[2.5rem] border border-pi-line bg-pi-surface shadow-pi-card">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-pi-violet/15 blur-[100px]" />
+          <div className="p-8 md:p-12 space-y-8 relative">
+            {/* 订单信息 */}
             <div className="space-y-4">
-              <div className="flex justify-between items-end">
+              <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mb-1">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-pi-muted">
                     Order Details
                   </p>
-                  <h3 className="text-xl font-bold">先锋 AI 框架 - 专业架构版</h3>
+                  <h3 className="text-xl font-bold text-white">
+                    {productLoading ? '加载服务中…' : product.title}
+                  </h3>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-black text-[#F3C136]">π 25.00</p>
+                  <p className="text-3xl font-black text-pi-gold">π {product.amount.toFixed(2)}</p>
                 </div>
               </div>
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
+              <div className="space-y-3 rounded-2xl border border-pi-line bg-white/[0.03] p-4">
                 <div className="flex justify-between text-xs font-medium">
-                  <span className="text-neutral-500">账期有效期</span>
-                  <span>12 个月 (年度授权)</span>
+                  <span className="text-pi-muted">结算方式</span>
+                  <span className="text-white">Pi 链上支付</span>
                 </div>
                 <div className="flex justify-between text-xs font-medium">
-                  <span className="text-neutral-500">包含组件</span>
-                  <span>全量 AI 路由 + 支付 SDK</span>
+                  <span className="text-pi-muted">安全保障</span>
+                  <span className="text-emerald-400">✓ 官方 SDK + 服务端审批</span>
                 </div>
               </div>
             </div>
 
+            {/* 认证身份 */}
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-pi-muted">
                 认证身份
               </h4>
               {piUser ? (
-                <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600" />
+                <div className="flex items-center gap-4 rounded-2xl border border-pi-line bg-white/[0.03] p-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pi-violet text-sm font-black text-white">
+                    {piUser.username.charAt(0).toUpperCase()}
+                  </div>
                   <div>
                     <p className="text-sm font-bold text-white">{piUser.username}</p>
-                    <p className="text-[10px] text-green-400 font-mono">✓ 已通过 Pi 身份验证</p>
+                    <p className="text-[10px] font-mono text-emerald-400">
+                      ✓ 已通过 Pi 身份验证，可直接支付
+                    </p>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5">
-                  <div className="w-10 h-10 rounded-full bg-neutral-800" />
+                <div className="flex items-center gap-4 rounded-2xl border border-pi-line bg-white/[0.03] p-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
+                    ?
+                  </div>
                   <div>
-                    <p className="text-sm text-neutral-400">
+                    <p className="text-sm text-pi-muted">
                       {isPiBrowser ? '点击下方按钮进行 Pi 身份验证' : '请在 Pi Browser 中打开'}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-pi-muted/60">
+                      验证成功后自动进入支付确认环节
                     </p>
                   </div>
                 </div>
@@ -201,40 +308,54 @@ export default function CheckoutPage() {
             </div>
 
             {errorMsg && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+              <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-center text-sm text-rose-300">
                 {errorMsg}
               </div>
             )}
 
             {!isPiBrowser ? (
-              <div className="w-full py-5 bg-neutral-800 text-neutral-400 font-bold rounded-2xl text-center">
+              <div className="w-full rounded-2xl bg-white/5 py-5 text-center font-bold text-pi-muted">
                 请在 Pi Browser 中打开以使用支付功能
               </div>
             ) : (
               <button
                 onClick={handlePay}
-                disabled={status === 'processing' || status === 'auth'}
-                className="w-full py-5 bg-[#F3C136] text-[#1E112A] font-black rounded-2xl text-lg hover:bg-[#EEA834] transition-all active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl shadow-[#F3C136]/10 disabled:opacity-50"
+                disabled={status === 'processing' || status === 'auth' || productLoading}
+                className="flex w-full items-center justify-center gap-3 rounded-2xl bg-pi-brand py-5 text-lg font-black text-[#1a0f2a] shadow-pi-glow transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
               >
                 {status === 'processing' || status === 'auth' ? (
                   <>
-                    <div className="w-5 h-5 border-4 border-[#1E112A]/20 border-t-[#1E112A] rounded-full animate-spin" />
-                    {status === 'auth' ? '验证身份中...' : '处理支付中...'}
+                    <span className="h-5 w-5 animate-spin rounded-full border-4 border-[#1a0f2a]/20 border-t-[#1a0f2a]" />
+                    {status === 'auth' ? '验证身份中…' : '处理支付中…'}
                   </>
                 ) : piUser ? (
-                  '使用 Pi Wallet 支付'
+                  '使用 Pi Wallet 确认支付'
                 ) : (
                   '验证 Pi 身份并支付'
                 )}
               </button>
             )}
 
-            <p className="text-center text-[10px] text-neutral-600 font-medium">
+            <p className="text-center text-[10px] font-medium text-pi-muted/60">
               点击支付即代表您同意《先锋 AI 框架商业授权协议》
             </p>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-pi-bg">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-pi-gold/20 border-t-pi-gold" />
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }

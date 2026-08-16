@@ -1,11 +1,80 @@
-﻿@charset "UTF-8";
+@charset "UTF-8";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
+@layer base {
+  :root {
+    color-scheme: dark;
+    --pi-bg: #07030e;
+    --pi-surface: #12081c;
+    --pi-surface-2: #1a0f2a;
+    --pi-gold: #f3c136;
+    --pi-violet: #8b5cf6;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-pi-bg text-white font-sans;
+  }
+
+  ::selection {
+    background: rgba(243, 193, 54, 0.9);
+    color: #1a0f2a;
+  }
+
+  /* 统一滚动条，符合深色大厂质感 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.22);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* 卡片容器 */
+  .pi-card {
+    @apply bg-pi-surface border border-pi-line rounded-2xl;
+  }
+  .pi-card-hover {
+    @apply transition-all duration-300 hover:border-pi-gold/30 hover:bg-pi-surface2;
+  }
+
+  /* 金色主按钮 */
+  .pi-btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-pi-brand px-5 py-2.5 text-sm font-bold text-[#1a0f2a] shadow-pi-glow transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+  /* 描边次按钮 */
+  .pi-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-pi-line bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+  /* 无边框文字按钮 */
+  .pi-btn-text {
+    @apply inline-flex items-center gap-1.5 text-sm font-semibold text-pi-muted transition-colors hover:text-white;
+  }
+
+  /* 徽标 / 状态胶囊 */
+  .pi-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold;
+  }
+
   .text-balance {
     text-wrap: balance;
   }
 }
-

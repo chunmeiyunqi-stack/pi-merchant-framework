@@ -15,7 +15,9 @@
     "react-dom": "^18.3.0",
     "@prisma/client": "^5.12.0",
     "jose": "^5.2.0",
-    "@pi-merchant/types": "workspace:*"
+    "@tanstack/react-query": "^5.28.0",
+    "@pi-merchant/types": "workspace:*",
+    "@pi-merchant/pi-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

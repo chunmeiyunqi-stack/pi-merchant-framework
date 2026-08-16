@@ -1,20 +1,83 @@
+# Dependencies
 node_modules
-.next
-.git
-.gitignore
-Dockerfile
-docker-compose*.yml
-.dockerignore
-*.md
-tests
-coverage
-.vscode
-.env.local
-.env.*
-.idea
-dist
-build
-__tests__
-*.log
 .pnpm-store
 .pnpm-store/**
+
+# Build outputs
+.next
+dist
+build
+out
+coverage
+
+# Version control
+.git
+.gitignore
+
+# Docker files (not needed in build context)
+Dockerfile
+Dockerfile.*
+docker-compose*.yml
+.dockerignore
+
+# Documentation (not needed in image)
+*.md
+docs
+screenshots
+user_manual*
+source_code*
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Environment files (secrets should not be in image)
+.env
+.env.local
+.env.*
+!.env.example
+
+# Test files
+tests
+__tests__
+coverage
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+jest.config.js
+jest.setup.ts
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Temporary files
+tmp
+temp
+*.tmp
+backups
+archive
+
+# Python virtual environment
+.venv
+venv
+__pycache__
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
+*.txt
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.json
+!turbo.json

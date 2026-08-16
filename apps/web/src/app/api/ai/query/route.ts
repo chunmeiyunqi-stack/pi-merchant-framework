@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-// Require Node.js runtime for server-side APIs that use Node built-ins (crypto, process, etc.)
+export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 import { cookies } from 'next/headers';
 import { generateMerchantAiResponse, logEvent, logError } from '@pi-merchant/pi-sdk';

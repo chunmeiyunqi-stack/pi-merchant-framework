@@ -1,4 +1,4 @@
-﻿// packages/pi-sdk/src/index.ts
+// packages/pi-sdk/src/index.ts
 // Pi SDK 灏佽灞傜粺涓€瀵煎嚭鍏ュ彛
 
 import { validateEnv } from './env-validator';
@@ -26,8 +26,10 @@ export type { TokenProvider } from './interceptors/auth';
 export { createRateLimitInterceptor, createAutoRetryInterceptor } from './interceptors/rateLimit';
 export type { RateLimitCallbacks } from './interceptors/rateLimit';
 
-export { useRequest } from './hooks/useRequest';
-export type { UseRequestReturn, UseRequestState, UseRequestOptions } from './hooks/useRequest';
+// useRequest 为 React Hook，只能用于客户端组件，不能从服务端 SDK 主入口导出，
+// 否则会被打包进 Server Component 导致 Next.js 构建失败（useEffect/useState 等）。
+// export { useRequest } from './hooks/useRequest';
+// export type { UseRequestReturn, UseRequestState, UseRequestOptions } from './hooks/useRequest';
 
 export { ApiError } from './types/api';
 export type {

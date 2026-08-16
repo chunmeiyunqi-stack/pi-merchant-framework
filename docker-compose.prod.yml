@@ -1,10 +1,8 @@
-﻿# Pi Merchant Framework — Production Docker Compose
+# Pi Merchant Framework — Production Docker Compose
 # Usage: docker compose -f docker-compose.prod.yml up -d
 
-version: "3.8"
-
 services:
-  # ─── PostgreSQL ──────────────────────────────────────────
+  # --- PostgreSQL ---
   db:
     image: postgres:15-alpine
     environment:
@@ -20,11 +18,10 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ─── Redis (BullMQ Queue) ────────────────────────────────
+  # --- Redis (BullMQ Queue) ---
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Do not expose Redis port to host in production
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -32,24 +29,21 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ─── Database Migration ─────────────────────────────────
+  # --- Database Migration ---
   migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: node:20-bookworm-slim
     env_file: .env
-    command: npx prisma migrate deploy
+    command: sh -c "npm install -g prisma@5.22.0 && npx prisma migrate deploy --schema=/app/prisma/schema.prisma"
+    volumes:
+      - ./prisma:/app/prisma:ro
     depends_on:
       db:
         condition: service_healthy
     restart: "no"
 
-  # ─── Main App ────────────────────────────────────────────
+  # --- Main App ---
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ${DOCKER_REPOSITORY:-pi-merchant-framework:latest}
+    image: pi-merchant-framework:latest
     env_file: .env
     ports:
       - "3000:3000"
@@ -58,12 +52,9 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  # ─── Admin Dashboard ─────────────────────────────────────
+  # --- Admin Dashboard ---
   admin:
-    build:
-      context: .
-      dockerfile: Dockerfile.admin
-    image: ${DOCKER_REPOSITORY:-pi-merchant-framework:admin-latest}
+    image: pi-merchant-framework:admin-latest
     env_file: .env
     ports:
       - "3001:3001"
@@ -72,24 +63,22 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  # ─── BullMQ Worker ───────────────────────────────────────
+  # --- BullMQ Worker ---
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ${DOCKER_REPOSITORY:-pi-merchant-framework:latest}
+    image: pi-merchant-framework:latest
     env_file: .env
-    command: pnpm --filter @pi-merchant/web start:prod
+    command: node apps/web/server.js
     environment:
       - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-3}
+      - WORKER_MODE=true
     depends_on:
       - redis
       - db
     restart: unless-stopped
 
-  # ─── Nginx Reverse Proxy ─────────────────────────────────
+  # --- Nginx Reverse Proxy ---
   nginx:
-    image: nginx:alpine
+    image: nginx:1.25-alpine
     ports:
       - "80:80"
     volumes:

@@ -4,6 +4,7 @@
  * Strategy: mock Next.js, session, prisma, pi-sdk, and metrics middleware
  * so the route handler can be exercised in isolation.
  */
+export {};
 
 // ─── polyfills ───────────────────────────────────────────────────────────────
 if (typeof global.Request === 'undefined') {
