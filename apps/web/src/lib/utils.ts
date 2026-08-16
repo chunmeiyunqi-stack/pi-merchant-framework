@@ -1,11 +1,8 @@
-export function getMerchantId(req?: Request): string {
-  if (req) {
-    const headerMerchantId = req.headers.get('x-merchant-id');
-    if (headerMerchantId) {
-      return headerMerchantId;
-    }
-  }
+export function cn(...inputs: (string | false | null | undefined)[]) {
+  return inputs.filter(Boolean).join(' ');
+}
 
+export function getMerchantId() {
   return (
     process.env.NEXT_PUBLIC_MERCHANT_ID ||
     process.env.NEXT_PUBLIC_DEFAULT_MERCHANT_ID ||

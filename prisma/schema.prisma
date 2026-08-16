@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+    provider = "prisma-client-js"
 }
 
 datasource db {
@@ -123,15 +123,13 @@ model Merchant {
 }
 
 model MerchantUser {
-  id                 String     @id @default(cuid())
-  merchantId         String     @map("merchant_id")
-  piUid              String     @map("pi_uid")
-  username           String
-  passwordHash       String?    @map("password_hash")
-  mustChangePassword Boolean    @default(false) @map("must_change_password")
-  role               UserRole   @default(STAFF)
-  status             UserStatus @default(ACTIVE)
-  createdAt          DateTime   @default(now()) @map("created_at")
+  id         String     @id @default(cuid())
+  merchantId String     @map("merchant_id")
+  piUid      String     @map("pi_uid")
+  username   String
+  role       UserRole   @default(STAFF)
+  status     UserStatus @default(ACTIVE)
+  createdAt  DateTime   @default(now()) @map("created_at")
 
   merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 

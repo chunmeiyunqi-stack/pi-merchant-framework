@@ -4,16 +4,17 @@
 # =============================================================================
 
 # ---- Stage 1: deps ----
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 
 RUN apk add --no-cache libc6-compat openssl
-RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+# Pin pnpm version to match package.json (pnpm@8.15.0)
+RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 WORKDIR /app
 
-# 1. 只复制 workspace 清单（最大化缓存命中）
+# 1. Copy workspace manifests (max cache hit)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-COPY tsconfig.json ./
+COPY tsconfig*.json ./
 
 COPY apps/admin/package.json      ./apps/admin/
 COPY apps/web/package.json        ./apps/web/
@@ -22,35 +23,32 @@ COPY packages/ui/package.json     ./packages/ui/
 COPY packages/pi-sdk/package.json ./packages/pi-sdk/
 COPY packages/config/package.json ./packages/config/
 
-# 2. 安装全部依赖（必须包含 devDependencies）
-#    不要使用 --shamefully-hoist，standalone 会自己打包
+# 2. Install all dependencies (frozen lockfile for reproducibility)
 RUN pnpm install --frozen-lockfile
 
 # ---- Stage 2: builder ----
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 RUN apk add --no-cache libc6-compat openssl
-RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 WORKDIR /app
 
-# 关键：把整个 deps 阶段的 /app 拷过来（包含 .pnpm 存储和正确的符号链接）
+# Copy entire /app from deps (includes .pnpm store and correct symlinks)
 COPY --from=deps /app ./
 
-# 再覆盖源码（保证最新）
+# Overlay source code
 COPY prisma ./prisma
 COPY packages ./packages
 COPY apps/admin ./apps/admin
-# 如果根目录有共享 src，再打开下面这行
-# COPY src ./src
 
-# 确保 public 目录存在
+# Ensure public directory exists
 RUN mkdir -p /app/apps/admin/public
 
-# 构建期环境变量（避免连接真实服务）
+# Build-time env stubs
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV DOCKER_BUILD=1
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/pi_merchant?schema=public"
 ENV NEXTAUTH_SECRET="docker-build-stub"
 ENV PI_API_KEY="docker-build-stub"
@@ -58,14 +56,14 @@ ENV LICENSE_PAYLOAD_SECRET="docker-build-stub"
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-# 1. 生成 Prisma Client（必须在 next build 之前）
+# 1. Generate Prisma Client (must run before next build)
 RUN pnpm exec prisma generate
 
-# 2. 只构建 admin 及其依赖的 workspace 包
+# 2. Build admin and its workspace dependencies
 RUN pnpm --filter @pi-merchant/admin... build
 
 # ---- Stage 3: runner ----
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 RUN apk add --no-cache libc6-compat openssl \
   && addgroup --system --gid 1001 nodejs \
@@ -78,21 +76,20 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 
-# standalone 产物（包含精简后的 node_modules）
-# outputFileTracingRoot=monorepo root → server.js 在 standalone/ 根，而不是 standalone/apps/admin/
+# standalone output — without outputFileTracingRoot, server.js is at standalone/apps/admin/server.js
 COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/.next/standalone ./
 
-# 静态资源 — 注意 outputFileTracingRoot 后静态文件仍在 apps/admin/.next/static
+# Static assets — still under apps/admin/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/.next/static ./apps/admin/.next/static
 
-# public 目录
+# public directory
 COPY --from=builder --chown=nextjs:nodejs /app/apps/admin/public ./apps/admin/public
 
-# Prisma 引擎（standalone 不会自动带原生二进制）
+# Prisma engine (standalone may not auto-include native binaries)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
-# 迁移文件（可选，方便容器内执行 migrate deploy）
+# Migration files (optional, for in-container migrate deploy)
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 USER nextjs
@@ -102,6 +99,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "require('http').get('http://127.0.0.1:3001/api/health',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 
-# outputFileTracingRoot=monorepo root → server.js 位于 standalone 根目录
-# 若不设 outputFileTracingRoot，改为: CMD ["node", "apps/admin/server.js"]
-CMD ["node", "server.js"]
+# Without outputFileTracingRoot, server.js is at apps/admin/server.js under standalone root
+CMD ["node", "apps/admin/server.js"]

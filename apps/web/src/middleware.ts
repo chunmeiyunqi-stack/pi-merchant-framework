@@ -22,6 +22,7 @@ const PUBLIC_PREFIXES = [
   '/login',
   '/register',
   '/services',
+  '/checkout',
   '/payment-result',
   '/api/auth',
   '/api/public',

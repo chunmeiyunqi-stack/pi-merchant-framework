@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
-export const dynamic = 'force-dynamic';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
 import { withMetrics } from '@/lib/metrics-middleware';
-
-const prisma = new PrismaClient();
 
 async function __POST(req: Request) {
   try {

@@ -29,7 +29,8 @@ export async function POST(req: Request) {
   }
 
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  const provider = typeof body.provider === 'string' ? body.provider : undefined;
+  const provider = (typeof body.provider === 'string' ? body.provider : undefined) as
+    'openai' | 'anthropic' | 'ollama' | undefined;
 
   if (!prompt) {
     return NextResponse.json({ success: false, error: 'Missing prompt' }, { status: 400 });
@@ -77,7 +78,11 @@ export async function POST(req: Request) {
         });
 
         try {
-          const streamIterable = streamMerchantAiResponse({ merchantId, prompt, provider });
+          const streamIterable = streamMerchantAiResponse({
+            merchantId,
+            prompt,
+            provider,
+          }) as AsyncIterable<any>;
 
           for await (const chunk of streamIterable) {
             // Check for client disconnect OR timeout

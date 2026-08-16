@@ -38,7 +38,10 @@ async function __POST(req: Request) {
 
     const merchantId = process.env.NEXT_PUBLIC_MERCHANT_ID || 'merchant-demo-001';
 
-    const result = await generateMerchantAiResponse({ merchantId, prompt });
+    const result = await generateMerchantAiResponse({
+      merchantId,
+      prompt,
+    });
 
     if (!result.success) {
       // record failed provider call if available

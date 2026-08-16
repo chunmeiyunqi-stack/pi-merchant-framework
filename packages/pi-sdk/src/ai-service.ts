@@ -34,35 +34,29 @@ function buildSystemPrompt(merchantId: string) {
  * @param request - AI 请求参数
  * @returns AI 响应（success/result/error + provider/model 元数据）
  */
-export async function generateMerchantAiResponse({
-  merchantId,
-  prompt,
-  model,
-  temperature,
-  provider,
-}: AIRequest): Promise<AIResponse> {
+export async function generateMerchantAiResponse(request: AIRequest): Promise<AIResponse> {
   try {
     const factory = getProviderFactory();
 
     const response = await factory.route(
       {
         messages: [
-          { role: 'system', content: buildSystemPrompt(merchantId) },
-          { role: 'user', content: prompt },
+          { role: 'system', content: buildSystemPrompt(request.merchantId) },
+          { role: 'user', content: request.prompt },
         ],
-        model,
-        temperature: temperature ?? 0.6,
+        model: request.model,
+        temperature: request.temperature ?? 0.6,
         maxTokens: 512,
       },
-      provider as AIProviderName | undefined
+      request.provider as AIProviderName | undefined
     );
 
     logEvent('AI response generated', {
-      merchantId,
+      merchantId: request.merchantId,
       provider: response.provider,
       model: response.model,
       fallback: response.routing?.fallback,
-      promptPreview: prompt.slice(0, 120),
+      promptPreview: request.prompt.slice(0, 120),
     });
 
     return {
@@ -80,9 +74,9 @@ export async function generateMerchantAiResponse({
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     logError('AI service call failed', error, {
-      merchantId,
-      requestedProvider: provider,
-      promptPreview: prompt.slice(0, 120),
+      merchantId: request.merchantId,
+      requestedProvider: request.provider,
+      promptPreview: request.prompt.slice(0, 120),
     });
 
     return {
@@ -98,36 +92,32 @@ export async function generateMerchantAiResponse({
  * @param request - AI 请求参数
  * @returns AI 流式块异步迭代器
  */
-export async function* streamMerchantAiResponse({
-  merchantId,
-  prompt,
-  model,
-  temperature,
-  provider,
-}: AIRequest): AsyncIterable<AIStreamChunk> {
+export async function* streamMerchantAiResponse(
+  request: AIRequest
+): AsyncGenerator<AIStreamChunk, void, unknown> {
   const factory = getProviderFactory();
 
   try {
     const stream = factory.routeStream(
       {
         messages: [
-          { role: 'system', content: buildSystemPrompt(merchantId) },
-          { role: 'user', content: prompt },
+          { role: 'system', content: buildSystemPrompt(request.merchantId) },
+          { role: 'user', content: request.prompt },
         ],
-        model,
-        temperature: temperature ?? 0.6,
+        model: request.model,
+        temperature: request.temperature ?? 0.6,
         maxTokens: 512,
       },
-      provider as AIProviderName | undefined
+      request.provider as AIProviderName | undefined
     );
 
     yield* stream;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logError('AI stream service call failed', error, {
-      merchantId,
-      requestedProvider: provider,
-      promptPreview: prompt.slice(0, 120),
+      merchantId: request.merchantId,
+      requestedProvider: request.provider,
+      promptPreview: request.prompt.slice(0, 120),
     });
     throw new Error(errorMessage || 'AI stream service unavailable right now.');
   }

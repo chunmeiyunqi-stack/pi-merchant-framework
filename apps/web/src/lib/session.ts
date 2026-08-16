@@ -1,28 +1,32 @@
 import crypto from 'crypto';
 
-// 使用不可推导的密钥盐进行服务端签名。生产环境请确保配置了独立的环境变量
-const SECRET_KEY = process.env.PI_SESSION_SECRET || 'dev_fallback_secret_for_pi_hmac_2026';
+let _secretKey: string | null = null;
 
-// Debug: surface whether the process is using env-provided secret or the fallback
-try {
-  const source = process.env.PI_SESSION_SECRET ? 'env' : 'fallback';
-  console.error('[session] SECRET_KEY source:', source);
-} catch (_e) {
-  /* ignore */
+function getSecretKey(): string {
+  if (_secretKey) return _secretKey;
+  const secret = process.env.PI_SESSION_SECRET;
+  if (secret) {
+    _secretKey = secret;
+    return _secretKey;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Missing required environment variable: PI_SESSION_SECRET');
+  }
+  _secretKey = 'dev_fallback_secret_for_pi_hmac_2026';
+  return _secretKey;
 }
 
 /**
- * 将真实的 piUid 打包并进行 HMAC-SHA256 签名，生成客户端不可篡改的 Opaque Token
- * 新格式 payload 为 JSON: { uid, exp }，然后 base64url 编码后签名。
- * 兼容旧格式（仅 base64(uid)）以便平滑过渡。
+ * Signs a piUid into an HMAC-SHA256 signed opaque token.
+ * Payload: JSON { uid, exp } → base64url → HMAC-SHA256 signature.
  */
-export function signSessionToken(piUid: string, ttlSeconds = 60 * 60): string {
+export function signSessionToken(piUid: string, ttlSeconds = 60 * 60 * 24 * 7): string {
   const exp = Math.floor(Date.now() / 1000) + Math.max(0, Math.floor(ttlSeconds));
   const payloadObj = { uid: piUid, exp };
   const payloadJson = JSON.stringify(payloadObj);
   const payload = Buffer.from(payloadJson).toString('base64url');
 
-  const hmac = crypto.createHmac('sha256', SECRET_KEY);
+  const hmac = crypto.createHmac('sha256', getSecretKey());
   hmac.update(payload);
   const signature = hmac.digest('base64url');
 
@@ -30,7 +34,7 @@ export function signSessionToken(piUid: string, ttlSeconds = 60 * 60): string {
 }
 
 /**
- * 验证收到的 Session Token，如果被篡改则返回 null
+ * Verifies a session token. Returns the uid if valid, null otherwise.
  */
 export function verifySessionToken(token: string): string | null {
   if (!token) {
@@ -52,7 +56,7 @@ export function verifySessionToken(token: string): string | null {
     return null;
   }
 
-  const hmac = crypto.createHmac('sha256', SECRET_KEY);
+  const hmac = crypto.createHmac('sha256', getSecretKey());
   hmac.update(payload);
   const expectedSignature = hmac.digest('base64url');
 
@@ -61,11 +65,9 @@ export function verifySessionToken(token: string): string | null {
     return null;
   }
 
-  // 验证签名通过后，解码并支持新版 JSON payload 或旧版纯 uid 字符串
   try {
     const decoded = Buffer.from(payload, 'base64url').toString('utf8');
 
-    // 优先尝试解析为 JSON（新格式）
     try {
       const obj = JSON.parse(decoded);
       const uid = typeof obj.uid === 'string' ? obj.uid : null;
@@ -80,7 +82,6 @@ export function verifySessionToken(token: string): string | null {
       }
       return uid;
     } catch (_jsonErr) {
-      // 不是 JSON -> 兼容旧格式：解码即为 uid
       if (decoded && decoded.length > 0) return decoded;
       console.error('[session] verifySessionToken: decoded payload empty or invalid');
       return null;
