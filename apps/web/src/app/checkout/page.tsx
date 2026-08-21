@@ -27,6 +27,7 @@ interface PiPaymentCallbacks {
 }
 
 interface PiSDKLike {
+  init: (config: { version: string; sandbox?: boolean }) => Promise<void>;
   authenticate: (scopes: string[], cb: (p: PiPayment) => void) => Promise<PiAuthResult>;
   createPayment: (data: PiPaymentData, callbacks: PiPaymentCallbacks) => void;
 }
@@ -93,6 +94,27 @@ function CheckoutContent() {
 
   const getPi = useCallback((): PiSDKLike | undefined => {
     return (window as any).Pi as PiSDKLike | undefined;
+  }, []);
+
+  // 确保 Pi SDK 已初始化完成。
+  // Pi.createPayment 内部走 checkInitialized()（未初始化会同步抛错，且不会等待 initPromise），
+  // 而 Pi.authenticate 走 ensureInitialized()（会等待 init）。为避免在首次点击时
+  // 出现 "SDK not initialized" 竞态，这里显式 await layout 内联脚本存下的 init Promise。
+  const ensurePiInitialized = useCallback(async (Pi: PiSDKLike) => {
+    const stored = (window as any).__piInitPromise as Promise<void> | undefined;
+    if (stored && typeof stored.then === 'function') {
+      await stored;
+      return;
+    }
+    // 兜底：layout 内联脚本未执行（例如历史页面缓存）时，在此再初始化一次
+    try {
+      await Pi.init({
+        version: '2.0',
+        sandbox: process.env.NEXT_PUBLIC_PI_SANDBOX !== 'false',
+      });
+    } catch {
+      // 重复初始化在部分 SDK 版本会被忽略；失败不阻断后续流程
+    }
   }, []);
 
   // 处理 Pi.authenticate 发现的上次未完成支付
@@ -162,10 +184,19 @@ function CheckoutContent() {
     setStatus('processing');
     setErrorMsg('');
 
-    // 2. 客户端生成订单号：支付面板【不依赖】服务端订单创建结果，保证能正常唤起钱包
+    // 2. 确保 SDK 初始化完成（createPayment 依赖 initialized 状态，未初始化会同步抛错）
+    try {
+      await ensurePiInitialized(Pi);
+    } catch {
+      setErrorMsg('Pi SDK 初始化失败，请刷新页面后重试');
+      setStatus('failed');
+      return;
+    }
+
+    // 3. 客户端生成订单号：支付面板【不依赖】服务端订单创建结果，保证能正常唤起钱包
     const orderNo = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // 3. 尽力创建服务端订单（后台异步，失败不阻断支付面板）
+    // 4. 尽力创建服务端订单（后台异步，失败不阻断支付面板）
     fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -180,58 +211,68 @@ function CheckoutContent() {
       console.warn('[Checkout] 服务端订单创建失败（不阻断支付）');
     });
 
-    // 4. 立即唤起 Pi 原生支付确认（确认支付验证环节）
-    Pi.createPayment(
-      {
-        amount: product.amount,
-        memo: product.memo,
-        metadata: {
-          orderId: orderNo,
-          planId: planKey,
-          ...(serviceId ? { serviceId } : {}),
+    // 5. 立即唤起 Pi 原生支付确认（确认支付验证环节）
+    try {
+      Pi.createPayment(
+        {
+          amount: product.amount,
+          memo: product.memo,
+          metadata: {
+            orderId: orderNo,
+            planId: planKey,
+            ...(serviceId ? { serviceId } : {}),
+          },
         },
-      },
-      {
-        onReadyForServerApproval: async (paymentId: string) => {
-          try {
-            await fetch('/api/payments/approve', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paymentId, orderId: orderNo }),
-              credentials: 'include',
-            });
-          } catch (e) {
-            console.error('[Checkout] 审批失败:', e);
-          }
-        },
-        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          try {
-            const res = await fetch('/api/payments/complete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paymentId, txid }),
-              credentials: 'include',
-            });
-            if (res.ok) {
-              router.push(`/payment-result?status=success&orderId=${encodeURIComponent(orderNo)}`);
-            } else {
+        {
+          onReadyForServerApproval: async (paymentId: string) => {
+            try {
+              await fetch('/api/payments/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, orderId: orderNo }),
+                credentials: 'include',
+              });
+            } catch (e) {
+              console.error('[Checkout] 审批失败:', e);
+            }
+          },
+          onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+            try {
+              const res = await fetch('/api/payments/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, txid }),
+                credentials: 'include',
+              });
+              if (res.ok) {
+                router.push(
+                  `/payment-result?status=success&orderId=${encodeURIComponent(orderNo)}`
+                );
+              } else {
+                router.push('/payment-result?status=failed');
+              }
+            } catch (e) {
               router.push('/payment-result?status=failed');
             }
-          } catch (e) {
-            router.push('/payment-result?status=failed');
-          }
-        },
-        onCancel: () => {
-          router.push('/payment-result?status=cancelled');
-        },
-        onError: (error: Error) => {
-          console.error('[Checkout] Pi 支付错误:', error);
-          setErrorMsg('支付出错：' + error.message);
-          setStatus('failed');
-        },
-      }
-    );
-  }, [getPi, piUser, handleAuth, product, planKey, serviceId, router]);
+          },
+          onCancel: () => {
+            router.push('/payment-result?status=cancelled');
+          },
+          onError: (error: Error) => {
+            console.error('[Checkout] Pi 支付错误:', error);
+            setErrorMsg('支付出错：' + error.message);
+            setStatus('failed');
+          },
+        }
+      );
+    } catch (error) {
+      // createPayment 同步抛错（如 SDK 未初始化、缺少 payments scope、金额非法等）
+      // 不会走到 onError 回调，必须在此兜底，避免界面一直卡在 "处理支付中..."
+      console.error('[Checkout] createPayment 同步异常:', error);
+      setErrorMsg('支付唤起失败：' + (error instanceof Error ? error.message : '未知错误'));
+      setStatus('failed');
+    }
+  }, [getPi, piUser, handleAuth, product, planKey, serviceId, router, ensurePiInitialized]);
 
   return (
     <div className="min-h-screen bg-pi-bg text-white flex items-center justify-center p-6">
