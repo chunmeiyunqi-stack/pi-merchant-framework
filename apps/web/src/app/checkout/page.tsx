@@ -273,14 +273,26 @@ function CheckoutContent() {
         {
           onReadyForServerApproval: async (paymentId: string) => {
             try {
-              await fetch('/api/payments/approve', {
+              const res = await fetch('/api/payments/approve', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paymentId, orderId: orderNo }),
                 credentials: 'include',
               });
+              if (!res.ok) {
+                let detail = '';
+                try {
+                  const e = await res.json();
+                  detail = e?.error ?? '';
+                } catch {
+                  // 忽略非 JSON 响应
+                }
+                console.error('[Checkout] 审批失败:', res.status, detail);
+                setErrorMsg(`支付审批失败(${res.status})：${detail || '请检查 PI_API_KEY 等配置'}`);
+              }
             } catch (e) {
-              console.error('[Checkout] 审批失败:', e);
+              console.error('[Checkout] 审批异常:', e);
+              setErrorMsg('支付审批请求失败，请重试');
             }
           },
           onReadyForServerCompletion: async (paymentId: string, txid: string) => {
