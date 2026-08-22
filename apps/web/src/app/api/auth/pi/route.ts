@@ -26,7 +26,8 @@ async function __POST(req: Request) {
     let verifiedUsername: string;
 
     try {
-      const piMeRes = await fetch(`${PI_API_BASE}/v2/me`, {
+      const meUrl = `${PI_API_BASE}/v2/me`;
+      const piMeRes = await fetch(meUrl, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -34,9 +35,12 @@ async function __POST(req: Request) {
 
       if (!piMeRes.ok) {
         const errBody = await piMeRes.text();
-        console.error('[Auth/Pi] Pi Platform /v2/me 验证失败:', piMeRes.status, errBody);
+        console.error('[Auth/Pi] Pi Platform /v2/me 验证失败:', meUrl, piMeRes.status, errBody);
         return NextResponse.json(
-          { success: false, error: `Pi Platform 验证失败 (${piMeRes.status}): token 无效或已过期` },
+          {
+            success: false,
+            error: `Pi Platform 验证失败 (${piMeRes.status}) @ ${meUrl}`,
+          },
           { status: 401 }
         );
       }

@@ -10,5 +10,6 @@
  */
 export function piPlatformBase(): string {
   const raw = (process.env.PI_PLATFORM_API_BASE ?? 'https://api.minepi.com').trim();
-  return raw.replace(/\/+$/, '').replace(/\/v2$/i, '');
+  // 去掉结尾斜杠，再去掉结尾的 /v<数字>（兼容 /v2、/v1 等任何版本号写法）
+  return raw.replace(/\/+$/, '').replace(/\/v\d+$/i, '');
 }
