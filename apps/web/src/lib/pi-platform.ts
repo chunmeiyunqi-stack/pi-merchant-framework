@@ -9,7 +9,13 @@
  * 出现 https://api.minepi.com/v2/v2/me → 404 的问题。
  */
 export function piPlatformBase(): string {
-  const raw = (process.env.PI_PLATFORM_API_BASE ?? 'https://api.minepi.com').trim();
+  const raw = (process.env.PI_PLATFORM_API_BASE ?? '').trim();
+  // Pi Platform API（/v2/me、/v2/payments）只存在于主网 api.minepi.com。
+  // 常见误配：把 PI_PLATFORM_API_BASE 填成 https://api.testnet.minepi.com ——
+  // 该域名下 /v2/me 返回 404，导致身份校验失败。这里对空值/测试网地址统一回归主网。
+  if (!raw || /testnet/i.test(raw)) {
+    return 'https://api.minepi.com';
+  }
   // 去掉结尾斜杠，再去掉结尾的 /v<数字>（兼容 /v2、/v1 等任何版本号写法）
   return raw.replace(/\/+$/, '').replace(/\/v\d+$/i, '');
 }
