@@ -127,9 +127,7 @@ function CheckoutContent() {
       await Pi.init({
         version: '2.0',
         sandbox:
-          process.env.NEXT_PUBLIC_PI_SANDBOX !== undefined
-            ? process.env.NEXT_PUBLIC_PI_SANDBOX === 'true'
-            : process.env.NODE_ENV !== 'production',
+          process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_PI_SANDBOX !== 'false',
       });
     } catch {
       // 重复初始化在部分 SDK 版本会被忽略；失败不阻断后续流程

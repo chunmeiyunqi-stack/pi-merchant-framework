@@ -29,13 +29,11 @@ export const viewport: Viewport = {
 };
 
 // 沙盒/主网判定：
-// - NEXT_PUBLIC_PI_SANDBOX 显式 "true" → 沙盒；显式 "false" → 主网
-// - 未设置时：本地开发(NODE_ENV!==production)走沙盒，生产(Vercel)默认走主网
-//   （否则部署在 Vercel 上用沙盒 accessToken 去验证主网 /v2/me 会 401 → “服务端身份校验失败”）
+// - 生产环境（Vercel）永远走主网（沙盒仅用于本地 localhost + sandbox browser，
+//   部署在 Vercel 上若误配 NEXT_PUBLIC_PI_SANDBOX=true 会造成“沙盒支付单 vs 主网审批”不匹配而超时）
+// - 本地开发默认走沙盒，除非显式 NEXT_PUBLIC_PI_SANDBOX=false
 const PI_SANDBOX =
-  process.env.NEXT_PUBLIC_PI_SANDBOX !== undefined
-    ? process.env.NEXT_PUBLIC_PI_SANDBOX === 'true'
-    : process.env.NODE_ENV !== 'production';
+  process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_PI_SANDBOX !== 'false';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
