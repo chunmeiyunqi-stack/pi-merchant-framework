@@ -4,9 +4,10 @@ import { cookies } from 'next/headers';
 import { signSessionToken } from '@/lib/session';
 import { logEvent } from '@pi-merchant/pi-sdk';
 import { withMetrics } from '@/lib/metrics-middleware';
+import { piPlatformBase } from '@/lib/pi-platform';
 
-// Pi Platform API 基础地址
-const PI_API_BASE = process.env.PI_PLATFORM_API_BASE ?? 'https://api.minepi.com';
+// Pi Platform API 根地址（规范化：兼容带/不带 /v2 的配置）
+const PI_API_BASE = piPlatformBase();
 
 async function __POST(req: Request) {
   try {

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifySessionToken } from '@/lib/session';
 import { withMetrics } from '@/lib/metrics-middleware';
+import { piPlatformBase } from '@/lib/pi-platform';
 
 async function __POST(req: Request) {
   try {
@@ -27,7 +28,7 @@ async function __POST(req: Request) {
     }
 
     // ── 环境变量校验 ──────────────────────────────────────
-    const piApiBase = process.env.PI_PLATFORM_API_BASE || 'https://api.minepi.com';
+    const piApiBase = piPlatformBase();
     const apiKey = process.env.PI_API_KEY;
     if (!apiKey) {
       console.error('[Pi API] CRITICAL: Missing PI_API_KEY');
