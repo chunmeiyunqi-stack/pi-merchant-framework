@@ -66,6 +66,22 @@ function CheckoutContent() {
     setIsPiBrowser(typeof window !== 'undefined' && !!window.Pi);
   }, []);
 
+  // 若已有登录会话（例如首页已连接过 Pi），直接复用，避免在收银台二次认证
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data?.authenticated && data?.username) {
+          setPiUser({ uid: '', username: data.username });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // 如果从服务商城跳转（?serviceId=），拉取该服务并以其价格结算
   useEffect(() => {
     if (!serviceId) return;
@@ -110,7 +126,10 @@ function CheckoutContent() {
     try {
       await Pi.init({
         version: '2.0',
-        sandbox: process.env.NEXT_PUBLIC_PI_SANDBOX !== 'false',
+        sandbox:
+          process.env.NEXT_PUBLIC_PI_SANDBOX !== undefined
+            ? process.env.NEXT_PUBLIC_PI_SANDBOX === 'true'
+            : process.env.NODE_ENV !== 'production',
       });
     } catch {
       // 重复初始化在部分 SDK 版本会被忽略；失败不阻断后续流程
@@ -152,7 +171,14 @@ function CheckoutContent() {
         }),
       });
       if (!res.ok) {
-        setErrorMsg('服务端身份校验失败，请重试');
+        let detail = '请重试';
+        try {
+          const errBody = await res.json();
+          if (errBody?.error) detail = errBody.error;
+        } catch {
+          // 响应体不是 JSON 时忽略
+        }
+        setErrorMsg(`服务端身份校验失败：${detail}`);
         setStatus('failed');
         return null;
       }
@@ -167,6 +193,21 @@ function CheckoutContent() {
     }
   }, [getPi, handleIncompletePayment]);
 
+  // 仅重新建立支付授权（payments scope），不重复走 /api/auth/pi 服务端校验。
+  // Pi Browser 对已授权过的 scope 会静默返回，不会再次弹窗。
+  const ensurePaymentsScope = useCallback(
+    async (Pi: PiSDKLike): Promise<boolean> => {
+      try {
+        await Pi.authenticate(['username', 'payments'], handleIncompletePayment);
+        return true;
+      } catch (e) {
+        console.error('[Checkout] 支付授权失败:', e);
+        return false;
+      }
+    },
+    [handleIncompletePayment]
+  );
+
   const handlePay = useCallback(async () => {
     const Pi = getPi();
     if (!Pi) {
@@ -174,11 +215,17 @@ function CheckoutContent() {
       return;
     }
 
-    // 1. 若尚未登录，先完成 Pi 握手，成功后【直接】进入支付环节
-    let user = piUser;
-    if (!user) {
-      user = await handleAuth();
+    // 1. 尚未登录 → 完整握手（authenticate + 服务端校验）；已登录（首页已连接过）→ 只重建 payments scope
+    if (!piUser) {
+      const user = await handleAuth();
       if (!user) return;
+    } else {
+      const ok = await ensurePaymentsScope(Pi);
+      if (!ok) {
+        setErrorMsg('支付授权失败，请重试');
+        setStatus('failed');
+        return;
+      }
     }
 
     setStatus('processing');
@@ -272,7 +319,17 @@ function CheckoutContent() {
       setErrorMsg('支付唤起失败：' + (error instanceof Error ? error.message : '未知错误'));
       setStatus('failed');
     }
-  }, [getPi, piUser, handleAuth, product, planKey, serviceId, router, ensurePiInitialized]);
+  }, [
+    getPi,
+    piUser,
+    handleAuth,
+    ensurePaymentsScope,
+    product,
+    planKey,
+    serviceId,
+    router,
+    ensurePiInitialized,
+  ]);
 
   return (
     <div className="min-h-screen bg-pi-bg text-white flex items-center justify-center p-6">
@@ -286,30 +343,30 @@ function CheckoutContent() {
 
         <div className="relative overflow-hidden rounded-[2.5rem] border border-pi-line bg-pi-surface shadow-pi-card">
           <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-pi-violet/15 blur-[100px]" />
-          <div className="p-8 md:p-12 space-y-8 relative">
+          <div className="p-6 sm:p-8 md:p-12 space-y-8 relative">
             {/* 订单信息 */}
             <div className="space-y-4">
-              <div className="flex items-end justify-between">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0">
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-pi-muted">
                     Order Details
                   </p>
-                  <h3 className="text-xl font-bold text-white">
+                  <h3 className="break-words text-xl font-bold leading-snug text-white">
                     {productLoading ? '加载服务中…' : product.title}
                   </h3>
                 </div>
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <p className="text-3xl font-black text-pi-gold">π {product.amount.toFixed(2)}</p>
                 </div>
               </div>
               <div className="space-y-3 rounded-2xl border border-pi-line bg-white/[0.03] p-4">
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-pi-muted">结算方式</span>
-                  <span className="text-white">Pi 链上支付</span>
+                <div className="flex items-start justify-between gap-3 text-xs font-medium">
+                  <span className="shrink-0 text-pi-muted">结算方式</span>
+                  <span className="text-right text-white">Pi 链上支付</span>
                 </div>
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-pi-muted">安全保障</span>
-                  <span className="text-emerald-400">✓ 官方 SDK + 服务端审批</span>
+                <div className="flex items-start justify-between gap-3 text-xs font-medium">
+                  <span className="shrink-0 text-pi-muted">安全保障</span>
+                  <span className="text-right text-emerald-400">✓ 官方 SDK + 服务端审批</span>
                 </div>
               </div>
             </div>
@@ -349,7 +406,7 @@ function CheckoutContent() {
             </div>
 
             {errorMsg && (
-              <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-center text-sm text-rose-300">
+              <div className="break-words rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-center text-sm text-rose-300">
                 {errorMsg}
               </div>
             )}
