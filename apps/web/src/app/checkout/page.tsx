@@ -238,10 +238,27 @@ function CheckoutContent() {
       return;
     }
 
-    // 3. 客户端生成订单号：支付面板【不依赖】服务端订单创建结果，保证能正常唤起钱包
+    // 3. 支付预检：PI_API_KEY 无效/未配置时立即提示，避免进入钱包后空等 60 秒超时
+    try {
+      const statusRes = await fetch('/api/payments/status');
+      const statusData = (await statusRes.json()) as { status?: string };
+      if (statusData?.status !== 'ok') {
+        setErrorMsg(
+          statusData?.status === 'not_set'
+            ? '支付功能未配置：缺少 PI_API_KEY，请联系管理员配置'
+            : '支付功能未就绪：PI_API_KEY 无效，需要管理员在 Pi 开发者后台重新生成后配置'
+        );
+        setStatus('failed');
+        return;
+      }
+    } catch {
+      // 预检失败不阻断支付（继续尝试，审批环节仍会有明确报错）
+    }
+
+    // 4. 客户端生成订单号：支付面板【不依赖】服务端订单创建结果，保证能正常唤起钱包
     const orderNo = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // 4. 尽力创建服务端订单（后台异步，失败不阻断支付面板）
+    // 5. 尽力创建服务端订单（后台异步，失败不阻断支付面板）
     fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -256,7 +273,7 @@ function CheckoutContent() {
       console.warn('[Checkout] 服务端订单创建失败（不阻断支付）');
     });
 
-    // 5. 立即唤起 Pi 原生支付确认（确认支付验证环节）
+    // 6. 立即唤起 Pi 原生支付确认（确认支付验证环节）
     try {
       Pi.createPayment(
         {
