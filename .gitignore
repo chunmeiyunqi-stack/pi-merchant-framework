@@ -74,3 +74,5 @@ user_manual_*.html
 mock_screenshots.html
 advanced_syntax_fix.py
 generate_*.py
+keys/private_key.pem
+keys/
