@@ -51,9 +51,9 @@
     "typescript": "^5.4.0"
   },
   "engines": {
-    "node": "\u003e=18.0.0",
-    "pnpm": "\u003e=8.0.0"
-  },
+  "node": "24.x",
+  "pnpm": ">=8.0.0"
+},
   "packageManager": "pnpm@8.15.0",
   "prisma": {
     "seed": "tsx prisma/seed.ts"
