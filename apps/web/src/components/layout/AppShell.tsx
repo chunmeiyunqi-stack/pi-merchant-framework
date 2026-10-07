@@ -139,9 +139,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '';
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [piReady, setPiReady] = useState<boolean | null>(null);
+
+  // 移动端抽屉打开时：锁定背景滚动 + 支持 Esc 关闭
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
 
   // 拉取会话与 Pi 环境状态
   useEffect(() => {
@@ -178,17 +193,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // 导航跳转：移动端点击后关闭抽屉
+  const handleNavClick = (href: string) => {
+    setMobileOpen(false);
+    router.push(href);
+  };
+
   return (
     <div className="min-h-screen bg-pi-bg text-white flex">
       {/* ── 侧边导航 ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-pi-line bg-pi-bg/90 backdrop-blur-xl transition-all duration-300 ${
-          collapsed ? 'w-[76px]' : 'w-[264px]'
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col border-r border-pi-line bg-pi-bg/90 backdrop-blur-xl transition-all duration-300 ${
+          collapsed ? 'lg:w-[76px]' : 'lg:w-[264px]'
+        } ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
       >
         {/* 品牌区 */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-pi-line">
-          <Link href="/" className="flex items-center gap-3 overflow-hidden">
+          <Link
+            href="/"
+            onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-3 overflow-hidden"
+          >
             <div className="h-9 w-9 shrink-0 rounded-xl bg-pi-brand p-[1.5px] shadow-pi-glow">
               <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-pi-bg text-lg font-black text-pi-gold">
                 π
@@ -206,7 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => setCollapsed((c) => !c)}
             aria-label="折叠导航"
-            className="hidden rounded-lg p-1.5 text-pi-muted transition-colors hover:bg-white/5 hover:text-white sm:block"
+            className="hidden rounded-lg p-1.5 text-pi-muted transition-colors hover:bg-white/5 hover:text-white lg:block"
           >
             <svg
               className="h-4 w-4"
@@ -239,7 +264,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   return (
                     <button
                       key={item.href}
-                      onClick={() => router.push(item.href)}
+                      onClick={() => handleNavClick(item.href)}
                       title={collapsed ? item.label : undefined}
                       className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                         active
@@ -279,13 +304,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       </aside>
 
+      {/* ── 移动端抽屉遮罩 ── */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+          className="fixed inset-0 z-[35] bg-black/60 backdrop-blur-sm transition-opacity lg:hidden"
+        />
+      )}
+
       {/* ── 主内容 ── */}
       <div
-        className={`flex min-h-screen flex-1 flex-col transition-all duration-300 ${collapsed ? 'pl-[76px]' : 'pl-[264px]'}`}
+        className={`flex min-h-screen flex-1 flex-col transition-all duration-300 ${collapsed ? 'lg:pl-[76px]' : 'lg:pl-[264px]'}`}
       >
         {/* 顶栏 */}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-pi-line bg-pi-bg/70 px-5 backdrop-blur-xl sm:px-8">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-pi-line bg-pi-bg/70 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
+            {/* 移动端汉堡按钮 */}
+            <button
+              onClick={() => setMobileOpen(true)}
+              aria-label="打开导航菜单"
+              className="rounded-lg p-1.5 text-pi-muted transition-colors hover:bg-white/5 hover:text-white lg:hidden"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <h1 className="text-base font-bold text-white sm:text-lg">{title}</h1>
             <span className="hidden text-xs text-pi-muted sm:inline">/ Pi Merchant Framework</span>
           </div>
@@ -363,7 +413,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* 内容区 */}
-        <main className="flex-1 px-5 py-6 sm:px-8">{children}</main>
+        <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</main>
       </div>
     </div>
   );
