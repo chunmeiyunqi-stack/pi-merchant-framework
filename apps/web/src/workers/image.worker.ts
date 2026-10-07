@@ -17,8 +17,9 @@ const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379'
   enableOfflineQueue: false,
 });
 
-// Type alias for Prisma dynamic access
-type AnyPrisma = typeof prisma & { generationHistory: { create: Function; update: Function } };
+// Type alias for Prisma dynamic access - Prisma Client may not have generated yet
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPrisma = typeof prisma & { generationHistory: any };
 
 interface DallEResponse {
   created: number;
@@ -133,7 +134,7 @@ export const imageWorker = new Worker<ImageGenerationJobData, ImageGenerationJob
             .catch(() => {});
         }
 
-        // 429/功屋译发批次重复过期生成重复
+        // 429/服务端错误交由批次重试，避免重复生成
         if (openaiResponse.status === 429 || openaiResponse.status >= 500) {
           throw new Error(errorMessage);
         }

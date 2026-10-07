@@ -1,7 +1,8 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { fetchWithPiAuth, storePiAuthToken } from '@/lib/apiClient';
 
 interface PiAuthResult {
   accessToken: string;
@@ -61,6 +62,8 @@ function CheckoutContent() {
     return { ...base };
   });
   const [productLoading, setProductLoading] = useState(!!serviceId);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const autoPayTriggered = useRef(false);
 
   useEffect(() => {
     setIsPiBrowser(typeof window !== 'undefined' && !!window.Pi);
@@ -76,7 +79,10 @@ function CheckoutContent() {
           setPiUser({ uid: '', username: data.username });
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSessionChecked(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -117,18 +123,23 @@ function CheckoutContent() {
   // 而 Pi.authenticate 走 ensureInitialized()（会等待 init）。为避免在首次点击时
   // 出现 "SDK not initialized" 竞态，这里显式 await layout 内联脚本存下的 init Promise。
   const ensurePiInitialized = useCallback(async (Pi: PiSDKLike) => {
+    // 给 init 等待加超时兜底，避免 SDK 初始化 Promise 长期 pending 导致页面无限卡住
+    const timeout = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
     const stored = (window as any).__piInitPromise as Promise<void> | undefined;
     if (stored && typeof stored.then === 'function') {
-      await stored;
+      await Promise.race([stored, timeout(8000)]);
       return;
     }
     // 兜底：layout 内联脚本未执行（例如历史页面缓存）时，在此再初始化一次
     try {
-      await Pi.init({
-        version: '2.0',
-        sandbox:
-          process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_PI_SANDBOX !== 'false',
-      });
+      await Promise.race([
+        Pi.init({
+          version: '2.0',
+          sandbox:
+            process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_PI_SANDBOX !== 'false',
+        }),
+        timeout(8000),
+      ]);
     } catch {
       // 重复初始化在部分 SDK 版本会被忽略；失败不阻断后续流程
     }
@@ -137,7 +148,7 @@ function CheckoutContent() {
   // 处理 Pi.authenticate 发现的上次未完成支付
   const handleIncompletePayment = useCallback(async (payment: PiPayment) => {
     if (payment.transaction?.txid) {
-      await fetch('/api/payments/complete', {
+      await fetchWithPiAuth('/api/payments/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,6 +191,10 @@ function CheckoutContent() {
         setStatus('failed');
         return null;
       }
+      const authData = await res.json();
+      if (authData?.token) {
+        storePiAuthToken(authData.token);
+      }
       setPiUser(auth.user);
       setStatus('idle');
       return auth.user;
@@ -191,21 +206,6 @@ function CheckoutContent() {
     }
   }, [getPi, handleIncompletePayment]);
 
-  // 仅重新建立支付授权（payments scope），不重复走 /api/auth/pi 服务端校验。
-  // Pi Browser 对已授权过的 scope 会静默返回，不会再次弹窗。
-  const ensurePaymentsScope = useCallback(
-    async (Pi: PiSDKLike): Promise<boolean> => {
-      try {
-        await Pi.authenticate(['username', 'payments'], handleIncompletePayment);
-        return true;
-      } catch (e) {
-        console.error('[Checkout] 支付授权失败:', e);
-        return false;
-      }
-    },
-    [handleIncompletePayment]
-  );
-
   const handlePay = useCallback(async () => {
     const Pi = getPi();
     if (!Pi) {
@@ -213,17 +213,11 @@ function CheckoutContent() {
       return;
     }
 
-    // 1. 尚未登录 → 完整握手（authenticate + 服务端校验）；已登录（首页已连接过）→ 只重建 payments scope
+    // 1. 尚未登录 → 完整握手（authenticate + 服务端校验，已含 payments scope）
+    //    已登录（身份已确认）→ 直接进入钱包，不再二次 authenticate 确认
     if (!piUser) {
       const user = await handleAuth();
       if (!user) return;
-    } else {
-      const ok = await ensurePaymentsScope(Pi);
-      if (!ok) {
-        setErrorMsg('支付授权失败，请重试');
-        setStatus('failed');
-        return;
-      }
     }
 
     setStatus('processing');
@@ -259,7 +253,7 @@ function CheckoutContent() {
     const orderNo = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     // 5. 尽力创建服务端订单（后台异步，失败不阻断支付面板）
-    fetch('/api/orders', {
+    fetchWithPiAuth('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -288,7 +282,7 @@ function CheckoutContent() {
         {
           onReadyForServerApproval: async (paymentId: string) => {
             try {
-              const res = await fetch('/api/payments/approve', {
+              const res = await fetchWithPiAuth('/api/payments/approve', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paymentId, orderId: orderNo }),
@@ -312,7 +306,7 @@ function CheckoutContent() {
           },
           onReadyForServerCompletion: async (paymentId: string, txid: string) => {
             try {
-              const res = await fetch('/api/payments/complete', {
+              const res = await fetchWithPiAuth('/api/payments/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paymentId, txid }),
@@ -346,17 +340,16 @@ function CheckoutContent() {
       setErrorMsg('支付唤起失败：' + (error instanceof Error ? error.message : '未知错误'));
       setStatus('failed');
     }
-  }, [
-    getPi,
-    piUser,
-    handleAuth,
-    ensurePaymentsScope,
-    product,
-    planKey,
-    serviceId,
-    router,
-    ensurePiInitialized,
-  ]);
+  }, [getPi, piUser, handleAuth, product, planKey, serviceId, router, ensurePiInitialized]);
+
+  // 点击订阅进入后自动「直连钱包」：Pi Browser 就绪、产品加载完成、会话检查完成后，
+  // 自动唤起支付流程（已登录直接进钱包；未登录自动弹身份确认）。取消/失败后仍可点按钮重试。
+  useEffect(() => {
+    if (!isPiBrowser || productLoading || !sessionChecked) return;
+    if (autoPayTriggered.current) return;
+    autoPayTriggered.current = true;
+    handlePay();
+  }, [isPiBrowser, productLoading, sessionChecked, handlePay]);
 
   return (
     <div className="min-h-screen bg-pi-bg text-white flex items-center justify-center p-6">
